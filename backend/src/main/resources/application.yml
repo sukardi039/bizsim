@@ -1,0 +1,29 @@
+server:
+  port: ${BIZSIM_PORT:8080}
+  error:
+    include-message: always
+
+spring:
+  application:
+    name: bizsim
+  datasource:
+    url: ${BIZSIM_DB_URL:jdbc:postgresql://localhost:5433/bizsim}
+    username: ${BIZSIM_DB_USER:bizsim}
+    password: ${BIZSIM_DB_PASSWORD:bizsim}
+    hikari:
+      maximum-pool-size: ${BIZSIM_DB_POOL:10}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    default-property-inclusion: non_null
+
+bizsim:
+  jwt:
+    # Must be >= 32 bytes. Override everywhere except a developer laptop.
+    secret: ${BIZSIM_JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+    ttl: PT8H
+
+logging:
+  level:
+    com.bizsim: INFO

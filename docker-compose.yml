@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: bizsim
+      POSTGRES_USER: bizsim
+      POSTGRES_PASSWORD: bizsim
+    ports:
+      - "5433:5432"
+    volumes:
+      - bizsim-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bizsim -d bizsim"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  bizsim-db:
