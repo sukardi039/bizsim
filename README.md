@@ -62,6 +62,10 @@ caller cannot map the API.
 
 ## Status
 
-S0 complete: schema baseline, tenant-scoped auth, CI. S1 adds the scenario loader, run/team/player
-management and the round state machine. See `docs/DECISIONS.md` and the delivery plan in
-`~/.hermes/plans/2026-11-01_management-simulation-v1-delivery-plan.md`.
+S0 complete: schema baseline, tenant-scoped auth, CI.
+S1 complete: run/team/player management, round state machine (open → close → advance), 16 tests.
+
+S2 (decisions, scoring, results) is blocked on the six domain answers in the delivery plan §7 —
+specifically: what a team decides per round, the market model, and the KPI set. Those are product
+facts, not design choices. `ScoringStrategy` is the first S2 task and it gets no formula until those
+answers land.
