@@ -82,6 +82,17 @@ Opening it from another machine: the console binds to all interfaces, so use the
 (`http://<host>:5173`) or, if the port is not exposed, tunnel it —
 `ssh -L 5173:localhost:5173 <user>@<host>` and then open `http://localhost:5173`.
 
+**Single port instead.** Build the console and start the backend with the directory; it then serves
+the UI at `/` on the same port as the API — no second server, no proxy, no CORS:
+
+```bash
+cd web && npm run build && cd ..
+BIZSIM_WEB_DIR=$PWD/web/dist BIZSIM_PORT=8080 mvn -f backend/pom.xml spring-boot:run -Dspring-boot.run.profiles=dev
+# or: java -jar backend/target/bizsim-backend-*.jar --spring.profiles.active=dev --bizsim.web.dir=$PWD/web/dist
+```
+
+If the directory does not exist, the backend runs API-only and behaves exactly as before.
+
 Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
 then drive the session with **Open next round** and **Compute round**. The scoreboard refreshes from a
 server-sent event stream, so a second browser on the same run sees the same round land within a

@@ -32,6 +32,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI();
+        // The built console is public by nature; everything it calls lives under /api and is guarded.
+        if (!path.startsWith("/api/")) {
+            return true;
+        }
         // The event stream authenticates with a single-use ticket in the query string instead of a
         // header, because EventSource cannot set headers (see RunStreamController).
         return path.equals("/api/auth/login")

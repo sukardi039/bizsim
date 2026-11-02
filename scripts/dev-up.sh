@@ -42,6 +42,7 @@ grep -q EMBEDDED_PG_READY "$RUN_DIR/db.log" || { echo "database did not start:";
 echo "==> starting the application on ${PORT_APP} (profile dev)"
 BIZSIM_PORT="$PORT_APP" BIZSIM_DB_URL="$DB_URL" BIZSIM_DB_USER="$DB_USER" \
   java -jar target/bizsim-backend-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev \
+  --bizsim.web.dir="$ROOT/web/dist" \
   > "$RUN_DIR/app.log" 2>&1 &
 echo $! > "$RUN_DIR/app.pid"
 
