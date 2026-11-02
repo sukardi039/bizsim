@@ -132,7 +132,10 @@ function Login({ onDone }: { onDone: () => void }) {
 export default function App() {
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
   const [runs, setRuns] = useState<Run[]>([]);
-  const [selected, setSelected] = useState<Run | null>(null);
+  // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
+  // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const selected = runs.find((run) => run.id === selectedId) ?? null;
   const [board, setBoard] = useState<ScoreRow[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
@@ -143,16 +146,11 @@ export default function App() {
 
   const refreshRuns = useCallback(async () => {
     try {
-      const list = await api.runs();
-      setRuns(list);
-      if (selected) {
-        const fresh = list.find((run) => run.id === selected.id);
-        if (fresh) setSelected(fresh);
-      }
+      setRuns(await api.runs());
     } catch (error) {
       setProblem(errorText(error));
     }
-  }, [selected]);
+  }, []);
 
   const refreshBoard = useCallback(async (runId: number) => {
     try {
@@ -167,8 +165,8 @@ export default function App() {
   }, [signedIn, refreshRuns]);
 
   useEffect(() => {
-    if (selected) void refreshBoard(selected.id);
-  }, [selected, refreshBoard]);
+    if (selectedId !== null) void refreshBoard(selectedId);
+  }, [selectedId, refreshBoard]);
 
   const note = useCallback((type: string, data: any) => {
     const text =
@@ -182,11 +180,11 @@ export default function App() {
     setFeed((items) => [{ id: Date.now() + Math.random(), type, text, at: new Date().toLocaleTimeString() }, ...items].slice(0, 40));
     if (type === "round.closed" || type === "round.opened") {
       void refreshRuns();
-      if (selected) void refreshBoard(selected.id);
+      if (selectedId !== null) void refreshBoard(selectedId);
     }
-  }, [refreshRuns, refreshBoard, selected]);
+  }, [refreshRuns, refreshBoard, selectedId]);
 
-  useRunStream(selected?.id ?? null, note);
+  useRunStream(selectedId, note);
 
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -194,7 +192,7 @@ export default function App() {
     try {
       const teamNames = Array.from({ length: teamCount }, (_, i) => `Company ${i + 1}`);
       const run = await api.createRun(name, "standard-v1", teamNames, cycles);
-      setSelected(run);
+      setSelectedId(run.id);
       await refreshRuns();
     } catch (error) {
       setProblem(errorText(error));
@@ -261,7 +259,7 @@ export default function App() {
         <ul className="runs">
           {runs.map((run) => (
             <li key={run.id} className={selected?.id === run.id ? "active" : ""}>
-              <button className="link" onClick={() => setSelected(run)}>
+              <button className="link" onClick={() => setSelectedId(run.id)}>
                 <span>{run.id} · {run.teams.length} companies</span>
                 <small>
                   {run.status} · round {run.currentRound}/{run.rounds}
