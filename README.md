@@ -97,7 +97,7 @@ S1 complete: run/company/player management, round state machine.
   facilitator or by its own clock, and closing twice computes nothing twice.
   Scenario #1 is provisional and calibrated in `docs/SCENARIO_CALIBRATION.md` — the discount
   strategy wins share and loses profit, which is the lesson D14 asked for.
-  54 tests, all against real PostgreSQL.
+  56 tests, all against real PostgreSQL.
 
 Next: S3 STOMP push + facilitator console, S4 decision form, S5 debrief export.
 

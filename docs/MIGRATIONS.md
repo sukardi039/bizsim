@@ -27,7 +27,34 @@ placeholder, V3 simulation model, V4 R&D curves.
 
 ---
 
-## 2. Failure → cause → fix
+## 2. Half-applied changes: why they cannot happen here
+
+This is the one that usually makes people hate migration tools, and it is a property of the database,
+not of Flyway. MySQL commits DDL immediately: a file that fails on statement 4 of 5 leaves statements
+1-3 applied, plus a failed row in the history table that someone must clean up by hand.
+
+PostgreSQL commits DDL the same way it commits DML, so Flyway wraps each migration file in a single
+transaction. The file applies completely, or none of it applies: no table, no column, no index, no
+row, no history entry.
+
+`MigrationSafetyTest` proves this with a deliberately broken five-statement file (create table,
+insert a row, add a column, create an index, then a syntax error). Afterwards the schema
+fingerprint - every column, index and constraint in `public` - is identical to before the attempt,
+and there is no failed row in `flyway_schema_history`.
+
+Three ways the guarantee can still be lost, and what stops each:
+
+| Way | What happens | Guard |
+|---|---|---|
+| A statement PostgreSQL cannot run in a transaction: `create index concurrently`, `vacuum`, `create database`, `alter system`, `reindex concurrently`, tablespace DDL | Flyway switches that file to autocommit, so a later failure leaves earlier statements applied | the lint test requires `-- migration:allow-non-transactional` and therefore a human documenting the recovery plan |
+| Several files in one release, and the third one fails | Files 1 and 2 stay applied - correct, each was atomic, but it looks "half applied" | one concern per file; `flyway:info` shows exactly where it stopped; deploying again resumes at the failed version |
+| SQL run outside Flyway (`psql`, a script, a "quick fix") | the schema stops matching the folder, and the next boot fails validation | rule 1 and the anti-pattern table |
+
+If you inherit a database that already contains a half-applied change, `flyway:repair` will not fix
+the schema - it only rewrites bookkeeping. Reconcile the schema by hand, check it against the
+migration files, then baseline at the version that matches.
+
+## 3. Failure → cause → fix
 
 | What you see at startup | What happened | What to do |
 |---|---|---|
@@ -42,7 +69,7 @@ placeholder, V3 simulation model, V4 R&D curves.
 
 ---
 
-## 3. Commands
+## 4. Commands
 
 The Maven plugin is pinned to the same Flyway version the application runs, so `info` from your
 laptop and `migrate` in production give the same answer.
@@ -64,7 +91,7 @@ loud.
 
 ---
 
-## 4. What we do not do
+## 5. What we do not do
 
 | Not used | Why |
 |---|---|
@@ -77,7 +104,7 @@ loud.
 
 ---
 
-## 5. What the tests enforce
+## 6. What the tests enforce
 
 Run by CI on every pull request (`mvn -B verify`), not by review discipline:
 
@@ -88,12 +115,17 @@ Run by CI on every pull request (`mvn -B verify`), not by review discipline:
   (`MigrationSafetyTest`).
 - **A broken migration rolls back completely** — table gone, no history row, previous schema still
   valid (`MigrationSafetyTest`, using a deliberately broken fixture in `src/test/resources`).
+- **A multi-statement file that fails mid-way changes nothing** — a five-statement fixture is
+  applied, fails on the last statement, and the full schema fingerprint (columns, indexes,
+  constraints) is asserted identical to before (`MigrationSafetyTest`).
+- **Non-transactional statements are refused without an allowance marker** — one
+  `create index concurrently` is enough to lose atomicity (`MigrationNamingTest`).
 - **An empty database gets the whole schema** on startup, including the shipped scenario
   (`SchemaCreationTest`).
 
 ---
 
-## 6. Adding a migration
+## 7. Adding a migration
 
 1. `git pull` — take the highest existing number, add one. Re-check right before merging; a rebase
    that brings in someone else's V5 means you renumber.

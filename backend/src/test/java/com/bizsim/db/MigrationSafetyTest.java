@@ -11,6 +11,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -70,7 +72,67 @@ class MigrationSafetyTest extends PostgresTestBase {
                 .locations("classpath:db/migration").load().validate();
     }
 
+    /**
+     * The exact scenario that made a previous life miserable: a file that creates a table, writes a
+     * row, alters another table, indexes it, and only then hits a syntax error. Afterwards the
+     * database must be byte-for-byte the same shape as before the attempt.
+     */
+    @Test
+    void a_multi_statement_migration_that_fails_mid_file_changes_nothing() throws Exception {
+        String url = freshDatabase();
+        Flyway.configure().dataSource(url, USER, USER)
+                .locations("classpath:db/migration").load().migrate();
+        List<String> before = fingerprint(url);
+
+        Flyway halfApplied = Flyway.configure().dataSource(url, USER, USER)
+                .locations("classpath:db/migration", "classpath:db/halfapplied").load();
+
+        assertThatThrownBy(halfApplied::migrate).isInstanceOf(FlywayException.class);
+
+        assertThat(fingerprint(url))
+                .as("columns, indexes and constraints after a failed migration")
+                .isEqualTo(before);
+
+        try (Connection connection = DriverManager.getConnection(url, USER, USER)) {
+            assertThat(exists(connection,
+                    "select to_regclass('public.half_applied_probe') is not null"))
+                    .as("table created by the first statement").isFalse();
+            assertThat(exists(connection, "select exists (select 1 from information_schema.columns "
+                    + "where table_name = 'team' and column_name = 'half_applied_probe')"))
+                    .as("column added by the third statement").isFalse();
+            assertThat(exists(connection, "select exists (select 1 from pg_indexes "
+                    + "where indexname = 'half_applied_probe_idx')"))
+                    .as("index created by the fourth statement").isFalse();
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    /** Columns, indexes and constraints: everything a half-applied file would have changed. */
+    private List<String> fingerprint(String url) throws Exception {
+        List<String> shape = new ArrayList<>();
+        try (Connection connection = DriverManager.getConnection(url, USER, USER)) {
+            shape.addAll(values(connection, "select table_name || '.' || column_name || ' ' "
+                    + "|| data_type || ' null=' || is_nullable from information_schema.columns "
+                    + "where table_schema = 'public' order by 1"));
+            shape.addAll(values(connection,
+                    "select indexname from pg_indexes where schemaname = 'public' order by 1"));
+            shape.addAll(values(connection,
+                    "select conname from pg_constraint where connamespace = 'public'::regnamespace order by 1"));
+        }
+        return shape;
+    }
+
+    private static List<String> values(Connection connection, String sql) throws Exception {
+        List<String> result = new ArrayList<>();
+        try (Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery(sql)) {
+            while (rows.next()) {
+                result.add(rows.getString(1));
+            }
+        }
+        return result;
+    }
 
     /** A brand-new empty database, created the same way production creates one. */
     private String freshDatabase() {

@@ -34,6 +34,19 @@ class MigrationNamingTest {
     private static final Pattern DESTRUCTIVE = Pattern.compile("(?i)\\b(drop\\s+table|truncate\\s+table)\\b");
     private static final String ALLOWANCE = "-- migration:allow-destructive";
 
+    /**
+     * Statements PostgreSQL refuses to run inside a transaction block. A migration containing one
+     * runs in autocommit mode, which is exactly how a half-applied change becomes possible.
+     */
+    private static final Pattern NON_TRANSACTIONAL = Pattern.compile(
+            "(?im)^\\s*vacuum\\b"
+                    + "|create\\s+(unique\\s+)?index\\s+concurrently"
+                    + "|reindex\\b.*concurrently"
+                    + "|create\\s+database|drop\\s+database"
+                    + "|create\\s+tablespace|drop\\s+tablespace"
+                    + "|alter\\s+system");
+    private static final String NON_TRANSACTIONAL_ALLOWANCE = "-- migration:allow-non-transactional";
+
     @Test
     void versions_are_contiguous_and_named_by_convention() {
         List<String> names = files();
@@ -62,6 +75,25 @@ class MigrationNamingTest {
                 assertThat(sql)
                         .as("%s drops or truncates a table; add %s and say why in a comment", name, ALLOWANCE)
                         .contains(ALLOWANCE);
+            }
+        }
+    }
+
+    /**
+     * This is the guard that keeps the "a migration either applies completely or not at all"
+     * guarantee true. One `create index concurrently` in a file is enough to lose it, because
+     * PostgreSQL cannot run that statement inside a transaction.
+     */
+    @Test
+    void statements_that_cannot_run_in_a_transaction_need_an_allowance() {
+        for (String name : files()) {
+            String sql = read(name);
+            if (NON_TRANSACTIONAL.matcher(sql).find()) {
+                assertThat(sql)
+                        .as("%s contains a statement PostgreSQL cannot run in a transaction, so the "
+                                + "file is no longer atomic; add %s and document the recovery plan",
+                                name, NON_TRANSACTIONAL_ALLOWANCE)
+                        .contains(NON_TRANSACTIONAL_ALLOWANCE);
             }
         }
     }
