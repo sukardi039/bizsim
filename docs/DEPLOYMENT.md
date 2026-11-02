@@ -40,7 +40,10 @@ containers read, so no credential is ever written into a tracked file.
 | `BIZSIM_DB_PASSWORD` | the same value as `POSTGRES_PASSWORD` | |
 | `BIZSIM_JWT_SECRET` | output of `openssl rand -base64 48` | **must be ≥ 32 bytes**; the app refuses to start otherwise |
 | `BIZSIM_DB_URL` | set by compose to `jdbc:postgresql://db:5432/bizsim` | no need to set it by hand |
-| `SPRING_PROFILES_ACTIVE` | `seed` | pilot only — creates the demo tenant and accounts |
+| `SPRING_PROFILES_ACTIVE` | leave unset | `seed` is a development convenience, not a deployment switch |
+| `BIZSIM_BOOTSTRAP_TENANT` | your tenant code, e.g. `demo` | creates the tenant if missing |
+| `BIZSIM_BOOTSTRAP_EMAIL` | the facilitator's email | creates that account if missing |
+| `BIZSIM_BOOTSTRAP_ADMIN_SECRET` | a credential of 8+ characters | initial login; remove all three after signing in |
 
 ### Frontend → backend
 

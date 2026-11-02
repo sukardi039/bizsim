@@ -46,7 +46,9 @@ public class DevSeeder implements CommandLineRunner {
         seedUser(tenantId, "trainer@demo.test", "Trainer", "FACILITATOR");
         seedUser(tenantId, "player@demo.test", "Player One", "PLAYER");
 
-        log.info("dev seed: tenant '{}' with 3 users, password '{}'", TENANT_CODE, DEMO_PASSWORD);
+        // The credential is documented in the README; writing it into the log of a deployed pilot
+        // would hand it to anyone with log access.
+        log.info("dev seed: tenant '{}' with 3 users (pilot credential is in the README)", TENANT_CODE);
     }
 
     private void seedUser(long tenantId, String email, String name, String role) {
