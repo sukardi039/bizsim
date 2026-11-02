@@ -16,6 +16,7 @@ backend/                  Spring Boot 3.3, Java 21
   src/main/resources/db/migration/   Flyway migrations (V1 = ten core tables)
 web/                      React 19 + TypeScript + Vite (sprint S3 onward)
 docs/DECISIONS.md         the rulings the code must obey
+docs/MIGRATIONS.md        schema rules, failure runbook, manual CLI commands
 ```
 
 ## Run it

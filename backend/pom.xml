@@ -106,6 +106,32 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <!-- Same Flyway version Spring Boot runs at startup, used for the manual operations a deploy
+           sometimes needs: info, validate, repair, baseline. Normal development never calls it.
+           Pass -Dflyway.url/-Dflyway.user/-Dflyway.password, or export the BIZSIM_DB_* variables. -->
+      <plugin>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-maven-plugin</artifactId>
+        <version>${flyway.version}</version>
+        <configuration>
+          <url>${env.BIZSIM_DB_URL}</url>
+          <user>${env.BIZSIM_DB_USER}</user>
+          <password>${env.BIZSIM_DB_PASSWORD}</password>
+          <locations>
+            <location>classpath:db/migration</location>
+          </locations>
+          <!-- The application already refuses to clean; the CLI must refuse too, or "no clean" is
+               only true on the server. Cleaning a schema is a human act on a named database. -->
+          <cleanDisabled>true</cleanDisabled>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>${flyway.version}</version>
+          </dependency>
+        </dependencies>
+      </plugin>
     </plugins>
   </build>
 </project>

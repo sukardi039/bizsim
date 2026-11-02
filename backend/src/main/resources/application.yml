@@ -15,6 +15,20 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+    # Fail the boot if an applied migration no longer matches its checksum. That error is the only
+    # thing standing between "the file says one thing" and "production already ran another".
+    validate-on-migrate: true
+    # Two branches both adding V5 must be resolved before merge, not applied in arrival order.
+    out-of-order: false
+    # `clean` drops every table. It must never be reachable from an application startup.
+    clean-disabled: true
+    # Attaching an existing database is a deliberate act (docs/MIGRATIONS.md), never implicit.
+    baseline-on-migrate: false
+    # Five instances starting at once: one migrates, the others wait instead of failing.
+    lock-retry-count: 60
+    # A database still coming up (compose, Kubernetes) gets retries, not a crash loop.
+    connect-retries: 10
+    connect-retries-interval: 5s
   jackson:
     default-property-inclusion: non_null
     deserialization:

@@ -1,6 +1,7 @@
 package com.bizsim.db;
 
 import com.bizsim.support.PostgresTestBase;
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,6 +20,22 @@ class SchemaCreationTest extends PostgresTestBase {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private Flyway flyway;
+
+    /**
+     * Guards the settings themselves: a resource file change could quietly re-enable clean or
+     * out-of-order, and both are the kind of mistake that only shows up in production.
+     */
+    @Test
+    void flyway_is_configured_the_safe_way() {
+        assertThat(flyway).isNotNull();
+        assertThat(flyway.getConfiguration().isCleanDisabled()).isTrue();
+        assertThat(flyway.getConfiguration().isValidateOnMigrate()).isTrue();
+        assertThat(flyway.getConfiguration().isOutOfOrder()).isFalse();
+        assertThat(flyway.getConfiguration().isBaselineOnMigrate()).isFalse();
+    }
 
     @Test
     void flyway_creates_the_whole_schema_on_a_fresh_database() {
