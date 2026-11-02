@@ -5,7 +5,8 @@ question. If you accept my recommendation, write `default` — that is enough. L
 I will use the recommendation anyway and mark it as *assumed* in `DECISIONS.md`.
 
 Questions come from `docs/SIMULATION_MODEL.md` §11. Rulings D1–D7 are already locked in
-`docs/DECISIONS.md`; these six are the remainder.
+`docs/DECISIONS.md`; these are the remainder. Q-G and Q-H came in from the retired worksheet, Q-I
+is the one lesson question the old worked example was really asking.
 
 ---
 
@@ -84,6 +85,68 @@ Rounds per session (default 8):
 Minutes per round:
 Total time available:
 Round clock visible to players? (yes/no):
+```
+
+---
+
+## Q-G. Facilitator powers (moved here from the retired worksheet Q5)
+
+Each power is a test case; each one added later also costs a console screen.
+
+| Power | v1 |
+|---|---|
+| Open / close a round, advance | ✓ |
+| Pause the round clock, extend time | ✓ |
+| Inject a scenario event (cost shock, demand spike, competitor move) | ✓ |
+| Adjust a company's cash, with a mandatory reason note, audited | ✓ |
+| Void and recompute the last round | ✓ |
+| View every company's submitted decisions while a round is open | ✓ |
+| Edit a company's decision after submission | ✗ |
+| Hand-edit a score | ✗ — breaks "server computes, deterministically" |
+
+**Recommendation: keep the six ✓, keep both ✗.** This blocks S3, not S2.
+
+```
+Answer (keep all / drop X / add Y):
+```
+
+---
+
+## Q-H. KPI set for the scoreboard and the debrief (moved from worksheet Q3)
+
+| # | KPI | On the slide? |
+|---|---|---|
+| 1 | Net profit — this month and cumulative | yes |
+| 2 | Market share (% of units sold) | yes |
+| 3 | Cash balance | yes |
+| 4 | Brand (0–100) | yes |
+| 5 | Stock on hand | yes |
+| 6 | Capacity utilisation | yes |
+| 7 | Lost sales (units and %) | page 2 |
+| 8 | R&D completed / tech index | page 2 |
+
+**Recommendation: all eight, six on the slide.** Six is the practical maximum before a slide stops
+being readable. Items 7 and 8 are the two that explain *why* profit moved.
+
+```
+Answer (all eight / drop # / add):
+```
+
+---
+
+## Q-I. Does "the cheapest company loses" match the lesson you want to teach?
+
+This sets the price elasticity in the demand formula (§5.2). It is one number, but it decides what
+the whole game rewards.
+
+- If **yes** → price matters, but quality/brand/availability can beat a 10% discount. The trainee
+  learns that undercutting without a supporting story destroys margin.
+- If **no, cheapest should win** → price elasticity goes high and the game becomes a price war.
+- If **don't know yet** → I use the recommendation and the exponent stays scenario data, so you can
+  change it without code after the first pilot.
+
+```
+Answer (yes / cheapest-wins / tune later):
 ```
 
 ---
