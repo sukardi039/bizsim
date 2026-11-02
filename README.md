@@ -24,11 +24,23 @@ Requires JDK 21 and Maven. The backend needs PostgreSQL; a throwaway one is in
 `docker-compose.yml` (port 5433).
 
 ```bash
-docker compose up -d db
+docker compose up -d db          # optional: a local PostgreSQL on 5433
 cd backend
-mvn spring-boot:run          # Flyway migrates on start
+mvn spring-boot:run              # creates the database if missing, then migrates the schema
 curl -s localhost:8080/api/ping
 ```
+
+Starting the backend is all that is needed to get a working schema:
+
+1. **Database** — if the database in `BIZSIM_DB_URL` does not exist, it is created on startup
+   (`DatabaseBootstrap`, connects to the `postgres` maintenance database). Set
+   `BIZSIM_DB_CREATE=false` where the application role has no `CREATEDB` right.
+2. **Schema** — Flyway applies `db/migration/V*.sql` in order on every startup and records what it
+   applied in `flyway_schema_history`. On an existing database it applies only what is new; on a
+   fresh one it creates every table, index and constraint.
+3. **Data** — lives in PostgreSQL, not in the application. Restarting the backend never recreates or
+   empties a table. There is no `ddl-auto`: the schema only changes through a reviewed migration, so
+   a deploy cannot silently alter a table that holds a class's history.
 
 Configuration is environment-only:
 
@@ -36,6 +48,7 @@ Configuration is environment-only:
 |---|---|---|
 | `BIZSIM_DB_URL` | JDBC URL | `jdbc:postgresql://localhost:5433/bizsim` |
 | `BIZSIM_DB_USER` / `BIZSIM_DB_PASSWORD` | credentials | `bizsim` / `bizsim` |
+| `BIZSIM_DB_CREATE` | create the empty database on first start | `true` |
 | `BIZSIM_JWT_SECRET` | HMAC key, **≥ 32 bytes** | dev-only value, refuses to start if short |
 | `BIZSIM_PORT` | HTTP port | `8080` |
 
