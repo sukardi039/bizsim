@@ -1,6 +1,9 @@
 /** Thin typed wrapper over the REST API. The token lives in localStorage, not in a URL. */
 
-const BASE = "/api";
+// Empty by default: the console calls its own origin and nginx forwards /api to the backend.
+// Set VITE_API_BASE_URL at build time only when the API lives on another origin.
+const ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
+const BASE = ORIGIN + "/api";
 const STORAGE = "bizsim.session";
 
 export class ApiError extends Error {
@@ -14,6 +17,10 @@ export class ApiError extends Error {
     if (Array.isArray(this.body?.problems)) return this.body.problems;
     return [];
   }
+}
+
+export function eventStreamUrl(runId: number, ticket: string): string {
+  return `${BASE}/runs/${runId}/events?ticket=${encodeURIComponent(ticket)}`;
 }
 
 export function getToken(): string {

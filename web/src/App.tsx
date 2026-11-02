@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, ApiError, clearToken, getToken, setToken, type Run, type ScoreRow } from "./api";
+import {
+  api,
+  ApiError,
+  clearToken,
+  eventStreamUrl,
+  getToken,
+  setToken,
+  type Run,
+  type ScoreRow,
+} from "./api";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -39,7 +48,7 @@ function useRunStream(runId: number | null, onEvent: (type: string, data: any) =
       try {
         const { ticket } = await api.streamTicket(runId);
         if (stopped) return;
-        source = new EventSource(`/api/runs/${runId}/events?ticket=${encodeURIComponent(ticket)}`);
+        source = new EventSource(eventStreamUrl(runId, ticket));
         for (const name of ["connected", "round.opened", "round.closed", "decision.submitted"]) {
           source.addEventListener(name, (event) => {
             const data = (event as MessageEvent).data;
