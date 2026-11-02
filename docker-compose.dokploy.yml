@@ -52,7 +52,16 @@ services:
       - api
     expose:
       - "80"
+    # Dokploy's Traefik can only route to containers that are on its network. Without this line the
+    # domain answers "404 page not found" in plain text, which is Traefik, not nginx.
+    networks:
+      - default
+      - dokploy-network
     restart: unless-stopped
+
+networks:
+  dokploy-network:
+    external: true
 
 volumes:
   bizsim-db:
