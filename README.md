@@ -73,11 +73,14 @@ scoreboard and the line-item statement, and prove a double close computes nothin
 ## Facilitator console (`web/`)
 
 ```bash
-cd web
-npm install
-npm run dev      # http://localhost:5173, proxies /api to the backend on 8080
-npm run build    # static bundle in web/dist
+scripts/dev-up.sh     # backend + database
+scripts/dev-web.sh    # console on 0.0.0.0:5173 (installs deps on first run)
+npm run build         # static bundle in web/dist, served by any static host
 ```
+
+Opening it from another machine: the console binds to all interfaces, so use the host's address
+(`http://<host>:5173`) or, if the port is not exposed, tunnel it —
+`ssh -L 5173:localhost:5173 <user>@<host>` and then open `http://localhost:5173`.
 
 Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
 then drive the session with **Open next round** and **Compute round**. The scoreboard refreshes from a
