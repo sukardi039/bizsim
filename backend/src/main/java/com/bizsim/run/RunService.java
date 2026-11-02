@@ -1,5 +1,9 @@
 package com.bizsim.run;
 
+import com.bizsim.run.RunRepository;
+import com.bizsim.sim.RoundService;
+import com.bizsim.sim.Scenario;
+import com.bizsim.sim.ScenarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -30,14 +34,16 @@ public class RunService {
     public record RoundState(int number, String status) {
     }
 
-    private static final BigDecimal START_CASH = new BigDecimal("100000.00");
-    private static final BigDecimal START_BRAND = new BigDecimal("50.00");
-
     private final RunRepository runs;
+    private final RoundService rounds;
+    private final ScenarioRepository scenarios;
     private final JdbcTemplate jdbc;
 
-    public RunService(RunRepository runs, JdbcTemplate jdbc) {
+    public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
+                      JdbcTemplate jdbc) {
         this.runs = runs;
+        this.rounds = rounds;
+        this.scenarios = scenarios;
         this.jdbc = jdbc;
     }
 
@@ -54,10 +60,14 @@ public class RunService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "at most 10 teams per run (decision 5)");
         }
+        Scenario scenario = scenarios.load(scenarioKey);
         long simulationId = runs.insertSimulation(tenantId, name, scenarioKey, facilitatorId);
         long runId = runs.insertRun(tenantId, simulationId, scenarioKey);
         for (TeamSpec team : teams) {
-            runs.insertTeam(runId, blankToNull(team.name(), "team name"), team.companyName(), START_CASH, START_BRAND);
+            long teamId = runs.insertTeam(runId, blankToNull(team.name(), "team name"),
+                    team.companyName(), scenario.params().startingCash(),
+                    scenario.params().startingBrand());
+            rounds.initialiseCompany(teamId, scenario);
         }
         return view(tenantId, runId);
     }
@@ -70,8 +80,10 @@ public class RunService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "teams cannot be added to a " + run.status() + " run");
         }
-        runs.insertTeam(runId, blankToNull(spec.name(), "team name"), spec.companyName(),
-                START_CASH, START_BRAND);
+        Scenario scenario = scenarios.load(run.scenarioKey());
+        long teamId = runs.insertTeam(runId, blankToNull(spec.name(), "team name"), spec.companyName(),
+                scenario.params().startingCash(), scenario.params().startingBrand());
+        rounds.initialiseCompany(teamId, scenario);
         return view(tenantId, runId);
     }
 
@@ -108,10 +120,10 @@ public class RunService {
                     "scenario " + run.scenarioKey() + " has only " + maxRounds + " rounds");
         }
 
-        // Advancing closes whatever is open. Closing an already-closed round is a no-op by design,
-        // so a facilitator who clicks twice does not get two rounds of submissions thrown away.
-        runs.closeOpenRound(runId);
-        runs.insertRound(runId, next);
+        // Advancing closes whatever is open and computes it. Closing an already-computed round is a
+        // no-op by design, so a facilitator who clicks twice does not get two rounds of results.
+        rounds.closeAndCompute(tenantId, runId);
+        rounds.openRound(runId, next);
         runs.setCurrentRound(runId, next);
 
         if (next == maxRounds) {

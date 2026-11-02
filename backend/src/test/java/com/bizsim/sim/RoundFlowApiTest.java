@@ -1,0 +1,264 @@
+package com.bizsim.sim;
+
+import com.bizsim.support.PostgresTestBase;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+
+import java.util.List;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/** S2a exit test: a real round goes in, a deterministic statement comes out. */
+@SpringBootTest
+@AutoConfigureMockMvc
+class RoundFlowApiTest extends PostgresTestBase {
+
+    @Autowired
+    private MockMvc mvc;
+    @Autowired
+    private JdbcTemplate jdbc;
+    @Autowired
+    private ObjectMapper json;
+
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
+
+    private long runId;
+    private long teamOne;
+    private long teamTwo;
+    private String facilitatorToken;
+    private String playerOneToken;
+
+    @BeforeEach
+    void seed() throws Exception {
+        for (String table : List.of("round_statement", "round_result", "decision", "round", "player",
+                "company_product", "company_staff", "company_rnd", "team", "run", "simulation",
+                "app_user", "tenant")) {
+            jdbc.update("delete from " + table);
+        }
+
+        long tenant = jdbc.queryForObject(
+                "insert into tenant (code, name) values ('acme', 'Acme') returning id", Long.class);
+        user(tenant, "trainer@acme.test", "FACILITATOR");
+        user(tenant, "one@acme.test", "PLAYER");
+        user(tenant, "two@acme.test", "PLAYER");
+        facilitatorToken = login("trainer@acme.test");
+        playerOneToken = login("one@acme.test");
+        String playerTwoToken = login("two@acme.test");
+
+        JsonNode run = createRun();
+        runId = run.get("id").asLong();
+        teamOne = run.get("teams").get(0).get("id").asLong();
+        teamTwo = run.get("teams").get(1).get("id").asLong();
+
+        addPlayer(teamOne, "one@acme.test");
+        addPlayer(teamTwo, "two@acme.test");
+        assertThat(playerTwoToken).isNotBlank();
+    }
+
+    @Test
+    void a_submitted_month_is_computed_for_every_company() throws Exception {
+        openRound();
+
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.teams.length()").value(2));
+
+        List<Map<String, Object>> board = jdbc.queryForList("""
+                select rr.team_id, (rr.score->>'profit')::numeric as profit from round_result rr
+                join round r on r.id = rr.round_id where r.run_id = ? order by rr.team_id
+                """, runId);
+        assertThat(board).hasSize(2);
+
+        // The company that submitted sells 600/150/30 at full capacity; the silent one sells nothing
+        // and still pays payroll and fixed cost.
+        assertThat(profit(board, teamOne)).isGreaterThan(profit(board, teamTwo));
+        assertThat(profit(board, teamTwo)).isLessThan(java.math.BigDecimal.ZERO);
+
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/statements")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].round").value(1))
+                .andExpect(jsonPath("$[0].revenue").isNumber());
+    }
+
+    @Test
+    void closing_twice_does_not_compute_the_month_twice() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isNoContent());
+
+        Integer results = jdbc.queryForObject("""
+                select count(*) from round_result rr join round r on r.id = rr.round_id
+                where r.run_id = ? and r.number = 1
+                """, Integer.class, runId);
+        assertThat(results).isEqualTo(2);
+    }
+
+    @Test
+    void a_plan_that_needs_more_workers_than_the_company_has_is_rejected() throws Exception {
+        openRound();
+        // 10,000 units of P1 at 40 units per worker needs 250 workers; the company starts with 30.
+        submit(playerOneToken, teamOne, payload(10_000, 0, 0, 0L, 30, 0))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details[0]").value(org.hamcrest.Matchers.containsString("workers")));
+    }
+
+    @Test
+    void spending_more_than_the_bank_balance_is_409_with_a_breakdown() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 5_000_000_000L, 30, 0))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("insufficient cash"))
+                .andExpect(jsonPath("$.lines.marketing").value(5_000_000_000L));
+    }
+
+    @Test
+    void a_player_cannot_submit_for_another_company() throws Exception {
+        openRound();
+        submit(playerOneToken, teamTwo, payload(600, 150, 30, 0L, 30, 0))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void an_unknown_field_is_rejected_rather_than_ignored() throws Exception {
+        openRound();
+        Map<String, Object> body = new java.util.LinkedHashMap<>(
+                payload(600, 150, 30, 0L, 30, 0));
+        body.put("colour", "red");
+        mvc.perform(post("/api/runs/" + runId + "/teams/" + teamOne + "/decisions")
+                        .header("Authorization", "Bearer " + playerOneToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void a_submission_after_the_clock_deadline_is_409() throws Exception {
+        openRound();
+        jdbc.update("update round set closes_at = now() - interval '1 minute' where run_id = ?", runId);
+
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void the_form_context_never_exposes_the_hidden_project_cost() throws Exception {
+        openRound();
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rndProjects.length()").value(5))
+                .andExpect(jsonPath("$.products.length()").value(3))
+                .andReturn();
+
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).doesNotContain("hiddenCost");
+        assertThat(body).contains("hintLow");
+        assertThat(json.readTree(body).get("rndProjects").get(0).has("hintHigh")).isTrue();
+    }
+
+    // ------------------------------------------------------------------ helpers
+
+    private org.springframework.test.web.servlet.ResultActions submit(String token, long teamId,
+                                                                      Map<String, Object> body)
+            throws Exception {
+        return mvc.perform(post("/api/runs/" + runId + "/teams/" + teamId + "/decisions")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(body)));
+    }
+
+    private static Map<String, Object> payload(int p1, int p2, int p3, long marketing, int production,
+                                               long rnd) {
+        return Map.of(
+                "production", List.of(
+                        Map.of("product", "P1", "units", p1),
+                        Map.of("product", "P2", "units", p2),
+                        Map.of("product", "P3", "units", p3)),
+                "price", List.of(
+                        Map.of("product", "P1", "unitPrice", 1_000_000),
+                        Map.of("product", "P2", "unitPrice", 2_500_000),
+                        Map.of("product", "P3", "unitPrice", 5_000_000)),
+                "marketing", List.of(Map.of("channel", "DIGITAL", "spend", marketing)),
+                "manpower", Map.of("production", production),
+                "rnd", List.of(Map.of("project", "RND-P1-COST", "invest", rnd)),
+                "capacityPurchase", 0);
+    }
+
+    private void openRound() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+    }
+
+    private JsonNode createRun() throws Exception {
+        MvcResult result = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Cohort",
+                                "scenarioKey", "standard-v1",
+                                "teams", List.of(
+                                        Map.of("name", "Alpha", "companyName", "Alpha Inc"),
+                                        Map.of("name", "Beta", "companyName", "Beta Inc"))))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return json.readTree(result.getResponse().getContentAsString());
+    }
+
+    private void addPlayer(long teamId, String email) throws Exception {
+        Long userId = jdbc.queryForObject("select id from app_user where email = ?", Long.class, email);
+        mvc.perform(post("/api/runs/" + runId + "/players")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "teamId", teamId, "userId", userId, "roleKey", "OWNER"))))
+                .andExpect(status().isCreated());
+    }
+
+    private static java.math.BigDecimal profit(List<Map<String, Object>> board, long teamId) {
+        return board.stream().filter(row -> ((Number) row.get("team_id")).longValue() == teamId)
+                .map(row -> (java.math.BigDecimal) row.get("profit")).findFirst().orElseThrow();
+    }
+
+    private void user(long tenantId, String email, String role) {
+        jdbc.update("""
+                insert into app_user (tenant_id, email, password_hash, display_name, role)
+                values (?, ?, ?, ?, ?)
+                """, tenantId, email, encoder.encode("pw-" + email), email, role);
+    }
+
+    private String login(String email) throws Exception {
+        MvcResult result = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", "acme", "email", email, "password", "pw-" + email))))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
+    }
+}

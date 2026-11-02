@@ -80,7 +80,7 @@ class RunApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.currentRound").value(0))
                 .andExpect(jsonPath("$.teams.length()").value(2))
                 .andExpect(jsonPath("$.teams[0].companyName").value("Alpha Industries"))
-                .andExpect(jsonPath("$.teams[0].cash").value(100000.00));
+                .andExpect(jsonPath("$.teams[0].cash").value(2000000000.00));
     }
 
     @Test
@@ -129,7 +129,7 @@ class RunApiTest extends PostgresTestBase {
 
         Map<String, Object> round1 = jdbc.queryForMap(
                 "select status, closed_at from round where run_id = ? and number = 1", runId);
-        assertThat(round1.get("status")).isEqualTo("CLOSED");
+        assertThat(round1.get("status")).isEqualTo("COMPUTED");
         assertThat(round1.get("closed_at")).isNotNull();
 
         mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
@@ -139,7 +139,10 @@ class RunApiTest extends PostgresTestBase {
     @Test
     void advancing_past_the_scenario_round_count_is_409() throws Exception {
         long runId = createRun(facilitatorToken);
-        for (int i = 1; i <= 6; i++) {
+        int rounds = jdbc.queryForObject(
+                "select (definition->>'rounds')::int from scenario where key = 'standard-v1'",
+                Integer.class);
+        for (int i = 1; i <= rounds; i++) {
             mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                             .header("Authorization", "Bearer " + facilitatorToken))
                     .andExpect(status().isOk());
@@ -148,10 +151,10 @@ class RunApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isConflict());
 
-        // The failed advance must not have closed round 6.
-        String status6 = jdbc.queryForObject(
-                "select status from round where run_id = ? and number = 6", String.class, runId);
-        assertThat(status6).isEqualTo("OPEN");
+        // The failed advance must not have closed the last round.
+        String lastStatus = jdbc.queryForObject(
+                "select status from round where run_id = ? and number = ?", String.class, runId, rounds);
+        assertThat(lastStatus).isEqualTo("OPEN");
     }
 
     @Test

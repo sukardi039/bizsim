@@ -17,6 +17,9 @@ spring:
     locations: classpath:db/migration
   jackson:
     default-property-inclusion: non_null
+    deserialization:
+      # A mistyped form field must be a 400, not a silently ignored decision.
+      fail-on-unknown-properties: true
 
 bizsim:
   jwt:

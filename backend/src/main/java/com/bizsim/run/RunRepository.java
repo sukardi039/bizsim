@@ -21,7 +21,7 @@ public class RunRepository {
     }
 
     public record TeamRow(long id, String name, String companyName, BigDecimal cash,
-                          BigDecimal brandScore) {
+                          BigDecimal brandScore, String status, BigDecimal machineWorkers) {
     }
 
     public record PlayerRow(long id, long teamId, long userId, String roleKey, String displayName) {
@@ -33,7 +33,8 @@ public class RunRepository {
 
     private static final RowMapper<TeamRow> TEAM = (rs, i) -> new TeamRow(
             rs.getLong("id"), rs.getString("name"), rs.getString("company_name"),
-            rs.getBigDecimal("cash"), rs.getBigDecimal("brand_score"));
+            rs.getBigDecimal("cash"), rs.getBigDecimal("brand_score"), rs.getString("status"),
+            rs.getBigDecimal("machine_workers"));
 
     private static final RowMapper<PlayerRow> PLAYER = (rs, i) -> new PlayerRow(
             rs.getLong("id"), rs.getLong("team_id"), rs.getLong("user_id"),

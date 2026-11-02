@@ -101,9 +101,13 @@ Order matters and is part of the contract; the debrief must explain the same ord
 
 ### 5.1 Demand pool per product
 
-`pool_j(round) = base_demand_j × seasonality(round) × growth^(round−1)`
+`pool_j(round) = base_demand_j × seasonality(round) × companies / 10`
 
-- `base_demand_j`, `seasonality[1..8]`, `growth` are scenario data.
+- `base_demand_j` and `seasonality[1..8]` are scenario data.
+- **Cohort scaling is implemented and deliberate**: the demand table is sized for 10 companies
+  (decision 5). Without scaling, a 3-company run faces a market about three times its combined
+  capacity, sells out every month, and market share measures only factory size. Scaling keeps the
+  demand-to-capacity ratio constant from 2 players to 10. `ScoringEngine.REFERENCE_COMPANIES`.
 - Every product has **its own pool**; products do not cannibalise each other in v1.
 - A **fixed synthetic competitor** ("Market Average") always takes part with constant price,
   quality and brand, so a 2-company run still has a market and a 10-company run is not a pure
@@ -146,11 +150,19 @@ code, name, targetProduct, hiddenCost, hintBand(±%), advantageType, advantageVa
 - **Proposal:** the facilitator/scenario offers 3–5 projects at run start; the same slate is open to
   all companies, so the choice is strategic, not lottery.
 - **Funding:** a company allocates dollars per project per month. Investment accumulates.
-- **Completion:** when `cumulativeInvested ≥ hiddenCost` **and** `monthsInvested ≥ minMonths`, the
-  project completes at month end; the advantage applies from the **next** month.
+- **Fixed duration (D10).** Every project has `duration_months`. Investment accumulates while it is
+  active; the outcome is evaluated **at the end of that duration**, not when the money crosses the
+  threshold. A project funded in its last month is evaluated like any other.
+- **Outcome (D10).** `ratio = cumulativeInvested / hiddenCost`.
+  - `ratio < 0.80` → **FAILED**. The money is gone, nothing is refunded.
+  - `0.80 ≤ ratio < 1.00` → **COMPLETED with partial benefit**:
+    `factor = (ratio − 0.80) / 0.20`, so 80% funding yields 0% of the advantage and 100% yields all
+    of it. A late or thin programme still returns something, which is the lesson.
+  - `ratio ≥ 1.00` → **COMPLETED at full benefit**; money above `hiddenCost` is refunded at
+    completion (**assumed** — the ruling did not cover over-funding).
 - **No random number generator.** Decision 4 requires a deterministic number, and a trainee must be
-  able to explain a failure. "I invested 80k against a project that needed 100k, so it did not
-  finish" is explainable; "you rolled badly" is not.
+  able to explain a failure. "I funded 80% of a programme and got a fraction of the benefit" is
+  explainable; "you rolled badly" is not.
 - **Hint:** each project shows an estimated cost **band** (e.g. "Rp 90–130 million"), derived
   deterministically from `hiddenCost` and `hintBand`. No noise, no RNG.
 - **Overshoot:** money above `hiddenCost` is not consumed (returned), so there is no penalty for
@@ -169,8 +181,10 @@ code, name, targetProduct, hiddenCost, hintBand(±%), advantageType, advantageVa
 - All commitments are checked at submit against `cash` (§4 step 2).
 - Payroll is monthly and unavoidable while staff exist; hiring costs one month of salary upfront,
   firing costs one month of salary as severance. **PROPOSED.**
-- Insolvency rule: see **Q-D**. Until ruled, code assumes: `cash < 0` → `INSOLVENT`, cannot produce,
-  stays on the scoreboard last. Not deleted, because a deleted company breaks the debrief history.
+- Insolvency rule (**D11**): `cash < 0` → status `INSOLVENT`, **production is forced to 0** next
+  month, payroll, fixed cost and holding cost still accrue, and stock keeps selling. If cash returns
+  to ≥ 0 the company goes back to `ACTIVE`. It is never removed from the run and never deleted —
+  the debrief needs its history. Ranking: insolvent companies are ordered last, by cash.
 
 ## 8. KPIs for the debrief (PROPOSED)
 
@@ -189,9 +203,10 @@ Worksheet Q3 said six is the practical maximum on a slide. **Recommendation: 1�
 7–8 on the second page.** They are the two that explain *why* profit moved, and a trainee who
 over-produced needs to see "lost sales 0, stock 4,000".
 
-## 9. Schema delta for V3 (S2 migration)
+## 9. Schema — implemented in `V3__simulation_model.sql`
 
-Changes from the S1 baseline. All additive except the `decision` unique key.
+Written and tested on 2026-11-02. All additive except the `decision` unique key.
+Measured numbers for the seeded scenario are in `docs/SCENARIO_CALIBRATION.md`.
 
 ```sql
 -- scenario catalogue
@@ -237,11 +252,35 @@ Ordered by teaching value per day of work. All are additive to the model above.
 | **Dividends / shareholder value** | capital allocation | 2 days | no — no shareholders in the model |
 | **Bribery / ethics event cards** | governance, consequence | 1 day | facilitator events, not a mechanic |
 
-Two of these are already implied by your rulings and I have included them as **v1**: price (if Q-A
-is yes) and capacity. Hiring/firing is the next cheapest. Everything else I would defer, because
-each one adds a form section and a debrief column, and S4 is already the tight sprint.
+Two of these are already implied by your rulings and I have included them as **v1**: price and
+capacity. Hiring/firing is in as production headcount. **D15 says every ticked aspect is wanted
+eventually** — the phasing below is a build order, not a "no":
 
-## 11. Open items — need one line each
+| Phase | Aspects | Why that order |
+|---|---|---|
+| v1 (by 31 Dec) | price, capacity purchase, hiring/firing, quality upgrade | each is one field plus one formula term |
+| v1.1 (pilot fixes, Jan) | paid market research, quality tuning | needs a console screen and a report document |
+| v2 | working capital / payment terms, new-product launch from R&D | revenue timing and product-unlock touch the statement and the product list |
+
+Working capital and new-product launch are the two that **must stay additive**: revenue recognition
+is isolated in §4 step 6, and a new product is a `company_product` row rather than a schema change.
+Nothing in S2 code may assume the catalogue has exactly three rows.
+
+## 11. Open items — all answered 2026-11-02
+
+| # | Item | Outcome |
+|---|---|---|
+| Q-A | price decision | **yes** → D8 |
+| Q-B | product catalogue | fixed set of 3 → D9 |
+| Q-C | R&D success rule | deterministic, fixed duration, 80% floor → D10 |
+| Q-D | insolvency | survive, zero production, rank last, can recover → D11 |
+| Q-E | legacy scenario | none — scenario #1 invented, provisional → D16 |
+| Q-F | round length | 8 cycles, 3 h total, clock visible, all per-simulation config → D12 |
+| Q-G | facilitator powers | six ✓, two ✗, auto-close clock, pre-defined events → D12 |
+| Q-H | KPI set | eight, six on the slide → D13 |
+| Q-I | price elasticity | default for now, tunable data → D14 |
+
+The reference table below is kept as the record of what was asked.
 
 | # | Question | My recommendation | Blocks |
 |---|---|---|---|
@@ -252,18 +291,25 @@ each one adds a form section and a debrief column, and S4 is already the tight s
 | Q-E | Scenario numbers — do you have the old Excel/paper simulation to encode? | Send the file; encode 1:1 (§Q6 of the worksheet, option A/C). Without it every number is invented and needs calibration with you. | V3 seed, all formulas' constants |
 | Q-F | Round length and total session time | 8 cycles × 20 min ≈ 3 h with intro and debrief. Confirm or give the real agenda. | facilitator console default only |
 
-## 12. Effect on the delivery plan
+## 12. Delivery status against the plan
 
-The S2 sprint in the plan was sized for "4 roles × 4 numeric inputs, one demand pool". The locked
-model is bigger: 3 products × 10 companies × 8 rounds, plus per-product stock, staffing, R&D
-accumulation and a line-item statement. That is not a reason to change the deadline yet, but S2
-must be split so something demoable exists by 20 Nov:
+The S2 sprint was sized for "4 roles × 4 numeric inputs, one demand pool". The locked model is much
+bigger, so it was split. **Both halves of the scoring engine are already built and green on
+2026-11-02**, ahead of the 20 Nov slot — the rulings arrived before the sprint, which is why.
 
-- **S2a (16–18 Nov):** single product, price, volume, one channel, cash validation, demand split
-  against the synthetic baseline. Exit: one company submits, month closes, profit and share
-  computed correctly.
-- **S2b (19–20 Nov):** multi-product, marketing channels, manpower/capacity, R&D projects.
-  Exit: the worked example in this file reproduces to the rupiah in a test.
+| Piece | Status |
+|---|---|
+| V3 schema: catalogue, company state, statement, decision key, round clock | done, Flyway v3 |
+| Decision payload, validation (all errors at once), capacity check, cash shortfall 409 | done |
+| `ScoringEngine`: production → cost → demand → sales → R&D → brand → cash | done, 9 unit tests |
+| Round close + statement + scoreboard, idempotent | done, 8 API tests |
+| Auto-close on the round clock (D12) | done, `RoundClock` |
+| Decision context endpoint that never exposes hidden R&D cost | done |
+| Scenario #1 calibration | done, `docs/SCENARIO_CALIBRATION.md` |
+| STOMP push + facilitator console (S3) | next |
+| Decision form UI, i18n (S4) | next |
+| PDF/Excel debrief (S5) | next |
 
-If S2b overruns, S4 (forms) starts on the S2a payload and multi-product fields are added behind a
-flag. That keeps the 31 Dec date and the pilot rehearsal intact.
+Remaining engine work that is deliberately deferred: quality upgrade per product (one extra field),
+capacity purchase is in the payload but has no UI, and events are catalogued but not yet injectable.
+None of them changes the schema.

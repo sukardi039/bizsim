@@ -67,6 +67,34 @@ brief §1.
 5. The S2 estimate in the delivery plan was sized for "4 roles × 4 inputs". It must be re-based —
    see `docs/SIMULATION_MODEL.md` §11.
 
+## Domain rulings — 2026-11-02 (answers to the open sheet)
+
+Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings.
+
+| # | Ruling |
+|---|---|
+| D8 | **Selling price per product is a monthly decision** (Q-A). |
+| D9 | **Fixed catalogue of 3 products**, the same for every company in a run (Q-B). |
+| D10 | **R&D is deterministic and time-boxed** (Q-C): every project has a **fixed duration**; success is evaluated **at the end of that duration**, not the moment money crosses the threshold. Outcome by cumulative investment ÷ hidden expected cost: **< 80% → failed, money lost; ≥ 80% → benefit scales linearly from 0 at 80% to full at 100%**. No random number generator. |
+| D11 | **Insolvency is survivable** (Q-D): at cash < 0 the company produces nothing, is marked `INSOLVENT` and ranks last, but **stays in the run** — it keeps selling stock, and if inventory sales bring cash back to ≥ 0 it returns to `ACTIVE`. |
+| D12 | **The round clock closes the round automatically** at the end of the allotted time (Q-G). Round count, round length and total session time are **configuration per simulation**, not constants. Scenario events are **defined when the simulation is set up**; the facilitator may only trigger events from that pre-defined catalogue, not author new ones mid-run. |
+| D13 | **KPI set is the eight in the answer sheet**, six on the slide, lost sales and R&D/tech on page 2 (Q-H). |
+| D14 | **Price elasticity is tuning data, not a ruling yet** (Q-I): the default model stands (cheapest does not automatically win), and the exponent stays in scenario data so it can be changed after the pilot without code. |
+| D15 | **Every listed company aspect is wanted eventually** (spec §10), including hiring/firing, capacity, quality upgrade, paid market research, working capital, and new-product launch from R&D. Dividends are rejected. Sequence is fixed by the delivery plan, not by this line. |
+| D16 | **No legacy scenario exists** (Q-E): scenario #1 is invented and **provisional**; all constants are calibration targets to be reviewed at the S7 rehearsal. |
+
+### Consequences of D8–D16
+
+6. The scenario definition carries **elasticities, salaries, holding cost, brand decay and the
+   baseline competitor share** — all tuning data, never Java constants.
+7. R&D needs `duration_months` and an evaluation-at-deadline step; a project funded late cannot
+   "catch up" inside a round.
+8. `round.closes_at` exists and a scheduler closes due rounds through the same transactional method
+   the facilitator endpoint uses; two closers must be idempotent, not race.
+9. Working capital and new-product launch are **not built in v1** but must stay additive: revenue
+   timing is isolated in the statement (§4 step 6 of the model spec) and a new product is a
+   `company_product` row, not a schema change. Any code that assumes "3 products exist" is a bug.
+
 ## Consequences that are now binding
 
 1. Every business table carries `tenant_id`; no endpoint accepts a tenant parameter.

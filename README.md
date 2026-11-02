@@ -49,12 +49,24 @@ Tests run against a real PostgreSQL started in-process (Zonky embedded), so `jso
 columns and the Flyway migrations are exercised as they will run in production. No Docker and no
 root are required.
 
-## API so far (S0)
+## API so far (S0 → S2)
 
 ```
-GET  /api/ping              no auth
-POST /api/auth/login        {tenantCode, email, password} -> {token, expiresInSeconds, ...}
-GET  /api/me                Bearer token -> caller identity from the token
+GET  /api/ping                          no auth
+POST /api/auth/login                    {tenantCode, email, password} -> {token, ...}
+GET  /api/me                            Bearer token -> caller identity
+
+POST /api/runs                          create a run with 1..10 companies
+GET  /api/runs/{id}                     run, companies, players, current round
+POST /api/runs/{id}/teams               add a company (OPEN runs only)
+POST /api/runs/{id}/players             assign a player to a company
+POST /api/runs/{id}/rounds/next         facilitator: close + compute, then open the next month
+POST /api/runs/{id}/rounds/close        facilitator: close + compute without opening the next
+
+POST /api/runs/{id}/teams/{tid}/decisions   player: submit the month (upsert per round)
+GET  /api/runs/{id}/teams/{tid}/context     form data; R&D shows a cost band, never the hidden cost
+GET  /api/runs/{id}/teams/{tid}/statements  line-item statements, one per round
+GET  /api/runs/{id}/scoreboard              KPIs per company per round
 ```
 
 Every other path returns 401 without a valid token — including unknown paths, so an unauthenticated
@@ -63,9 +75,15 @@ caller cannot map the API.
 ## Status
 
 S0 complete: schema baseline, tenant-scoped auth, CI.
-S1 complete: run/team/player management, round state machine (open → close → advance), 16 tests.
+S1 complete: run/company/player management, round state machine.
+**S2 complete (2 Nov 2026): the deterministic scoring engine.**
+  `V3__simulation_model.sql` adds the product/channel/R&D catalogue and per-company state;
+  `ScoringEngine` runs the month in a fixed order (produce → cost → demand → sell → R&D → brand →
+  cash); `round_statement` keeps the line items the debrief needs. A round can be closed by the
+  facilitator or by its own clock, and closing twice computes nothing twice.
+  Scenario #1 is provisional and calibrated in `docs/SCENARIO_CALIBRATION.md` — the discount
+  strategy wins share and loses profit, which is the lesson D14 asked for.
+  33 tests, all against real PostgreSQL.
 
-S2 (decisions, scoring, results) is blocked on the six domain answers in the delivery plan §7 —
-specifically: what a team decides per round, the market model, and the KPI set. Those are product
-facts, not design choices. `ScoringStrategy` is the first S2 task and it gets no formula until those
-answers land.
+Next: S3 STOMP push + facilitator console, S4 decision form, S5 debrief export.
+

@@ -15,6 +15,21 @@ import java.util.Map;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<Map<String, Object>> invalid(ValidationException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", "invalid decision", "details", e.errors()));
+    }
+
+    @ExceptionHandler(CashShortfallException.class)
+    public ResponseEntity<Map<String, Object>> shortfall(CashShortfallException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                "error", "insufficient cash",
+                "cash", e.cash(),
+                "required", e.required(),
+                "lines", e.lines()));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Map<String, String>> conflict(DataIntegrityViolationException e) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
