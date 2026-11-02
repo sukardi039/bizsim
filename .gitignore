@@ -12,3 +12,4 @@ dist/
 .dev/
 web/node_modules/
 web/dist/
+.env

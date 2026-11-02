@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  * password nor duplicates users. Never active in production — the profile is the guard, not a flag.
  */
 @Component
-@Profile("dev")
+@Profile({"dev", "seed"})
 public class DevSeeder implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DevSeeder.class);

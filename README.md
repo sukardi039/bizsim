@@ -98,6 +98,10 @@ then drive the session with **Open next round** and **Compute round**. The score
 server-sent event stream, so a second browser on the same run sees the same round land within a
 second. Player decision forms are the next sprint (S4); the console is read-and-drive only.
 
+## Deploy
+
+Dokploy (one image, one port, TLS at the proxy): see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Test
 
 ```bash

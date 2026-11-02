@@ -1,0 +1,42 @@
+# Deployment compose for Dokploy (or any Docker host with a reverse proxy in front).
+#
+# Differences from docker-compose.yml, which is for a laptop:
+#   * nothing is published on the host — Dokploy attaches a domain to `app` port 8080 and terminates TLS;
+#   * secrets are not written here. Dokploy's Environment tab produces the .env that both services read,
+#     so no credential ever lands in a tracked file (see docs/DEPLOYMENT.md for the keys to add).
+
+services:
+  db:
+    image: postgres:16-alpine
+    env_file:
+      - .env
+    volumes:
+      - bizsim-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      BIZSIM_DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-bizsim}
+      BIZSIM_PORT: "8080"
+      # PostgreSQL already creates the database from POSTGRES_DB; the app role has no CREATEDB right,
+      # so tell the bootstrap not to try.
+      BIZSIM_DB_CREATE: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - "8080"
+    restart: unless-stopped
+
+volumes:
+  bizsim-db:
