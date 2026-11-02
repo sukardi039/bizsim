@@ -302,7 +302,7 @@ bigger, so it was split. **Both halves of the scoring engine are already built a
 | V3 schema: catalogue, company state, statement, decision key, round clock | done, Flyway v3 |
 | Decision payload, validation (all errors at once), capacity check, cash shortfall 409 | done |
 | `ScoringEngine`: production → cost → demand → sales → R&D → brand → cash | done, 9 unit tests |
-| Round close + statement + scoreboard, idempotent | done, 8 API tests |
+| Round close + statement + scoreboard, idempotent | done, 9 API tests |
 | Auto-close on the round clock (D12) | done, `RoundClock` |
 | Decision context endpoint that never exposes hidden R&D cost | done |
 | Scenario #1 calibration | done, `docs/SCENARIO_CALIBRATION.md` |

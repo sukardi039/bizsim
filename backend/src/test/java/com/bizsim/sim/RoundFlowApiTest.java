@@ -182,7 +182,50 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat(json.readTree(body).get("rndProjects").get(0).has("hintHigh")).isTrue();
     }
 
+    @Test
+    void three_months_in_sequence_accumulate_state_without_drift() throws Exception {
+        // RND-P1-COST costs 300M over 3 months: 100M a month must complete it exactly at month 3.
+        openRound();
+        for (int month = 1; month <= 3; month++) {
+            submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 100_000_000L))
+                    .andExpect(status().isOk());
+            if (month < 3) {
+                advance();
+            }
+        }
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/statements")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        Map<String, Object> project = jdbc.queryForMap("""
+                select status, benefit_factor, months_invested from company_rnd
+                where team_id = ? and project_code = 'RND-P1-COST'
+                """, teamOne);
+        assertThat(project.get("status")).isEqualTo("COMPLETED");
+        assertThat((java.math.BigDecimal) project.get("benefit_factor")).isEqualByComparingTo("1.0000");
+        assertThat(project.get("months_invested")).isEqualTo(3);
+
+        Map<String, Object> team = jdbc.queryForMap(
+                "select cash, brand_score, cumulative_profit, cumulative_revenue from team where id = ?", teamOne);
+        // A company that sells at capacity with a sane cost base is profitable: cash grows, it does
+        // not drain. This is the calibration guard, not a business assertion.
+        assertThat((java.math.BigDecimal) team.get("cash")).isGreaterThan(new java.math.BigDecimal("2000000000"));
+        assertThat((java.math.BigDecimal) team.get("cumulative_profit")).isGreaterThan(java.math.BigDecimal.ZERO);
+        assertThat((java.math.BigDecimal) team.get("cumulative_revenue")).isGreaterThan(new java.math.BigDecimal("2000000000"));
+        // Three months of 20M in digital: brand rises, it does not spike.
+        assertThat((java.math.BigDecimal) team.get("brand_score")).isGreaterThan(new java.math.BigDecimal("50"));
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private void advance() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+    }
 
     private org.springframework.test.web.servlet.ResultActions submit(String token, long teamId,
                                                                       Map<String, Object> body)
