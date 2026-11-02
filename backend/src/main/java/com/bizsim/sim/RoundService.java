@@ -33,17 +33,20 @@ public class RoundService {
     private final ScoringEngine engine;
     private final DecisionValidator validator;
     private final EnvironmentService environment;
+    private final RunEventService events;
     private final JdbcTemplate jdbc;
 
     public RoundService(RunRepository runs, RoundRepository rounds, ScenarioRepository scenarios,
                         ScoringEngine engine, DecisionValidator validator,
-                        EnvironmentService environment, JdbcTemplate jdbc) {
+                        EnvironmentService environment, RunEventService events,
+                        JdbcTemplate jdbc) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
         this.engine = engine;
         this.validator = validator;
         this.environment = environment;
+        this.events = events;
         this.jdbc = jdbc;
     }
 
@@ -97,6 +100,8 @@ public class RoundService {
         }
 
         rounds.upsertDecision(round.id(), teamId, payload, userId);
+        events.publishAfterCommit(runId, "decision.submitted",
+                Map.of("round", round.number(), "teamId", teamId));
     }
 
     // ------------------------------------------------------------------ close and compute
@@ -145,6 +150,18 @@ public class RoundService {
         }
 
         rounds.markComputed(round.id());
+
+        List<Map<String, Object>> summary = new ArrayList<>();
+        for (ScoringEngine.TeamOutcome outcome : outcomes) {
+            summary.add(Map.of(
+                    "teamId", outcome.teamId(),
+                    "profit", outcome.profit(),
+                    "cash", outcome.cash(),
+                    "brand", outcome.brand()));
+        }
+        events.publishAfterCommit(runId, "round.closed",
+                Map.of("round", round.number(), "teams", summary));
+
         return Optional.of(new ScoringEngine.RoundResult(outcomes));
     }
 
@@ -153,6 +170,7 @@ public class RoundService {
     public void openRound(long runId, int number) {
         Scenario scenario = scenarios.load(scenarioKey(runId));
         rounds.insertRound(runId, number, scenario.params().roundMinutes());
+        events.publishAfterCommit(runId, "round.opened", Map.of("round", number));
     }
 
     /** Seeds a new company with its product line, workforce and untouched R&D slate. */
