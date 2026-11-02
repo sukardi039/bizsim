@@ -270,8 +270,8 @@ public class RoundRepository {
     public List<Map<String, Object>> statements(long runId, long teamId) {
         return jdbc.queryForList("""
                 select r.number as round, s.revenue, s.cogs, s.payroll, s.marketing, s.rnd_spend,
-                       s.fixed_cost, s.holding_cost, s.hiring_cost, s.capacity_cost, s.profit,
-                       s.cash_after, s.brand_after, s.lost_sales, s.capacity_used,
+                       s.fixed_cost, s.holding_cost, s.hiring_cost, s.capacity_cost, s.report_cost,
+                       s.profit, s.cash_after, s.brand_after, s.lost_sales, s.capacity_used,
                        s.capacity_available, s.detail::text as detail
                 from round_statement s
                 join round r on r.id = s.round_id

@@ -53,6 +53,23 @@ Configuration is environment-only:
 | `BIZSIM_JWT_SECRET` | HMAC key, **≥ 32 bytes** | dev-only value, refuses to start if short |
 | `BIZSIM_PORT` | HTTP port | `8080` |
 
+### No Docker, no PostgreSQL install
+
+```bash
+scripts/dev-up.sh      # real PostgreSQL from the Maven test dependency, then the backend
+scripts/smoke.py       # drives a whole session against the running backend
+scripts/dev-down.sh    # stops both
+```
+
+`dev-up.sh` starts PostgreSQL on 5433 from the test-scoped Zonky binaries and the application on 8080
+with the `dev` profile, which seeds a demo tenant and three accounts: a facilitator, a player and an
+admin, all sharing one demo password (see `DevSeeder` for the addresses).
+
+`smoke.py` exercises the real API end to end: login, create a three-company run with two cycles, open
+a round, read the decision form context, see the market report refused with 402 and then bought,
+submit a decision, get an over-capacity plan rejected with a worker count, close the round, print the
+scoreboard and the line-item statement, and prove a double close computes nothing twice.
+
 ## Test
 
 ```bash
