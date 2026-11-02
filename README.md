@@ -80,6 +80,7 @@ POST /api/runs/{id}/rounds/close        facilitator: close + compute without ope
 POST /api/runs/{id}/teams/{tid}/decisions   player: submit the month (upsert per round)
 GET  /api/runs/{id}/teams/{tid}/context     form data; R&D shows a cost band, never the hidden cost
 GET  /api/runs/{id}/teams/{tid}/statements  line-item statements, one per round
+GET  /api/runs/{id}/teams/{tid}/market-report    paid forecast; 402 until bought (D18)
 GET  /api/runs/{id}/scoreboard              KPIs per company per round
 ```
 
@@ -97,7 +98,7 @@ S1 complete: run/company/player management, round state machine.
   facilitator or by its own clock, and closing twice computes nothing twice.
   Scenario #1 is provisional and calibrated in `docs/SCENARIO_CALIBRATION.md` — the discount
   strategy wins share and loses profit, which is the lesson D14 asked for.
-  56 tests, all against real PostgreSQL.
+  62 tests, all against real PostgreSQL.
 
 Next: S3 STOMP push + facilitator console, S4 decision form, S5 debrief export.
 

@@ -129,3 +129,38 @@ no table at all.
   and starting state are identical. Differentiation starts at round 1 through pricing and mix only.
 - **Marketing has no saturation cap** beyond the square root. At 1,000 M of spend the reach term is
   about 7, which is large but finite; no test currently covers absurd spend.
+
+## 9. Environment timeline and event deck (D18)
+
+Round 1 is deliberately neutral (1.000 / 1.000 / 1.000), so the measured table in §6 is still exact
+under the environment model — the economy starts moving from round 2.
+
+| Round | Demand index | Cost index | Wage index | Note |
+|---|---|---|---|---|
+| 1 | 1.000 | 1.000 | 1.000 | steady |
+| 2 | 1.020 | 1.020 | 1.010 | mild expansion |
+| 3 | 0.950 | 1.050 | 1.020 | slowdown, input prices rising |
+| 4 | 0.900 | 1.080 | 1.030 | trough |
+| 5 | 0.930 | 1.060 | 1.030 | bottoming out |
+| 6 | 1.000 | 1.030 | 1.020 | recovery |
+| 7 | 1.060 | 1.010 | 1.020 | expansion |
+| 8 | 1.100 | 1.000 | 1.030 | peak |
+
+Income elasticity: **P1 0.40, P2 1.00, P3 1.80**. At the round-4 trough the premium line keeps
+`0.90^1.8 = 83%` of its market and the basic line `0.90^0.4 = 96%`. A trainee who only sells premium
+learns cyclicality the hard way; a mixed portfolio survives.
+
+| Event | Window | Chance | Duration | Demand | Cost | Wage | Target |
+|---|---|---|---|---|---|---|---|
+| Fuel and logistics spike | 2–6 | 55% | 2 | — | ×1.12 | — | all |
+| Regional conflict | 3–7 | 45% | 2 | ×0.94 | ×1.15 | ×1.01 | all |
+| Consumer recession | 3–6 | 40% | 2 | ×0.88 | ×0.97 | — | all |
+| Premium segment boom | 4–6 | 35% | 2 | ×1.20 | — | — | P3 |
+
+Each card fires at most once per run, on a round drawn inside its window, and the result is frozen
+when the run is created. Two runs of the same scenario therefore differ — that is the point — but a
+replay of one run reproduces its schedule exactly, which is what makes the debrief defensible.
+
+Market review: 15 M per month, two rounds of forecast, ±8% band. On a 2,000 M balance that is 0.75%
+of starting cash to buy a slightly wrong view of next month — cheap enough to try, expensive enough
+to think about.

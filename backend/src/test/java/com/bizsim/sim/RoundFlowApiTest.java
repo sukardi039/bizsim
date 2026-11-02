@@ -220,6 +220,32 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat((java.math.BigDecimal) team.get("brand_score")).isGreaterThan(new java.math.BigDecimal("50"));
     }
 
+    @Test
+    void the_market_report_is_paywalled_and_then_readable() throws Exception {
+        openRound();
+
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/market-report")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isPaymentRequired());
+
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0, true))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/market-report")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cost").value(15000000))
+                .andExpect(jsonPath("$.forecast.length()").value(2))
+                .andExpect(jsonPath("$.current.demandIndex").isNumber());
+
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        java.math.BigDecimal reportCost = jdbc.queryForObject(
+                "select report_cost from round_statement where team_id = ?", java.math.BigDecimal.class, teamOne);
+        assertThat(reportCost).isEqualByComparingTo("15000000");
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void advance() throws Exception {
@@ -238,7 +264,14 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     private static Map<String, Object> payload(int p1, int p2, int p3, long marketing, int production,
                                                long rnd) {
-        return Map.of(
+        return payload(p1, p2, p3, marketing, production, rnd, false);
+    }
+
+    private static Map<String, Object> payload(int p1, int p2, int p3, long marketing, int production,
+                                               long rnd, boolean marketReport) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("marketReport", marketReport);
+        body.putAll(Map.of(
                 "production", List.of(
                         Map.of("product", "P1", "units", p1),
                         Map.of("product", "P2", "units", p2),
@@ -250,7 +283,8 @@ class RoundFlowApiTest extends PostgresTestBase {
                 "marketing", List.of(Map.of("channel", "DIGITAL", "spend", marketing)),
                 "manpower", Map.of("production", production),
                 "rnd", List.of(Map.of("project", "RND-P1-COST", "invest", rnd)),
-                "capacityPurchase", 0);
+                "capacityPurchase", 0));
+        return body;
     }
 
     private void openRound() throws Exception {

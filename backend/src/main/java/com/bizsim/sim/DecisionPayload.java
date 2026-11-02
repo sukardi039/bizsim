@@ -18,7 +18,8 @@ public record DecisionPayload(List<ProductRow> production,
                               List<ChannelRow> marketing,
                               ManpowerRow manpower,
                               List<RndRow> rnd,
-                              BigDecimal capacityPurchase) {
+                              BigDecimal capacityPurchase,
+                              Boolean marketReport) {
 
     public record ProductRow(String product, BigDecimal units) {
     }
@@ -37,7 +38,11 @@ public record DecisionPayload(List<ProductRow> production,
     }
 
     public static DecisionPayload none() {
-        return new DecisionPayload(List.of(), List.of(), List.of(), null, List.of(), null);
+        return new DecisionPayload(List.of(), List.of(), List.of(), null, List.of(), null, null);
+    }
+
+    public boolean marketReportRequested() {
+        return Boolean.TRUE.equals(marketReport);
     }
 
     public BigDecimal units(String product) {

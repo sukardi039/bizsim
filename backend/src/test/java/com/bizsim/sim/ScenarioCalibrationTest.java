@@ -46,8 +46,10 @@ class ScenarioCalibrationTest extends PostgresTestBase {
                         Map.of("DIGITAL", 15_000_000L, "TRADE", 10_000_000L, "FIELD", 5_000_000L),
                         30, 30_000_000L));
 
-        List<ScoringEngine.TeamOutcome> outcomes = engine.compute(scenario, 1, List.of(a, b, c)).teams();
-        BigDecimal pool = engine.marketPool(scenario, 1, 3);
+        EnvironmentService.RoundEnvironment neutral =
+                EnvironmentService.RoundEnvironment.neutral(1, java.util.Set.of("P1", "P2", "P3"));
+        List<ScoringEngine.TeamOutcome> outcomes = engine.compute(scenario, neutral, List.of(a, b, c)).teams();
+        BigDecimal pool = engine.marketPool(scenario, neutral, 3);
 
         System.out.println("| company | revenue | profit | share % | cash | brand | sold | lost | util % |");
         for (ScoringEngine.TeamOutcome o : outcomes) {
@@ -112,6 +114,6 @@ class ScenarioCalibrationTest extends PostgresTestBase {
         return new DecisionPayload(productionRows, priceRows, channelRows,
                 new DecisionPayload.ManpowerRow(production),
                 List.of(new DecisionPayload.RndRow("RND-P1-COST", BigDecimal.valueOf(rnd))),
-                BigDecimal.ZERO);
+                BigDecimal.ZERO, false);
     }
 }

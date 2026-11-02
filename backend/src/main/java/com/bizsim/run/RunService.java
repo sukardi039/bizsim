@@ -1,6 +1,7 @@
 package com.bizsim.run;
 
 import com.bizsim.run.RunRepository;
+import com.bizsim.sim.EnvironmentService;
 import com.bizsim.sim.RoundService;
 import com.bizsim.sim.Scenario;
 import com.bizsim.sim.ScenarioRepository;
@@ -37,13 +38,15 @@ public class RunService {
     private final RunRepository runs;
     private final RoundService rounds;
     private final ScenarioRepository scenarios;
+    private final EnvironmentService environment;
     private final JdbcTemplate jdbc;
 
     public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
-                      JdbcTemplate jdbc) {
+                      EnvironmentService environment, JdbcTemplate jdbc) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
+        this.environment = environment;
         this.jdbc = jdbc;
     }
 
@@ -63,6 +66,8 @@ public class RunService {
         Scenario scenario = scenarios.load(scenarioKey);
         long simulationId = runs.insertSimulation(tenantId, name, scenarioKey, facilitatorId);
         long runId = runs.insertRun(tenantId, simulationId, scenarioKey);
+        // The event deck is drawn once, here, and frozen for this run (D18).
+        environment.scheduleEvents(scenario, runId);
         for (TeamSpec team : teams) {
             long teamId = runs.insertTeam(runId, blankToNull(team.name(), "team name"),
                     team.companyName(), scenario.params().startingCash(),

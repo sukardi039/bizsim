@@ -62,7 +62,8 @@ One submission per company, not per role. **PROPOSED** payload:
 
   "rnd":        [ { "project": "RND-COST-P1", "invest": 15000 } ],
 
-  "capacityPurchase": 0                        // optional, see §10
+  "capacityPurchase": 0,                        // optional, see §10
+  "marketReport": false                         // buys this month's forecast (D18)
 }
 ```
 
@@ -138,6 +139,31 @@ brand = brand × (1 − decay) + Σ_c α_c × sqrt(spend_c)      capped 0..100
 
 - `decay` ≈ 0.10/month, `α_c` per channel, both scenario data.
 - Marketing must be paid **every month** to hold brand — that is the intended lesson.
+
+### 5.4 Environment — the economy moves market size (D18)
+
+```
+market size for j  = base_j × seasonality × companies/10
+                     × demand_index(r) ^ income_elasticity_j
+                     × (demand multiplier of any event targeting j)
+unit material cost = base cost × cost_index(r) × (event cost multipliers)
+payroll            = salary × headcount × wage_index(r) × (event wage multipliers)
+```
+
+- The timeline lives in `scenario_round`: one row per round, missing rounds are neutral (1.0).
+- `income_elasticity` lives on the product: 0.40 basic, 1.00 standard, 1.80 premium in scenario #1.
+  A 10% fall in the demand index costs the premium line 18% of its market and the basic line 4%.
+  That is the "different customer groups react differently" requirement, in one number per product.
+- The event deck lives in `environment_event`. Each card has a window, a probability, a duration and
+  three multipliers (optionally targeted at one product). At run creation, `EnvironmentService`
+  draws each card with `Seed.uniform(runId:env:code)`; if it fires, the start round is drawn inside
+  the window and frozen in `run_environment_event`. Trainees cannot see the deck or the draw; the
+  debrief can, and a replay of the run produces the same schedule.
+- **Paid market review.** `marketReport: true` in the monthly decision costs
+  `marketReportCost`; `GET /teams/{id}/market-report` then returns current indices, the active events
+  that have already started, and `forecastHorizon` rounds of forecast with ±`forecastBand` noise.
+  The forecast reads the published timeline only — never the deck — so buying it cannot leak an
+  event. It can still be wrong by up to the band, which is the point.
 
 ## 6. R&D — ruled (D10, D17)
 

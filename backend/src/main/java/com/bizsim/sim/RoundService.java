@@ -32,15 +32,18 @@ public class RoundService {
     private final ScenarioRepository scenarios;
     private final ScoringEngine engine;
     private final DecisionValidator validator;
+    private final EnvironmentService environment;
     private final JdbcTemplate jdbc;
 
     public RoundService(RunRepository runs, RoundRepository rounds, ScenarioRepository scenarios,
-                        ScoringEngine engine, DecisionValidator validator, JdbcTemplate jdbc) {
+                        ScoringEngine engine, DecisionValidator validator,
+                        EnvironmentService environment, JdbcTemplate jdbc) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
         this.engine = engine;
         this.validator = validator;
+        this.environment = environment;
         this.jdbc = jdbc;
     }
 
@@ -74,7 +77,8 @@ public class RoundService {
             throw new ValidationException(errors);
         }
 
-        ScoringEngine.Commitment commitment = engine.preview(scenario, input);
+        ScoringEngine.Commitment commitment = engine.preview(scenario,
+                environment.forRound(scenario, runId, round.number()), input);
         if (commitment.plannedWorkers().compareTo(commitment.capacityAvailable()) > 0) {
             throw new ValidationException(List.of("production: the plan needs "
                     + commitment.plannedWorkers().stripTrailingZeros().toPlainString()
@@ -113,16 +117,18 @@ public class RoundService {
         }
 
         Scenario scenario = scenarios.load(run.scenarioKey());
+        EnvironmentService.RoundEnvironment environment =
+                this.environment.forRound(scenario, runId, round.number());
         Map<Long, ScoringEngine.TeamInput> inputs = inputs(runId, round.id());
         List<ScoringEngine.TeamOutcome> outcomes = engine.compute(
-                scenario, round.number(), new ArrayList<>(inputs.values())).teams();
+                scenario, environment, new ArrayList<>(inputs.values())).teams();
 
         Map<Long, RoundRepository.TeamState> state = new LinkedHashMap<>();
         for (RoundRepository.TeamState team : rounds.teams(runId)) {
             state.put(team.id(), team);
         }
 
-        BigDecimal pool = engine.marketPool(scenario, round.number(), outcomes.size());
+        BigDecimal pool = engine.marketPool(scenario, environment, outcomes.size());
         for (ScoringEngine.TeamOutcome outcome : outcomes) {
             RoundRepository.TeamState before = state.get(outcome.teamId());
             BigDecimal cumulativeRevenue = nz(before == null ? null : before.cumulativeRevenue())
@@ -246,6 +252,36 @@ public class RoundService {
             projects.add(row);
         }
         body.put("rndProjects", projects);
+        body.put("market", environment.conditions(scenario, runId, run.currentRound()));
+        body.put("marketReportCost", scenario.params().marketReportCost());
+        return body;
+    }
+
+    /**
+     * The paid market review (D18). It is bought with the round's decision, so it cannot be read
+     * before paying, and it reports the ordinary economics only — never the event deck.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> marketReport(long tenantId, long runId, long teamId) {
+        RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+        if (!rounds.teamBelongsToRun(teamId, runId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
+        }
+        RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.CONFLICT, "no round is open"));
+        DecisionPayload decision = rounds.decision(round.id(), teamId).orElse(null);
+        if (decision == null || !decision.marketReportRequested()) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
+                    "the market review has not been purchased for this round");
+        }
+
+        Scenario scenario = scenarios.load(run.scenarioKey());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("purchasedForRound", round.number());
+        body.put("cost", scenario.params().marketReportCost());
+        body.put("current", environment.conditions(scenario, runId, round.number()));
+        body.put("forecast", environment.forecast(scenario, runId, round.number()));
         return body;
     }
 

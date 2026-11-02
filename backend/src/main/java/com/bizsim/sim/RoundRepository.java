@@ -186,15 +186,15 @@ public class RoundRepository {
     public void insertStatement(long roundId, ScoringEngine.TeamOutcome outcome) {
         jdbc.update("""
                 insert into round_statement (round_id, team_id, revenue, cogs, payroll, marketing,
-                    rnd_spend, fixed_cost, holding_cost, hiring_cost, capacity_cost, profit, cash_after,
-                    brand_after, lost_sales, capacity_used, capacity_available, detail)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                    rnd_spend, fixed_cost, holding_cost, hiring_cost, capacity_cost, report_cost,
+                    profit, cash_after, brand_after, lost_sales, capacity_used, capacity_available, detail)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                 on conflict (round_id, team_id) do nothing
                 """, roundId, outcome.teamId(), outcome.revenue(), outcome.cogs(), outcome.payroll(),
                 outcome.marketing(), outcome.rndSpend(), outcome.fixedCost(), outcome.holdingCost(),
-                outcome.hiringCost(), outcome.capacityCost(), outcome.profit(), outcome.cash(),
-                outcome.brand(), outcome.lostSales(), outcome.capacityUsed(), outcome.capacityAvailable(),
-                detailJson(outcome));
+                outcome.hiringCost(), outcome.capacityCost(), outcome.reportCost(), outcome.profit(),
+                outcome.cash(), outcome.brand(), outcome.lostSales(), outcome.capacityUsed(),
+                outcome.capacityAvailable(), detailJson(outcome));
     }
 
     public void insertResult(long roundId, long teamId, Map<String, Object> score, BigDecimal totalScore) {

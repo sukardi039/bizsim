@@ -191,6 +191,22 @@ class ScoringEngineTest {
         assertThat(lost.rndUpdates().get(0).invested()).isEqualByComparingTo("2000.00");
     }
 
+    @Test
+    void the_environment_scales_the_market_and_the_input_costs() {
+        // Half the demand, double the material cost: the two knobs must reach different places.
+        EnvironmentService.RoundEnvironment harsh = new EnvironmentService.RoundEnvironment(1,
+                bd("0.5"), bd("2.0"), ONE, Map.of("P", bd("0.5")), List.of());
+
+        ScoringEngine.TeamOutcome outcome = engine.compute(scenario(), harsh,
+                List.of(team(decision(bd("100"), ZERO), bd("1000000"), "ACTIVE", active("PRJ"), ZERO)))
+                .teams().get(0);
+
+        assertThat(line(outcome).unitCost()).isEqualByComparingTo("80.00");
+        assertThat(line(outcome).demand())
+                .as("pool 1,000 x environment multiplier 0.5").isEqualByComparingTo("500.00");
+        assertThat(line(outcome).sold()).isEqualByComparingTo("100.00");
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private ScoringEngine.TeamOutcome run(ScoringEngine.TeamInput team) {
@@ -202,7 +218,9 @@ class ScoringEngineTest {
     }
 
     private ScoringEngine.TeamOutcome runAt(int round, ScoringEngine.TeamInput team, Scenario scenario) {
-        return engine.compute(scenario, round, List.of(team)).teams().get(0);
+        return engine.compute(scenario,
+                EnvironmentService.RoundEnvironment.neutral(round, java.util.Set.of("P")),
+                List.of(team)).teams().get(0);
     }
 
     private static ScoringEngine.ProductLine line(ScoringEngine.TeamOutcome outcome) {
@@ -218,11 +236,12 @@ class ScoringEngineTest {
                 new Scenario.Params(4, 20, bd("1000000"), bd("50"), ZERO, bd("0.10"), ZERO,
                         bd("50"), bd("1000000"), bd("100000"), ONE, ONE, bd("0.80"), ZERO,
                         List.of(ONE), ZERO, ZERO, ZERO, ZERO,
-                        Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10)),
+                        Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10),
+                        bd("15000000"), 2, bd("0.08")),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
-                        bd("10000"), bd("10"))),
+                        bd("10000"), bd("10"), ONE)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
-                List.of(project));
+                List.of(project), List.of(), List.of());
     }
 
     private static Scenario.ProjectSpec project(boolean partialBenefit, String curve,
@@ -252,7 +271,7 @@ class ScoringEngineTest {
                 List.of(),
                 new DecisionPayload.ManpowerRow(10),
                 List.of(new DecisionPayload.RndRow("PRJ", invest)),
-                ZERO);
+                ZERO, false);
     }
 
     private static BigDecimal bd(String v) {

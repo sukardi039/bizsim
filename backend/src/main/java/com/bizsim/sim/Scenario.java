@@ -14,7 +14,8 @@ import java.util.stream.Collectors;
  * fixed number of products: a new product is a row, not a code change (D15, consequence 9).
  */
 public record Scenario(String key, Params params, List<ProductSpec> products,
-                       List<ChannelSpec> channels, List<ProjectSpec> projects) {
+                       List<ChannelSpec> channels, List<ProjectSpec> projects,
+                       List<RoundSpec> rounds, List<EventSpec> events) {
 
     public Optional<ProductSpec> product(String code) {
         return products.stream().filter(p -> p.code().equals(code)).findFirst();
@@ -49,11 +50,28 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          BigDecimal baselineShare, List<BigDecimal> seasonality,
                          BigDecimal priceElasticity, BigDecimal qualityElasticity,
                          BigDecimal brandElasticity, BigDecimal marketingElasticity,
-                         Map<String, BigDecimal> salaries, Map<String, Integer> startingStaff) {
+                         Map<String, BigDecimal> salaries, Map<String, Integer> startingStaff,
+                         BigDecimal marketReportCost, int forecastHorizon, BigDecimal forecastBand) {
+    }
+
+    /** The economy for one round. Missing rounds fall back to neutral (1.0). */
+    public record RoundSpec(int round, BigDecimal demandIndex, BigDecimal costIndex,
+                            BigDecimal wageIndex, String note) {
+    }
+
+    /**
+     * A card in the event deck. Whether it fires, and when inside its window, is drawn per run from
+     * a seed — unpredictable to trainees, fixed and replayable for the facilitator.
+     */
+    public record EventSpec(String code, String name, String description, int earliestRound,
+                            int latestRound, BigDecimal probability, int durationMonths,
+                            BigDecimal demandMultiplier, BigDecimal costMultiplier,
+                            BigDecimal wageMultiplier, String targetProduct) {
     }
 
     public record ProductSpec(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
-                              BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker) {
+                              BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
+                              BigDecimal incomeElasticity) {
     }
 
     public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {

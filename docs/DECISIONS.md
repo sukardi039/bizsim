@@ -83,6 +83,7 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 | D15 | **Every listed company aspect is wanted eventually** (spec §10), including hiring/firing, capacity, quality upgrade, paid market research, working capital, and new-product launch from R&D. Dividends are rejected. Sequence is fixed by the delivery plan, not by this line. |
 | D16 | **No legacy scenario exists** (Q-E): scenario #1 is invented and **provisional**; all constants are calibration targets to be reviewed at the S7 rehearsal. |
 | D17 | **R&D partial credit and over-funding are per-project definition**, not engine constants: a `partial_benefit` on/off switch; a curve of `LINEAR`, `POWER` (exponent; 2.0 makes the last dollars buy the most) or `CHANCE` (hidden threshold, so more investment means a higher chance of full success); and `overfunding` either `REFUND` or `LOST`. `CHANCE` draws its threshold from a **seeded** digest of company + round + project, so a recomputed round returns the same outcome — the uncertainty belongs to the trainee, not to the server. |
+| D18 | **The economy is a scenario timeline, not a constant.** Each round carries demand, cost and wage indices; each product carries an **income elasticity**, so one downturn hits the premium line harder than the basic line. An **event deck** (conflict, fuel spike, recession, segment boom) is defined at setup and drawn **once per run** from a seed: unpredictable to trainees, frozen and replayable for the facilitator. A **paid market review** reports current conditions and a banded forecast, and never reveals the deck. |
 
 ### Consequences of D8–D16
 
@@ -99,6 +100,10 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
     "same inputs, same number" still holds and a voided round recomputes identically. If a trainer
     ever wants genuinely irreproducible outcomes, that is a documented exception to decision 4 and
     must be written down before the code changes.
+11. Market size is a function of the round (D18). Anything that divides by "the market" — market
+    share, lost sales, the scoreboard — uses the environment-adjusted pool, not the base demand.
+12. The event draw is part of the run, not of the scenario (D18): two runs of the same scenario may
+    have different events, and the debrief reads `run_environment_event`, never the live draw.
 
 ## Consequences that are now binding
 

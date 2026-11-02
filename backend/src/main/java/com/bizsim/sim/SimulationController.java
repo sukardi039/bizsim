@@ -50,6 +50,13 @@ public class SimulationController {
         return rounds.statements(me.tenantId(), runId, teamId);
     }
 
+    /** The paid forecast (D18). 402 until the round's decision buys it. */
+    @GetMapping("/teams/{teamId}/market-report")
+    public Map<String, Object> marketReport(@PathVariable long runId, @PathVariable long teamId) {
+        TenantContext.Principal me = TenantContext.require();
+        return rounds.marketReport(me.tenantId(), runId, teamId);
+    }
+
     @GetMapping("/scoreboard")
     public List<Map<String, Object>> scoreboard(@PathVariable long runId) {
         TenantContext.Principal me = TenantContext.require();

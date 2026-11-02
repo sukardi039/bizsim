@@ -76,15 +76,20 @@ public class ScenarioRepository {
                 dec(elasticity.path("quality")),
                 dec(elasticity.path("brand")),
                 dec(elasticity.path("marketing")),
-                salaryMap, staffMap);
+                salaryMap, staffMap,
+                dec(d.path("marketReportCost")),
+                d.path("forecastHorizon").asInt(2),
+                dec(d.path("forecastBand")));
 
         List<Scenario.ProductSpec> products = jdbc.query("""
-                select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker
+                select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
+                       income_elasticity
                 from product where scenario_key = ? order by code
                 """, (rs, i) -> new Scenario.ProductSpec(
                         rs.getString("code"), rs.getString("name"), rs.getBigDecimal("base_price"),
                         rs.getBigDecimal("base_unit_cost"), rs.getBigDecimal("base_quality"),
-                        rs.getBigDecimal("base_demand"), rs.getBigDecimal("units_per_worker")), key);
+                        rs.getBigDecimal("base_demand"), rs.getBigDecimal("units_per_worker"),
+                        rs.getBigDecimal("income_elasticity")), key);
 
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
@@ -109,7 +114,28 @@ public class ScenarioRepository {
         if (products.isEmpty()) {
             throw new IllegalStateException("scenario " + key + " has no products");
         }
-        return new Scenario(key, params, products, channels, projects);
+
+        List<Scenario.RoundSpec> rounds = jdbc.query("""
+                select round_number, demand_index, cost_index, wage_index, note
+                from scenario_round where scenario_key = ? order by round_number
+                """, (rs, i) -> new Scenario.RoundSpec(
+                        rs.getInt("round_number"), rs.getBigDecimal("demand_index"),
+                        rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
+                        rs.getString("note")), key);
+
+        List<Scenario.EventSpec> events = jdbc.query("""
+                select code, name, description, earliest_round, latest_round, probability,
+                       duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
+                       target_product
+                from environment_event where scenario_key = ? order by code
+                """, (rs, i) -> new Scenario.EventSpec(
+                        rs.getString("code"), rs.getString("name"), rs.getString("description"),
+                        rs.getInt("earliest_round"), rs.getInt("latest_round"),
+                        rs.getBigDecimal("probability"), rs.getInt("duration_months"),
+                        rs.getBigDecimal("demand_multiplier"), rs.getBigDecimal("cost_multiplier"),
+                        rs.getBigDecimal("wage_multiplier"), rs.getString("target_product")), key);
+
+        return new Scenario(key, params, products, channels, projects, rounds, events);
     }
 
     private static BigDecimal dec(JsonNode node) {

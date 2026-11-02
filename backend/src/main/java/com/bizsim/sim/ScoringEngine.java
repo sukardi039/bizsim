@@ -75,9 +75,10 @@ public class ScoringEngine {
                               Map<String, BigDecimal> stock, List<ProductLine> lines,
                               BigDecimal revenue, BigDecimal cogs, BigDecimal payroll, BigDecimal marketing,
                               BigDecimal rndSpend, BigDecimal fixedCost, BigDecimal holdingCost,
-                              BigDecimal hiringCost, BigDecimal capacityCost, BigDecimal profit,
-                              BigDecimal cashChange, BigDecimal lostSales, BigDecimal capacityUsed,
-                              BigDecimal capacityAvailable, List<RndUpdate> rndUpdates) {
+                              BigDecimal hiringCost, BigDecimal capacityCost, BigDecimal reportCost,
+                              BigDecimal profit, BigDecimal cashChange, BigDecimal lostSales,
+                              BigDecimal capacityUsed, BigDecimal capacityAvailable,
+                              List<RndUpdate> rndUpdates) {
     }
 
     public record Commitment(BigDecimal materials, BigDecimal payroll, BigDecimal hiring,
@@ -101,17 +102,18 @@ public class ScoringEngine {
                         Map<String, Integer> staff,
                         BigDecimal materials, BigDecimal payroll, BigDecimal hiring, BigDecimal marketing,
                         BigDecimal rndSpend, BigDecimal holding, BigDecimal capacityCost,
-                        BigDecimal machineAdded, BigDecimal plannedWorkers, BigDecimal capacityUsed,
-                        BigDecimal capacityAvailable) {
+                        BigDecimal reportCost, BigDecimal machineAdded, BigDecimal plannedWorkers,
+                        BigDecimal capacityUsed, BigDecimal capacityAvailable) {
     }
 
     // ------------------------------------------------------------------ entry points
 
     /** What the company would commit in cash if this decision were accepted, for submit-time checks. */
-    public Commitment preview(Scenario scenario, TeamInput team) {
-        Plan p = plan(scenario, team);
+    public Commitment preview(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                              TeamInput team) {
+        Plan p = plan(scenario, environment, team);
         BigDecimal discretionary = p.materials().add(p.marketing()).add(p.rndSpend())
-                .add(p.capacityCost()).add(p.hiring());
+                .add(p.capacityCost()).add(p.hiring()).add(p.reportCost());
         BigDecimal total = discretionary.add(p.payroll()).add(p.holding())
                 .add(scenario.params().fixedCostPerMonth());
         return new Commitment(p.materials(), p.payroll(), p.hiring(), p.marketing(), p.rndSpend(),
@@ -120,24 +122,27 @@ public class ScoringEngine {
                 p.capacityAvailable());
     }
 
-    public RoundResult compute(Scenario scenario, int round, List<TeamInput> teams) {
+    public RoundResult compute(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                               List<TeamInput> teams) {
         List<Plan> plans = new ArrayList<>();
         for (TeamInput team : teams) {
-            plans.add(fitToCash(scenario, team, plan(scenario, team)));
+            plans.add(fitToCash(scenario, team, plan(scenario, environment, team)));
         }
 
-        Map<Long, Map<String, Double>> demandByTeam = allocateDemand(scenario, round, teams, plans);
+        Map<Long, Map<String, Double>> demandByTeam =
+                allocateDemand(scenario, environment, teams, plans);
 
         List<TeamOutcome> outcomes = new ArrayList<>();
         for (int i = 0; i < teams.size(); i++) {
-            outcomes.add(settle(scenario, round, teams.get(i), plans.get(i), demandByTeam.get(teams.get(i).teamId())));
+            outcomes.add(settle(scenario, environment, teams.get(i), plans.get(i),
+                    demandByTeam.get(teams.get(i).teamId())));
         }
         return new RoundResult(outcomes);
     }
 
     // ------------------------------------------------------------------ planning
 
-    private Plan plan(Scenario scenario, TeamInput team) {
+    private Plan plan(Scenario scenario, EnvironmentService.RoundEnvironment environment, TeamInput team) {
         DecisionPayload d = team.decision() == null ? DecisionPayload.none() : team.decision();
         boolean insolvent = "INSOLVENT".equals(team.status());
         Effects effects = effects(scenario, team);
@@ -165,7 +170,8 @@ public class ScoringEngine {
             BigDecimal price = d.priceOf(spec.code());
             prices.put(spec.code(), price != null && price.signum() > 0 ? price : currentPrice);
             effectiveCost.put(spec.code(), money(nz(state == null ? spec.baseUnitCost() : state.unitCost())
-                    .multiply(effects.costMult().getOrDefault(spec.code(), ONE))));
+                    .multiply(effects.costMult().getOrDefault(spec.code(), ONE))
+                    .multiply(nz(environment.costIndex()))));
             effectiveQuality.put(spec.code(), currentQuality
                     .add(effects.qualityAdd().getOrDefault(spec.code(), ZERO)));
 
@@ -215,8 +221,10 @@ public class ScoringEngine {
 
         BigDecimal payroll = ZERO;
         BigDecimal hiring = ZERO;
+        BigDecimal wage = nz(environment.wageIndex());
         for (Map.Entry<String, Integer> entry : staff.entrySet()) {
-            BigDecimal salary = scenario.params().salaries().getOrDefault(entry.getKey(), ZERO);
+            BigDecimal salary = scenario.params().salaries().getOrDefault(entry.getKey(), ZERO)
+                    .multiply(wage);
             payroll = payroll.add(salary.multiply(bd(entry.getValue())));
             int previous = team.staff().getOrDefault(entry.getKey(), 0);
             int delta = entry.getValue() - previous;
@@ -244,9 +252,13 @@ public class ScoringEngine {
             capacityUsed = capacityUsed.add(div(produced.get(spec.code()), upw));
         }
 
+        BigDecimal reportCost = Boolean.TRUE.equals(d.marketReport())
+                ? nz(scenario.params().marketReportCost()) : ZERO;
+
         return new Plan(planned, produced, prices, effectiveCost, effectiveQuality, effects,
                 spendByChannel, investByProject, staff, materials, money(payroll), money(hiring),
                 money(marketing), money(rndSpend), money(holding), money(capacityCost),
+                money(reportCost),
                 div(capacityCost, nz(scenario.params().machineCostPerWorker())),
                 units(required), units(capacityUsed), workers);
     }
@@ -259,7 +271,7 @@ public class ScoringEngine {
     private Plan fitToCash(Scenario scenario, TeamInput team, Plan p) {
         BigDecimal fixed = nz(scenario.params().fixedCostPerMonth());
         BigDecimal other = p.payroll().add(p.hiring()).add(p.marketing()).add(p.rndSpend())
-                .add(p.holding()).add(fixed).add(p.capacityCost());
+                .add(p.holding()).add(fixed).add(p.capacityCost()).add(p.reportCost());
         BigDecimal available = nz(team.cash()).subtract(other).max(ZERO);
         if (p.materials().compareTo(available) <= 0) {
             return p;
@@ -280,12 +292,14 @@ public class ScoringEngine {
         return new Plan(p.planned(), produced, p.prices(), p.effectiveCost(), p.effectiveQuality(),
                 p.effects(), p.spendByChannel(), p.investByProject(), p.staff(), money(materials),
                 p.payroll(), p.hiring(), p.marketing(), p.rndSpend(), p.holding(), p.capacityCost(),
-                p.machineAdded(), p.plannedWorkers(), units(capacityUsed), p.capacityAvailable());
+                p.reportCost(), p.machineAdded(), p.plannedWorkers(), units(capacityUsed),
+                p.capacityAvailable());
     }
 
     // ------------------------------------------------------------------ market
 
-    private Map<Long, Map<String, Double>> allocateDemand(Scenario scenario, int round,
+    private Map<Long, Map<String, Double>> allocateDemand(Scenario scenario,
+                                                          EnvironmentService.RoundEnvironment environment,
                                                           List<TeamInput> teams, List<Plan> plans) {
         Map<Long, Map<String, Double>> result = new LinkedHashMap<>();
         for (TeamInput team : teams) {
@@ -300,7 +314,8 @@ public class ScoringEngine {
                 attractiveness[i] = attractiveness(scenario, spec.code(), teams.get(i), plans.get(i));
                 sum += attractiveness[i];
             }
-            BigDecimal pool = poolFor(scenario, spec, round, teams.size());
+            BigDecimal pool = poolFor(scenario, spec, environment.round(), teams.size())
+                    .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE)));
             for (int i = 0; i < teams.size(); i++) {
                 double share = sum <= 0 ? 0 : (attractiveness[i] / sum) * (1 - baselineShare);
                 BigDecimal demand = units(pool.multiply(bd(share)));
@@ -311,10 +326,12 @@ public class ScoringEngine {
     }
 
     /** Total units demanded across every product in a round, for a cohort of this size. */
-    public BigDecimal marketPool(Scenario scenario, int round, int companies) {
+    public BigDecimal marketPool(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                                 int companies) {
         BigDecimal pool = ZERO;
         for (Scenario.ProductSpec spec : scenario.products()) {
-            pool = pool.add(poolFor(scenario, spec, round, companies));
+            pool = pool.add(poolFor(scenario, spec, environment.round(), companies)
+                    .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE))));
         }
         return units(pool);
     }
@@ -365,9 +382,10 @@ public class ScoringEngine {
 
     // ------------------------------------------------------------------ settlement
 
-    private TeamOutcome settle(Scenario scenario, int round, TeamInput team, Plan plan,
-                               Map<String, Double> demand) {
+    private TeamOutcome settle(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                               TeamInput team, Plan plan, Map<String, Double> demand) {
         Scenario.Params p = scenario.params();
+        int round = environment.round();
         List<ProductLine> lines = new ArrayList<>();
         Map<String, BigDecimal> stock = new LinkedHashMap<>();
 
@@ -475,11 +493,11 @@ public class ScoringEngine {
         BigDecimal fixed = nz(p.fixedCostPerMonth());
         BigDecimal profit = revenue.subtract(cogs).subtract(plan.payroll()).subtract(plan.marketing())
                 .subtract(plan.rndSpend()).subtract(fixed).subtract(plan.holding())
-                .subtract(plan.hiring());
+                .subtract(plan.hiring()).subtract(plan.reportCost());
         BigDecimal cashAfter = nz(team.cash()).add(revenue).subtract(plan.materials())
                 .subtract(plan.payroll()).subtract(plan.marketing()).subtract(plan.rndSpend())
                 .subtract(fixed).subtract(plan.holding()).subtract(plan.hiring())
-                .subtract(plan.capacityCost()).add(refund);
+                .subtract(plan.capacityCost()).subtract(plan.reportCost()).add(refund);
         BigDecimal cashChange = cashAfter.subtract(nz(team.cash()));
 
         BigDecimal brandAfter = brand(scenario, team.brand(), plan.spendByChannel());
@@ -489,9 +507,9 @@ public class ScoringEngine {
         return new TeamOutcome(team.teamId(), status, money(cashAfter), brandAfter,
                 money(nz(team.machineWorkers()).add(plan.machineAdded())), plan.staff(), stock, lines,
                 money(revenue), money(cogs), plan.payroll(), plan.marketing(), plan.rndSpend(),
-                money(fixed), plan.holding(), plan.hiring(), plan.capacityCost(), money(profit),
-                money(cashChange), units(lostSales), plan.capacityUsed(), plan.capacityAvailable(),
-                rndUpdates);
+                money(fixed), plan.holding(), plan.hiring(), plan.capacityCost(), plan.reportCost(),
+                money(profit), money(cashChange), units(lostSales), plan.capacityUsed(),
+                plan.capacityAvailable(), rndUpdates);
     }
 
     /** Brand is a stock, not a flow: this month's spend is felt next month, and it decays (D5/marketing). */
