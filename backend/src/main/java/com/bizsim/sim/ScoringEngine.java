@@ -4,6 +4,9 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,7 +66,8 @@ public class ScoringEngine {
     }
 
     public record RndUpdate(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
-                            String status, BigDecimal benefitFactor, Integer completedRound) {
+                            String status, BigDecimal benefitFactor, Integer completedRound,
+                            BigDecimal threshold) {
     }
 
     public record TeamOutcome(long teamId, String status, BigDecimal cash, BigDecimal brand,
@@ -409,6 +413,7 @@ public class ScoringEngine {
             Integer started = state == null ? null : state.startedRound();
             BigDecimal factor = state == null ? ZERO : nz(state.benefitFactor());
             Integer completedRound = null;
+            BigDecimal roll = null;
 
             BigDecimal invest = "ACTIVE".equals(status)
                     ? nz(plan.investByProject().getOrDefault(project.code(), ZERO)) : ZERO;
@@ -419,26 +424,52 @@ public class ScoringEngine {
                 months = round - started + 1;
                 invested = invested.add(invest);
                 if (months >= project.durationMonths()) {
+                    completedRound = round;
                     BigDecimal ratio = div(invested, project.hiddenCost());
                     BigDecimal minimum = nz(p.minRndBenefitRatio());
-                    if (ratio.compareTo(minimum) < 0) {
+
+                    if (ratio.compareTo(ONE) >= 0) {
+                        status = "COMPLETED";
+                        factor = ONE;
+                    } else if (!project.partialBenefit() || ratio.compareTo(minimum) < 0) {
+                        // D17: partial credit is a per-project switch. Off means 100% or nothing.
                         status = "FAILED";
                         factor = ZERO;
                     } else {
-                        BigDecimal span = ONE.subtract(minimum);
-                        factor = min(ONE, div(ratio.subtract(minimum), span));
-                        status = "COMPLETED";
+                        BigDecimal progress = min(ONE,
+                                div(ratio.subtract(minimum), ONE.subtract(minimum)));
+                        String curve = project.benefitCurve() == null ? "LINEAR" : project.benefitCurve();
+                        if ("CHANCE".equals(curve)) {
+                            // The dice is a hidden threshold, drawn once per team+round+project from a
+                            // seeded digest. Investment is compared against it, so the same inputs
+                            // always produce the same answer on replay (decision 4) — the trainee
+                            // just cannot see the number in advance.
+                            BigDecimal threshold = minimum.add(ONE.subtract(minimum)
+                                    .multiply(roll(team.teamId(), round, project.code())))
+                                    .setScale(4, RoundingMode.HALF_UP);
+                            roll = threshold;
+                            boolean success = ratio.compareTo(threshold) >= 0;
+                            factor = success ? ONE : ZERO;
+                            status = success ? "COMPLETED" : "FAILED";
+                        } else {
+                            factor = "POWER".equals(curve)
+                                    ? power(progress, project.benefitExponent())
+                                    : progress;
+                            status = "COMPLETED";
+                        }
+                    }
+
+                    if ("COMPLETED".equals(status)) {
                         BigDecimal over = invested.subtract(project.hiddenCost());
-                        if (over.signum() > 0) {
+                        if (over.signum() > 0 && project.refundsOverfunding()) {
                             refund = refund.add(over);
                             invested = project.hiddenCost();
                         }
                     }
-                    completedRound = round;
                 }
             }
             rndUpdates.add(new RndUpdate(project.code(), money(invested), months, started, status,
-                    factor.setScale(4, RoundingMode.HALF_UP), completedRound));
+                    factor.setScale(4, RoundingMode.HALF_UP), completedRound, roll));
         }
 
         BigDecimal fixed = nz(p.fixedCostPerMonth());
@@ -542,6 +573,32 @@ public class ScoringEngine {
 
     private static BigDecimal div(BigDecimal a, BigDecimal b) {
         return b == null || b.signum() == 0 ? ZERO : a.divide(b, 6, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal power(BigDecimal base, BigDecimal exponent) {
+        double value = Math.pow(base.doubleValue(), nz(exponent).doubleValue());
+        return min(ONE, bd(value)).max(ZERO);
+    }
+
+    /**
+     * A uniform value in [0, 1) derived from the team, round and project. Deterministic on purpose:
+     * the same round recomputed (a void, a retry, a dispute) must produce the same outcome, which is
+     * what keeps the CHANCE curve compatible with decision 4.
+     */
+    private static BigDecimal roll(long teamId, int round, String projectCode) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest((teamId + ":" + round + ":" + projectCode)
+                    .getBytes(StandardCharsets.UTF_8));
+            long bits = 0;
+            for (int i = 0; i < 8; i++) {
+                bits = (bits << 8) | (bytes[i] & 0xffL);
+            }
+            double uniform = (double) ((bits & 0x7fffffffffffffffL) >>> 11) / (double) (1L << 53);
+            return bd(uniform);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is unavailable", e);
+        }
     }
 
     private static BigDecimal min(BigDecimal a, BigDecimal b) {

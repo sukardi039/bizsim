@@ -82,6 +82,7 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 | D14 | **Price elasticity is tuning data, not a ruling yet** (Q-I): the default model stands (cheapest does not automatically win), and the exponent stays in scenario data so it can be changed after the pilot without code. |
 | D15 | **Every listed company aspect is wanted eventually** (spec §10), including hiring/firing, capacity, quality upgrade, paid market research, working capital, and new-product launch from R&D. Dividends are rejected. Sequence is fixed by the delivery plan, not by this line. |
 | D16 | **No legacy scenario exists** (Q-E): scenario #1 is invented and **provisional**; all constants are calibration targets to be reviewed at the S7 rehearsal. |
+| D17 | **R&D partial credit and over-funding are per-project definition**, not engine constants: a `partial_benefit` on/off switch; a curve of `LINEAR`, `POWER` (exponent; 2.0 makes the last dollars buy the most) or `CHANCE` (hidden threshold, so more investment means a higher chance of full success); and `overfunding` either `REFUND` or `LOST`. `CHANCE` draws its threshold from a **seeded** digest of company + round + project, so a recomputed round returns the same outcome — the uncertainty belongs to the trainee, not to the server. |
 
 ### Consequences of D8–D16
 
@@ -94,6 +95,10 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 9. Working capital and new-product launch are **not built in v1** but must stay additive: revenue
    timing is isolated in the statement (§4 step 6 of the model spec) and a new product is a
    `company_product` row, not a schema change. Any code that assumes "3 products exist" is a bug.
+10. `CHANCE` is deterministic in form (D17): the threshold is derived from an immutable seed, so
+    "same inputs, same number" still holds and a voided round recomputes identically. If a trainer
+    ever wants genuinely irreproducible outcomes, that is a documented exception to decision 4 and
+    must be written down before the code changes.
 
 ## Consequences that are now binding
 

@@ -68,9 +68,25 @@ a subscription, not a purchase.
 | RND-CAP | whole line | capacity +20% | 400 M | 4 months | 300–500 M |
 | RND-MKT-P1 | P1 | attractiveness +15% | 250 M | 2 months | 200–300 M |
 
-D10: the outcome is decided **at the end of the duration**, by `invested / hidden cost`. Below 80%
-the project fails and the money is gone. From 80% to 100% the benefit scales linearly, so 90% funding
-returns half the advantage. No dice.
+D10/D17: the outcome is decided **at the end of the duration**, by `invested / hidden cost`. Below 80%
+the project fails and the money is gone. From 80% to 100% the benefit follows the project's curve —
+`LINEAR` by default; `POWER` (exponent 2.0) makes the last dollars worth the most; `CHANCE` turns the
+80–100% band into a hidden success threshold, so the funding ratio is the probability of full success.
+Every project can also switch partial credit off entirely (100% or nothing) and can keep or refund
+over-funding.
+
+**The shipped slate is `LINEAR` + `REFUND`**, so the measured table in §6 stays valid and the standard
+scenario matches D10 exactly. Changing one project is one statement:
+
+```sql
+update rnd_project set benefit_curve = 'POWER', benefit_exponent = 2.0 where code = 'RND-CAP';
+update rnd_project set benefit_curve = 'CHANCE'                          where code = 'RND-P3-QUAL';
+update rnd_project set partial_benefit = false                           where code = 'RND-MKT-P1';
+update rnd_project set overfunding = 'LOST'                             where code = 'RND-P2-COST';
+```
+
+If you change any of these for the pilot, re-run `ScenarioCalibrationTest` — it asserts the lesson
+shape, and the curve values are covered by `ScoringEngineTest`.
 
 ## 6. Measured round 1 — three strategies, three companies, no R&D effects yet
 

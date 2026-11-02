@@ -61,10 +61,15 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
 
     public record ProjectSpec(String code, String name, String targetProduct, String advantageType,
                               BigDecimal advantageValue, BigDecimal hiddenCost, BigDecimal hintBand,
-                              int durationMonths) {
+                              int durationMonths, boolean partialBenefit, String benefitCurve,
+                              BigDecimal benefitExponent, String overfunding) {
 
         public boolean processWide() {
             return targetProduct == null || targetProduct.isBlank();
+        }
+
+        public boolean refundsOverfunding() {
+            return !"LOST".equals(overfunding);
         }
     }
 }

@@ -139,7 +139,7 @@ brand = brand × (1 − decay) + Σ_c α_c × sqrt(spend_c)      capped 0..100
 - `decay` ≈ 0.10/month, `α_c` per channel, both scenario data.
 - Marketing must be paid **every month** to hold brand — that is the intended lesson.
 
-## 6. R&D (PROPOSED — deterministic, per decision 4)
+## 6. R&D — ruled (D10, D17)
 
 A project is a row of scenario data:
 
@@ -153,21 +153,39 @@ code, name, targetProduct, hiddenCost, hintBand(±%), advantageType, advantageVa
 - **Fixed duration (D10).** Every project has `duration_months`. Investment accumulates while it is
   active; the outcome is evaluated **at the end of that duration**, not when the money crosses the
   threshold. A project funded in its last month is evaluated like any other.
-- **Outcome (D10).** `ratio = cumulativeInvested / hiddenCost`.
-  - `ratio < 0.80` → **FAILED**. The money is gone, nothing is refunded.
-  - `0.80 ≤ ratio < 1.00` → **COMPLETED with partial benefit**:
-    `factor = (ratio − 0.80) / 0.20`, so 80% funding yields 0% of the advantage and 100% yields all
-    of it. A late or thin programme still returns something, which is the lesson.
-  - `ratio ≥ 1.00` → **COMPLETED at full benefit**; money above `hiddenCost` is refunded at
-    completion (**assumed** — the ruling did not cover over-funding).
-- **No random number generator.** Decision 4 requires a deterministic number, and a trainee must be
-  able to explain a failure. "I funded 80% of a programme and got a fraction of the benefit" is
-  explainable; "you rolled badly" is not.
+- **Outcome (D10, D17).** `ratio = cumulativeInvested / hiddenCost`, and
+  `progress = (ratio − 0.80) / 0.20`.
+  - `ratio ≥ 1.00` → **COMPLETED at full benefit**, always, whatever the curve.
+  - `partial_benefit = false` → **100% or nothing**: any ratio below 1.00 fails.
+  - `partial_benefit = true` and `ratio < 0.80` → **FAILED**, money gone.
+  - otherwise the curve decides the factor:
+
+| Curve | Factor at 85% funding | 90% | 95% | Shape |
+|---|---|---|---|---|
+| `LINEAR` | 0.25 | 0.50 | 0.75 | every dollar buys the same |
+| `POWER` (exponent 2.0) | 0.0625 | 0.25 | 0.5625 | the last dollars buy the most |
+| `POWER` (exponent 0.5) | 0.50 | 0.71 | 0.87 | early dollars buy the most |
+| `CHANCE` | 25% chance of full | 50% | 75% | all or nothing, odds rise with funding |
+
+- **`CHANCE` (D17).** The "dice" is a hidden threshold drawn uniformly in `[0.80, 1.00)` from a
+  SHA-256 digest of `teamId:round:projectCode`. Success if `ratio ≥ threshold`, full benefit or none.
+  Two consequences a facilitator should know: the odds are exactly the funding ratio, and a
+  recomputed round gives the same answer, so a disputed month can be replayed in front of the class.
+  The threshold is recorded in the round statement, so the debrief can say "you had 60%, the bar was
+  94%".
+- **Over-funding (D17).** `overfunding = REFUND` returns everything above the hidden cost at
+  completion; `LOST` lets the programme keep it. Only completed projects can refund — a failed
+  project has already consumed what it was given.
+- The **terms** of every project (`partial_benefit`, curve, exponent, overfunding, duration, cost
+  band) are public in the decision context; only `hiddenCost` is withheld.
+- **No dice in the default model.** `LINEAR`/`POWER` are pure arithmetic and a trainee can explain a
+  failure. `CHANCE` is opt-in per project and is seeded (above), so it stays reproducible even though
+  it is uncertain. "You rolled badly" is never the whole explanation: the statement records the bar
+  you had to clear.
 - **Hint:** each project shows an estimated cost **band** (e.g. "Rp 90–130 million"), derived
   deterministically from `hiddenCost` and `hintBand`. No noise, no RNG.
-- **Overshoot:** money above `hiddenCost` is not consumed (returned), so there is no penalty for
-  over-funding beyond the opportunity cost. Keeps validation simple and avoids a "wasted cash"
-  argument in the room.
+- **Overshoot:** follows the project's `overfunding` policy (D17) — `REFUND` gives the excess back at
+  completion, `LOST` keeps it. The shipped slate is `REFUND`.
 - **Advantage types for v1** (each maps to an existing variable, so no new engine):
   1. `UNIT_COST_DOWN` — unit cost of product j −x%.
   2. `CAPACITY_UP` — units per worker for j +x%.

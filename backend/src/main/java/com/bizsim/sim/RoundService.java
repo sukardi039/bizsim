@@ -233,6 +233,11 @@ public class RoundService {
             row.put("advantageType", project.advantageType());
             row.put("advantageValue", project.advantageValue());
             row.put("durationMonths", project.durationMonths());
+            // D17: the terms of the programme are public; only its cost is hidden.
+            row.put("partialBenefit", project.partialBenefit());
+            row.put("benefitCurve", project.benefitCurve());
+            row.put("benefitExponent", project.benefitExponent());
+            row.put("overfunding", project.overfunding());
             row.put("hintLow", estimateLow(project));
             row.put("hintHigh", estimateHigh(project));
             row.put("invested", state == null ? BigDecimal.ZERO : state.invested());

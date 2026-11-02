@@ -95,13 +95,16 @@ public class ScenarioRepository {
 
         List<Scenario.ProjectSpec> projects = jdbc.query("""
                 select code, name, target_product, advantage_type, advantage_value, hidden_cost,
-                       hint_band, duration_months
+                       hint_band, duration_months, partial_benefit, benefit_curve, benefit_exponent,
+                       overfunding
                 from rnd_project where scenario_key = ? order by code
                 """, (rs, i) -> new Scenario.ProjectSpec(
                         rs.getString("code"), rs.getString("name"), rs.getString("target_product"),
                         rs.getString("advantage_type"), rs.getBigDecimal("advantage_value"),
                         rs.getBigDecimal("hidden_cost"), rs.getBigDecimal("hint_band"),
-                        rs.getInt("duration_months")), key);
+                        rs.getInt("duration_months"), rs.getBoolean("partial_benefit"),
+                        rs.getString("benefit_curve"), rs.getBigDecimal("benefit_exponent"),
+                        rs.getString("overfunding")), key);
 
         if (products.isEmpty()) {
             throw new IllegalStateException("scenario " + key + " has no products");

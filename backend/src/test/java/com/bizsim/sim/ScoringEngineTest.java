@@ -113,6 +113,84 @@ class ScoringEngineTest {
         assertThat(outcome.status()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void partial_benefit_switched_off_needs_full_funding() {
+        Scenario hard = scenario(project(true, "LINEAR", ONE, "REFUND"));
+        Scenario strict = scenario(project(false, "LINEAR", ONE, "REFUND"));
+        ScoringEngine.RndState started = new ScoringEngine.RndState("PRJ", bd("400"), 1, 1, "ACTIVE", ZERO);
+
+        // 90% funding: partial credit under the switch, failure without it.
+        assertThat(runAt(2, team(decision(bd("0"), bd("500")), bd("1000000"), "ACTIVE",
+                Map.of("PRJ", started), ZERO), hard).rndUpdates().get(0).status()).isEqualTo("COMPLETED");
+        ScoringEngine.RndUpdate strictResult = runAt(2, team(decision(bd("0"), bd("500")),
+                bd("1000000"), "ACTIVE", Map.of("PRJ", started), ZERO), strict).rndUpdates().get(0);
+        assertThat(strictResult.status()).isEqualTo("FAILED");
+        assertThat(strictResult.benefitFactor()).isEqualByComparingTo("0.0000");
+    }
+
+    @Test
+    void power_curve_makes_the_last_dollars_worth_more() {
+        // 90% funding -> progress 0.5 -> 0.5^2 = 0.25 of the advantage, versus 0.5 on the linear curve.
+        Scenario parabolic = scenario(project(true, "POWER", bd("2.0"), "REFUND"));
+        ScoringEngine.RndState started = new ScoringEngine.RndState("PRJ", bd("400"), 1, 1, "ACTIVE", ZERO);
+
+        ScoringEngine.RndUpdate update = runAt(2, team(decision(bd("0"), bd("500")), bd("1000000"),
+                "ACTIVE", Map.of("PRJ", started), ZERO), parabolic).rndUpdates().get(0);
+
+        assertThat(update.status()).isEqualTo("COMPLETED");
+        assertThat(update.benefitFactor()).isEqualByComparingTo("0.2500");
+    }
+
+    @Test
+    void chance_curve_is_a_hidden_threshold_and_replays_identically() {
+        Scenario chance = scenario(project(true, "CHANCE", ONE, "REFUND"));
+        ScoringEngine.RndState started = new ScoringEngine.RndState("PRJ", bd("400"), 1, 1, "ACTIVE", ZERO);
+        ScoringEngine.TeamInput input = team(decision(bd("0"), bd("500")), bd("1000000"), "ACTIVE",
+                Map.of("PRJ", started), ZERO);
+
+        ScoringEngine.RndUpdate first = runAt(2, input, chance).rndUpdates().get(0);
+        ScoringEngine.RndUpdate again = runAt(2, input, chance).rndUpdates().get(0);
+
+        assertThat(first.threshold()).isEqualByComparingTo(again.threshold());
+        assertThat(first.status()).isEqualTo(again.status());
+        assertThat(first.threshold()).isBetween(new BigDecimal("0.8000"), new BigDecimal("1.0000"));
+        // The outcome follows from the threshold, not from a fresh roll: 90% funding.
+        boolean expected = new BigDecimal("0.900000").compareTo(first.threshold()) >= 0;
+        assertThat(first.status()).isEqualTo(expected ? "COMPLETED" : "FAILED");
+    }
+
+    @Test
+    void chance_curve_draws_a_different_threshold_per_company_but_never_a_certainty() {
+        Scenario chance = scenario(project(true, "CHANCE", ONE, "REFUND"));
+        java.util.Set<String> thresholds = new java.util.HashSet<>();
+
+        for (long id = 1; id <= 20; id++) {
+            ScoringEngine.TeamInput input = new ScoringEngine.TeamInput(id, "ACTIVE", bd("1000000"),
+                    bd("1000000"), ZERO, Map.of("PRODUCTION", 10),
+                    Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO)),
+                    Map.of("PRJ", new ScoringEngine.RndState("PRJ", bd("400"), 1, 1, "ACTIVE", ZERO)),
+                    decision(bd("0"), bd("500")));
+            thresholds.add(runAt(2, input, chance).rndUpdates().get(0).threshold().toPlainString());
+        }
+        assertThat(thresholds).hasSizeGreaterThan(10);
+    }
+
+    @Test
+    void overfunding_is_refunded_or_lost_as_the_project_says() {
+        ScoringEngine.RndState started = new ScoringEngine.RndState("PRJ", bd("0"), 1, 1, "ACTIVE", ZERO);
+
+        ScoringEngine.TeamOutcome refunded = runAt(2, team(decision(bd("0"), bd("2000")), bd("1000000"),
+                "ACTIVE", Map.of("PRJ", started), ZERO), scenario(project(true, "LINEAR", ONE, "REFUND")));
+        ScoringEngine.TeamOutcome lost = runAt(2, team(decision(bd("0"), bd("2000")), bd("1000000"),
+                "ACTIVE", Map.of("PRJ", started), ZERO), scenario(project(true, "LINEAR", ONE, "LOST")));
+
+        // Cash: 1,000,000 - 2,000 spent, + 1,000 returned only under REFUND.
+        assertThat(refunded.cash()).isEqualByComparingTo("999000.00");
+        assertThat(refunded.rndUpdates().get(0).invested()).isEqualByComparingTo("1000.00");
+        assertThat(lost.cash()).isEqualByComparingTo("998000.00");
+        assertThat(lost.rndUpdates().get(0).invested()).isEqualByComparingTo("2000.00");
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private ScoringEngine.TeamOutcome run(ScoringEngine.TeamInput team) {
@@ -120,7 +198,11 @@ class ScoringEngineTest {
     }
 
     private ScoringEngine.TeamOutcome runAt(int round, ScoringEngine.TeamInput team) {
-        return engine.compute(scenario(), round, List.of(team)).teams().get(0);
+        return runAt(round, team, scenario());
+    }
+
+    private ScoringEngine.TeamOutcome runAt(int round, ScoringEngine.TeamInput team, Scenario scenario) {
+        return engine.compute(scenario, round, List.of(team)).teams().get(0);
     }
 
     private static ScoringEngine.ProductLine line(ScoringEngine.TeamOutcome outcome) {
@@ -128,6 +210,10 @@ class ScoringEngineTest {
     }
 
     private static Scenario scenario() {
+        return scenario(project(true, "LINEAR", ONE, "REFUND"));
+    }
+
+    private static Scenario scenario(Scenario.ProjectSpec project) {
         return new Scenario("test",
                 new Scenario.Params(4, 20, bd("1000000"), bd("50"), ZERO, bd("0.10"), ZERO,
                         bd("50"), bd("1000000"), bd("100000"), ONE, ONE, bd("0.80"), ZERO,
@@ -136,8 +222,13 @@ class ScoringEngineTest {
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
                         bd("10000"), bd("10"))),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
-                List.of(new Scenario.ProjectSpec("PRJ", "Process", "P", "UNIT_COST_DOWN",
-                        bd("0.5"), bd("1000"), bd("0.2"), 2)));
+                List.of(project));
+    }
+
+    private static Scenario.ProjectSpec project(boolean partialBenefit, String curve,
+                                                BigDecimal exponent, String overfunding) {
+        return new Scenario.ProjectSpec("PRJ", "Process", "P", "UNIT_COST_DOWN", bd("0.5"), bd("1000"),
+                bd("0.2"), 2, partialBenefit, curve, exponent, overfunding);
     }
 
     private static ScoringEngine.TeamInput team(DecisionPayload decision, BigDecimal cash,
