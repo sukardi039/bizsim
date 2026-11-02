@@ -70,6 +70,20 @@ a round, read the decision form context, see the market report refused with 402 
 submit a decision, get an over-capacity plan rejected with a worker count, close the round, print the
 scoreboard and the line-item statement, and prove a double close computes nothing twice.
 
+## Facilitator console (`web/`)
+
+```bash
+cd web
+npm install
+npm run dev      # http://localhost:5173, proxies /api to the backend on 8080
+npm run build    # static bundle in web/dist
+```
+
+Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
+then drive the session with **Open next round** and **Compute round**. The scoreboard refreshes from a
+server-sent event stream, so a second browser on the same run sees the same round land within a
+second. Player decision forms are the next sprint (S4); the console is read-and-drive only.
+
 ## Test
 
 ```bash

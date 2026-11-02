@@ -10,3 +10,5 @@ dist/
 .env.local
 *.log
 .dev/
+web/node_modules/
+web/dist/

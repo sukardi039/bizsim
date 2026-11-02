@@ -221,6 +221,27 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_run_list_is_scoped_to_the_tenant() throws Exception {
+        mvc.perform(get("/api/runs").header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value((int) runId))
+                .andExpect(jsonPath("$[0].teams.length()").value(2));
+
+        // Another tenant must see an empty list, not this tenant's runs.
+        long other = jdbc.queryForObject(
+                "insert into tenant (code, name) values ('other', 'Other') returning id", Long.class);
+        jdbc.update("""
+                insert into app_user (tenant_id, email, password_hash, display_name, role)
+                values (?, 'boss@other.test', ?, 'boss', 'FACILITATOR')
+                """, other, encoder.encode("pw-boss@other.test"));
+        String otherToken = loginOn("other", "boss@other.test");
+
+        mvc.perform(get("/api/runs").header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void the_market_report_is_paywalled_and_then_readable() throws Exception {
         openRound();
 
@@ -359,6 +380,17 @@ class RoundFlowApiTest extends PostgresTestBase {
                 insert into app_user (tenant_id, email, password_hash, display_name, role)
                 values (?, ?, ?, ?, ?)
                 """, tenantId, email, encoder.encode("pw-" + email), email, role);
+    }
+
+    private String loginOn(String tenantCode, String email) throws Exception {
+        MvcResult result = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", tenantCode, "email", email,
+                                "password", "pw-" + email))))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
 
     private String login(String email) throws Exception {

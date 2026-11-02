@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -153,6 +154,16 @@ public class RunService {
     @Transactional(readOnly = true)
     public RunView get(long tenantId, long runId) {
         return view(tenantId, runId);
+    }
+
+    /** Runs of the caller's tenant, newest first. Feeds the console sidebar. */
+    @Transactional(readOnly = true)
+    public List<RunView> runs(long tenantId) {
+        List<RunView> views = new ArrayList<>();
+        for (RunRepository.RunRow run : runs.findAll(tenantId)) {
+            views.add(view(tenantId, run.id()));
+        }
+        return views;
     }
 
     private RunView view(long tenantId, long runId) {

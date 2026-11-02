@@ -42,6 +42,12 @@ public class RunController {
                 request.scenarioKey(), request.teams(), request.rounds(), request.cycles());
     }
 
+    @GetMapping
+    public List<RunService.RunView> list() {
+        TenantContext.Principal me = TenantContext.require();
+        return runs.runs(me.tenantId());
+    }
+
     @GetMapping("/{id}")
     public RunService.RunView get(@PathVariable long id) {
         return runs.get(TenantContext.require().tenantId(), id);

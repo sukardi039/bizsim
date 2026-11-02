@@ -54,6 +54,13 @@ public class RunRepository {
                 """, Long.class, tenantId, name, scenarioKey, facilitatorId);
     }
 
+    /** Every run of one tenant, newest first. The tenant id comes from the token, never the caller. */
+    public List<RunRow> findAll(long tenantId) {
+        return jdbc.query("""
+                select * from run where tenant_id = ? order by id desc
+                """, RUN, tenantId);
+    }
+
     public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles) {
         return jdbc.queryForObject("""
                 insert into run (tenant_id, simulation_id, scenario_key, status, current_round,
