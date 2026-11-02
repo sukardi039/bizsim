@@ -79,17 +79,21 @@ public class ScenarioRepository {
                 salaryMap, staffMap,
                 dec(d.path("marketReportCost")),
                 d.path("forecastHorizon").asInt(2),
-                dec(d.path("forecastBand")));
+                dec(d.path("forecastBand")),
+                d.path("cycles").asInt(2),
+                d.path("cycleLength").asInt(4),
+                dec(d.path("cycleDemandDrift")),
+                dec(d.path("cycleCostDrift")));
 
         List<Scenario.ProductSpec> products = jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
-                       income_elasticity
+                       income_elasticity, trend_affinity
                 from product where scenario_key = ? order by code
                 """, (rs, i) -> new Scenario.ProductSpec(
                         rs.getString("code"), rs.getString("name"), rs.getBigDecimal("base_price"),
                         rs.getBigDecimal("base_unit_cost"), rs.getBigDecimal("base_quality"),
                         rs.getBigDecimal("base_demand"), rs.getBigDecimal("units_per_worker"),
-                        rs.getBigDecimal("income_elasticity")), key);
+                        rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity")), key);
 
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
@@ -116,11 +120,13 @@ public class ScenarioRepository {
         }
 
         List<Scenario.RoundSpec> rounds = jdbc.query("""
-                select round_number, demand_index, cost_index, wage_index, note
+                select round_number, demand_index, cost_index, wage_index, trend_strength,
+                       trend_label, note
                 from scenario_round where scenario_key = ? order by round_number
                 """, (rs, i) -> new Scenario.RoundSpec(
                         rs.getInt("round_number"), rs.getBigDecimal("demand_index"),
                         rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
+                        rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
                         rs.getString("note")), key);
 
         List<Scenario.EventSpec> events = jdbc.query("""

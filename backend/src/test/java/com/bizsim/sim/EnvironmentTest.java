@@ -26,15 +26,23 @@ class EnvironmentTest extends PostgresTestBase {
     @Autowired
     private JdbcTemplate jdbc;
 
+    /**
+     * A run id that no test creates, so no scheduled event can leak into a pure-economy assertion.
+     * Circumstances collide here because every test class shares one PostgreSQL instance.
+     */
+    private static final long NO_EVENTS_RUN = 987_654_321L;
+
     @Test
     void a_recession_hits_the_premium_product_harder_than_the_basic_one() {
         Scenario scenario = scenarios.load("standard-v1");
 
-        // Round 4 is the trough: demand index 0.90, cost index 1.08.
-        EnvironmentService.RoundEnvironment trough = environment.forRound(scenario, 1L, 4);
+        // Position 3 of the cycle is the recession: demand index 0.92, cost index 1.07.
+        EnvironmentService.RoundEnvironment trough = environment.forRound(scenario, NO_EVENTS_RUN, 3);
 
-        assertThat(trough.demandIndex()).isEqualByComparingTo("0.900");
-        assertThat(trough.costIndex()).isEqualByComparingTo("1.080");
+        assertThat(trough.demandIndex()).isEqualByComparingTo("0.920");
+        assertThat(trough.costIndex()).isEqualByComparingTo("1.070");
+        assertThat(trough.trendStrength())
+                .as("consumers trade down in the same round").isEqualByComparingTo("-0.40");
         assertThat(trough.demandByProduct().get("P1"))
                 .as("basic, elasticity 0.4").isGreaterThan(trough.demandByProduct().get("P2"));
         assertThat(trough.demandByProduct().get("P2"))
@@ -44,7 +52,7 @@ class EnvironmentTest extends PostgresTestBase {
     @Test
     void a_round_the_timeline_does_not_cover_is_neutral() {
         Scenario scenario = scenarios.load("standard-v1");
-        EnvironmentService.RoundEnvironment far = environment.forRound(scenario, 1L, 99);
+        EnvironmentService.RoundEnvironment far = environment.forRound(scenario, NO_EVENTS_RUN, 99);
 
         assertThat(far.demandIndex()).isEqualByComparingTo("1.000");
         assertThat(far.demandByProduct().get("P3")).isEqualByComparingTo("1.000");
@@ -95,9 +103,29 @@ class EnvironmentTest extends PostgresTestBase {
 
         assertThat(first.toString()).isEqualTo(again.toString());
         assertThat(first).allSatisfy(row -> assertThat((Integer) row.get("starts_round")).isBetween(1, 7));
-        // Two different runs draw independently; with four cards the schedules are not always equal.
-        assertThat(first.toString().equals(other.toString())
-                || first.size() != other.size()).isTrue();
+        // Two runs are drawn independently: each schedule is valid for its own window.
+        assertThat(other).allSatisfy(row -> assertThat((Integer) row.get("starts_round")).isBetween(1, 7));
+    }
+
+    @Test
+    void a_second_cycle_repeats_the_shape_with_a_drift() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long runId = seedRun();
+
+        environment.generateTimeline(scenario, runId, 8);
+
+        // Same cycle position, one cycle later: 2% demand drift on top of the template.
+        assertThat(environment.forRound(scenario, runId, 1).demandIndex())
+                .isEqualByComparingTo("1.000");
+        assertThat(environment.forRound(scenario, runId, 5).demandIndex())
+                .isEqualByComparingTo("1.020");
+        // The recession and the consumer trade-down repeat at positions 3 and 7.
+        assertThat(environment.forRound(scenario, runId, 3).trendStrength())
+                .isEqualByComparingTo("-0.40");
+        assertThat(environment.forRound(scenario, runId, 7).trendStrength())
+                .isEqualByComparingTo("-0.40");
+        assertThat(environment.forRound(scenario, runId, 7).demandIndex())
+                .isEqualByComparingTo("0.938");
     }
 
     // ------------------------------------------------------------------ helpers

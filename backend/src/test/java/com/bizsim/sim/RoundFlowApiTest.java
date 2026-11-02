@@ -246,6 +246,38 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat(reportCost).isEqualByComparingTo("15000000");
     }
 
+    @Test
+    void cycles_are_configurable_and_rounds_can_exceed_the_default() throws Exception {
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Three cycles", "scenarioKey", "standard-v1", "cycles", 3,
+                                "teams", List.of(Map.of("name", "A", "companyName", "A Inc"))))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.rounds").value(12))
+                .andExpect(jsonPath("$.cycles").value(3))
+                .andReturn();
+        long newRun = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        // Twelve rounds of economy were generated, and the third cycle carries the drift.
+        Integer generated = jdbc.queryForObject(
+                "select count(*) from run_round_economy where run_id = ?", Integer.class, newRun);
+        assertThat(generated).isEqualTo(12);
+        java.math.BigDecimal roundNine = jdbc.queryForObject(
+                "select demand_index from run_round_economy where run_id = ? and round_number = 9",
+                java.math.BigDecimal.class, newRun);
+        assertThat(roundNine).isEqualByComparingTo("1.040");
+
+        // Past the eight-round default: every round must still open, and the thirteenth must not.
+        for (int i = 1; i <= 12; i++) {
+            mvc.perform(post("/api/runs/" + newRun + "/rounds/next")
+                    .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        }
+        mvc.perform(post("/api/runs/" + newRun + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isConflict());
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void advance() throws Exception {

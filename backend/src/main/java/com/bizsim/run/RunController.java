@@ -17,7 +17,8 @@ import java.util.List;
 @RequestMapping("/api/runs")
 public class RunController {
 
-    public record CreateRunRequest(String name, String scenarioKey, List<RunService.TeamSpec> teams) {
+    public record CreateRunRequest(String name, String scenarioKey, List<RunService.TeamSpec> teams,
+                                   Integer rounds, Integer cycles) {
     }
 
     public record AddTeamRequest(String name, String companyName) {
@@ -38,7 +39,7 @@ public class RunController {
         TenantContext.Principal me = requireFacilitator();
         return runs.createRun(me.tenantId(), me.userId(),
                 request.name() == null || request.name().isBlank() ? "Untitled" : request.name(),
-                request.scenarioKey(), request.teams());
+                request.scenarioKey(), request.teams(), request.rounds(), request.cycles());
     }
 
     @GetMapping("/{id}")

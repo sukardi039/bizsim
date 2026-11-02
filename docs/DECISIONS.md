@@ -84,6 +84,7 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 | D16 | **No legacy scenario exists** (Q-E): scenario #1 is invented and **provisional**; all constants are calibration targets to be reviewed at the S7 rehearsal. |
 | D17 | **R&D partial credit and over-funding are per-project definition**, not engine constants: a `partial_benefit` on/off switch; a curve of `LINEAR`, `POWER` (exponent; 2.0 makes the last dollars buy the most) or `CHANCE` (hidden threshold, so more investment means a higher chance of full success); and `overfunding` either `REFUND` or `LOST`. `CHANCE` draws its threshold from a **seeded** digest of company + round + project, so a recomputed round returns the same outcome — the uncertainty belongs to the trainee, not to the server. |
 | D18 | **The economy is a scenario timeline, not a constant.** Each round carries demand, cost and wage indices; each product carries an **income elasticity**, so one downturn hits the premium line harder than the basic line. An **event deck** (conflict, fuel spike, recession, segment boom) is defined at setup and drawn **once per run** from a seed: unpredictable to trainees, frozen and replayable for the facilitator. A **paid market review** reports current conditions and a banded forecast, and never reveals the deck. |
+| D19 | **Cycles are chosen when the simulation is set up.** A scenario defines one **cycle template** (length, shape, per-cycle drift); a run chooses how many cycles to play and may stretch the round count if the cohort needs more time. The expanded economy is frozen per run. The forecast also carries a **consumer trend** — one signed strength per round plus one affinity per product — so a shift in taste tilts demand between segments without anyone forecasting per product. |
 
 ### Consequences of D8–D16
 
@@ -104,6 +105,12 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
     share, lost sales, the scoreboard — uses the environment-adjusted pool, not the base demand.
 12. The event draw is part of the run, not of the scenario (D18): two runs of the same scenario may
     have different events, and the debrief reads `run_environment_event`, never the live draw.
+13. `run.rounds` is the length of a session (D19); `scenario.rounds` is only the length of the cycle
+    template. Anything that asks "how many rounds" reads the run, and a run may be longer than the
+    template by any whole number of positions.
+14. A consumer trend is not a forecast per product (D19): it is one number per round, and the
+    per-product effect comes from the product's affinity. No screen may show a per-product forecast
+    as though the system predicted it.
 
 ## Consequences that are now binding
 

@@ -51,12 +51,15 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          BigDecimal priceElasticity, BigDecimal qualityElasticity,
                          BigDecimal brandElasticity, BigDecimal marketingElasticity,
                          Map<String, BigDecimal> salaries, Map<String, Integer> startingStaff,
-                         BigDecimal marketReportCost, int forecastHorizon, BigDecimal forecastBand) {
+                         BigDecimal marketReportCost, int forecastHorizon, BigDecimal forecastBand,
+                         int cycles, int cycleLength, BigDecimal cycleDemandDrift,
+                         BigDecimal cycleCostDrift) {
     }
 
-    /** The economy for one round. Missing rounds fall back to neutral (1.0). */
+    /** The economy for one cycle position. Missing positions fall back to neutral (1.0). */
     public record RoundSpec(int round, BigDecimal demandIndex, BigDecimal costIndex,
-                            BigDecimal wageIndex, String note) {
+                            BigDecimal wageIndex, BigDecimal trendStrength, String trendLabel,
+                            String note) {
     }
 
     /**
@@ -71,7 +74,7 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
 
     public record ProductSpec(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
                               BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
-                              BigDecimal incomeElasticity) {
+                              BigDecimal incomeElasticity, BigDecimal trendAffinity) {
     }
 
     public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {

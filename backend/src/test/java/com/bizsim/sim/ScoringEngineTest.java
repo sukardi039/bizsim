@@ -195,7 +195,7 @@ class ScoringEngineTest {
     void the_environment_scales_the_market_and_the_input_costs() {
         // Half the demand, double the material cost: the two knobs must reach different places.
         EnvironmentService.RoundEnvironment harsh = new EnvironmentService.RoundEnvironment(1,
-                bd("0.5"), bd("2.0"), ONE, Map.of("P", bd("0.5")), List.of());
+                bd("0.5"), bd("2.0"), ONE, ZERO, null, Map.of("P", bd("0.5")), List.of());
 
         ScoringEngine.TeamOutcome outcome = engine.compute(scenario(), harsh,
                 List.of(team(decision(bd("100"), ZERO), bd("1000000"), "ACTIVE", active("PRJ"), ZERO)))
@@ -237,9 +237,9 @@ class ScoringEngineTest {
                         bd("50"), bd("1000000"), bd("100000"), ONE, ONE, bd("0.80"), ZERO,
                         List.of(ONE), ZERO, ZERO, ZERO, ZERO,
                         Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10),
-                        bd("15000000"), 2, bd("0.08")),
+                        bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01")),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
-                        bd("10000"), bd("10"), ONE)),
+                        bd("10000"), bd("10"), ONE, ZERO)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
                 List.of(project), List.of(), List.of());
     }

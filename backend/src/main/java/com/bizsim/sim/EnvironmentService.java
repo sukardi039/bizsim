@@ -11,16 +11,17 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The economy (ruling D18): a per-round timeline of indices, an event deck drawn once per run, and
- * the forecast a trainee can buy.
+ * The economy (rulings D18, D19): a cycle template expanded into this run's rounds, an event deck
+ * drawn once per run, a consumer-trend signal, and the forecast a trainee can buy.
  *
- * <p>Demand does not move uniformly. Each product has an income elasticity, so the same downturn
- * barely touches the basic product and guts the premium one — that is the lesson, and it is one
- * number per product rather than per-scenario code.
+ * <p>Demand does not move uniformly. Each product has an income elasticity and a trend affinity, so
+ * the same downturn and the same shift in consumer taste hit the basic and the premium line
+ * differently — that is the lesson, and it is two numbers per product rather than per-scenario code.
  */
 @Service
 public class EnvironmentService {
@@ -29,10 +30,12 @@ public class EnvironmentService {
 
     /**
      * The economy as the engine consumes it: market-wide indices plus one already-resolved demand
-     * multiplier per product, so the engine does not need to know about elasticities or events.
+     * multiplier per product, so the engine needs to know nothing about elasticities, trends or
+     * events.
      */
     public record RoundEnvironment(int round, BigDecimal demandIndex, BigDecimal costIndex,
-                                   BigDecimal wageIndex, Map<String, BigDecimal> demandByProduct,
+                                   BigDecimal wageIndex, BigDecimal trendStrength, String trendLabel,
+                                   Map<String, BigDecimal> demandByProduct,
                                    List<String> activeEvents) {
 
         public static RoundEnvironment neutral(int round, Collection<String> products) {
@@ -40,7 +43,8 @@ public class EnvironmentService {
             for (String code : products) {
                 multipliers.put(code, ONE);
             }
-            return new RoundEnvironment(round, ONE, ONE, ONE, multipliers, List.of());
+            return new RoundEnvironment(round, ONE, ONE, ONE, BigDecimal.ZERO, null,
+                    multipliers, List.of());
         }
     }
 
@@ -50,7 +54,43 @@ public class EnvironmentService {
         this.jdbc = jdbc;
     }
 
-    // ------------------------------------------------------------------ the draw
+    // ------------------------------------------------------------------ setup
+
+    /**
+     * Expands the scenario's cycle template into this run's rounds and freezes the result, so the
+     * session can cover two cycles or five, and every run keeps its own copy of the economy.
+     */
+    public void generateTimeline(Scenario scenario, long runId, int rounds) {
+        int length = Math.max(1, scenario.params().cycleLength());
+        if (scenario.rounds().isEmpty()) {
+            return;
+        }
+        BigDecimal demandDrift = ONE.add(nz(scenario.params().cycleDemandDrift()));
+        BigDecimal costDrift = ONE.add(nz(scenario.params().cycleCostDrift()));
+
+        for (int round = 1; round <= rounds; round++) {
+            int position = Math.floorMod(round - 1, length) + 1;
+            int cycle = (round - 1) / length;
+            Scenario.RoundSpec template = templateAt(scenario, position).orElse(null);
+            if (template == null) {
+                continue;
+            }
+            BigDecimal demandFactor = demandDrift.pow(cycle, java.math.MathContext.DECIMAL64);
+            BigDecimal costFactor = costDrift.pow(cycle, java.math.MathContext.DECIMAL64);
+
+            jdbc.update("""
+                    insert into run_round_economy (run_id, round_number, demand_index, cost_index,
+                                                   wage_index, trend_strength, trend_label)
+                    values (?, ?, ?, ?, ?, ?, ?)
+                    on conflict (run_id, round_number) do nothing
+                    """, runId, round,
+                    nz(template.demandIndex()).multiply(demandFactor).setScale(3, RoundingMode.HALF_UP),
+                    nz(template.costIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
+                    nz(template.wageIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
+                    nz(template.trendStrength()).setScale(2, RoundingMode.HALF_UP),
+                    template.trendLabel());
+        }
+    }
 
     /**
      * Decides which deck entries fire in this run, and when. Called once, when the run is created, so
@@ -80,12 +120,15 @@ public class EnvironmentService {
     // ------------------------------------------------------------------ the round
 
     public RoundEnvironment forRound(Scenario scenario, long runId, int round) {
-        Scenario.RoundSpec base = roundSpec(scenario, round)
-                .orElse(new Scenario.RoundSpec(round, ONE, ONE, ONE, "neutral"));
+        Scenario.RoundSpec base = runRound(runId, round)
+                .or(() -> templateAt(scenario, Math.max(1, round)))
+                .orElse(new Scenario.RoundSpec(round, ONE, ONE, ONE, BigDecimal.ZERO, "Stable",
+                        "neutral"));
 
         BigDecimal demand = nz(base.demandIndex());
         BigDecimal cost = nz(base.costIndex());
         BigDecimal wage = nz(base.wageIndex());
+        BigDecimal trend = nz(base.trendStrength());
 
         Map<String, BigDecimal> byProduct = new LinkedHashMap<>();
         for (Scenario.ProductSpec product : scenario.products()) {
@@ -107,14 +150,17 @@ public class EnvironmentService {
 
         for (Scenario.ProductSpec product : scenario.products()) {
             double elastic = Math.pow(demand.doubleValue(), nz(product.incomeElasticity()).doubleValue());
+            BigDecimal trendFactor = ONE.add(trend.multiply(nz(product.trendAffinity())));
             byProduct.put(product.code(), byProduct.get(product.code())
                     .multiply(BigDecimal.valueOf(elastic))
+                    .multiply(trendFactor)
                     .setScale(6, RoundingMode.HALF_UP));
         }
 
         return new RoundEnvironment(round, demand.setScale(3, RoundingMode.HALF_UP),
                 cost.setScale(3, RoundingMode.HALF_UP), wage.setScale(3, RoundingMode.HALF_UP),
-                byProduct, List.copyOf(active));
+                trend.setScale(2, RoundingMode.HALF_UP), base.trendLabel(), byProduct,
+                List.copyOf(active));
     }
 
     /** Descriptions of the events that have already started — public knowledge by then. */
@@ -145,13 +191,20 @@ public class EnvironmentService {
 
         for (int step = 1; step <= horizon; step++) {
             int target = round + step;
-            Scenario.RoundSpec base = roundSpec(scenario, target)
-                    .orElse(new Scenario.RoundSpec(target, ONE, ONE, ONE, "neutral"));
+            Scenario.RoundSpec base = runRound(runId, target)
+                    .or(() -> templateAt(scenario, Math.max(1, target)))
+                    .orElse(new Scenario.RoundSpec(target, ONE, ONE, ONE, BigDecimal.ZERO,
+                            "Stable", "neutral"));
+
+            BigDecimal demand = noisy(nz(base.demandIndex()), runId, round, step, "demand", band);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("round", target);
-            row.put("demandIndex", noisy(nz(base.demandIndex()), runId, round, step, "demand", band));
+            row.put("demandIndex", demand);
             row.put("costIndex", noisy(nz(base.costIndex()), runId, round, step, "cost", band));
             row.put("wageIndex", noisy(nz(base.wageIndex()), runId, round, step, "wage", band));
+            row.put("trendStrength", noisy(nz(base.trendStrength()), runId, round, step, "trend",
+                    band).setScale(2, RoundingMode.HALF_UP));
+            row.put("trendLabel", base.trendLabel());
             row.put("band", band);
             rows.add(row);
         }
@@ -168,12 +221,28 @@ public class EnvironmentService {
         body.put("demandIndex", environment.demandIndex());
         body.put("costIndex", environment.costIndex());
         body.put("wageIndex", environment.wageIndex());
+        body.put("trendStrength", environment.trendStrength());
+        body.put("trendLabel", environment.trendLabel());
         body.put("outlook", outlook(environment.demandIndex()));
         body.put("events", activeEventDetails(scenario, runId, round));
         return body;
     }
 
     // ------------------------------------------------------------------ internals
+
+    private Optional<Scenario.RoundSpec> runRound(long runId, int round) {
+        return jdbc.query("""
+                select demand_index, cost_index, wage_index, trend_strength, trend_label
+                from run_round_economy where run_id = ? and round_number = ?
+                """, (rs, i) -> new Scenario.RoundSpec(round, rs.getBigDecimal("demand_index"),
+                rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
+                rs.getBigDecimal("trend_strength"), rs.getString("trend_label"), null),
+                runId, round).stream().findFirst();
+    }
+
+    private static Optional<Scenario.RoundSpec> templateAt(Scenario scenario, int position) {
+        return scenario.rounds().stream().filter(spec -> spec.round() == position).findFirst();
+    }
 
     private List<Scenario.EventSpec> activeEvents(Scenario scenario, long runId, int round) {
         Set<String> codes = new HashSet<>();
@@ -188,10 +257,6 @@ public class EnvironmentService {
     private Integer startOf(long runId, String code) {
         return jdbc.query("select starts_round from run_environment_event where run_id = ? and event_code = ?",
                 (rs, i) -> rs.getInt(1), runId, code).stream().findFirst().orElse(null);
-    }
-
-    private static Optional<Scenario.RoundSpec> roundSpec(Scenario scenario, int round) {
-        return scenario.rounds().stream().filter(spec -> spec.round() == round).findFirst();
     }
 
     private static BigDecimal noisy(BigDecimal value, long runId, int round, int step, String kind,

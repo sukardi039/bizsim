@@ -17,7 +17,7 @@ import java.util.Optional;
 public class RunRepository {
 
     public record RunRow(long id, long tenantId, long simulationId, String scenarioKey,
-                         String status, int currentRound) {
+                         String status, int currentRound, Integer rounds, Integer cycles) {
     }
 
     public record TeamRow(long id, String name, String companyName, BigDecimal cash,
@@ -29,7 +29,8 @@ public class RunRepository {
 
     private static final RowMapper<RunRow> RUN = (rs, i) -> new RunRow(
             rs.getLong("id"), rs.getLong("tenant_id"), rs.getLong("simulation_id"),
-            rs.getString("scenario_key"), rs.getString("status"), rs.getInt("current_round"));
+            rs.getString("scenario_key"), rs.getString("status"), rs.getInt("current_round"),
+            (Integer) rs.getObject("rounds"), (Integer) rs.getObject("cycles"));
 
     private static final RowMapper<TeamRow> TEAM = (rs, i) -> new TeamRow(
             rs.getLong("id"), rs.getString("name"), rs.getString("company_name"),
@@ -53,11 +54,12 @@ public class RunRepository {
                 """, Long.class, tenantId, name, scenarioKey, facilitatorId);
     }
 
-    public long insertRun(long tenantId, long simulationId, String scenarioKey) {
+    public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles) {
         return jdbc.queryForObject("""
-                insert into run (tenant_id, simulation_id, scenario_key, status, current_round, started_at)
-                values (?, ?, ?, 'OPEN', 0, now()) returning id
-                """, Long.class, tenantId, simulationId, scenarioKey);
+                insert into run (tenant_id, simulation_id, scenario_key, status, current_round,
+                                 rounds, cycles, started_at)
+                values (?, ?, ?, 'OPEN', 0, ?, ?, now()) returning id
+                """, Long.class, tenantId, simulationId, scenarioKey, rounds, cycles);
     }
 
     public long insertTeam(long runId, String name, String companyName, BigDecimal cash,

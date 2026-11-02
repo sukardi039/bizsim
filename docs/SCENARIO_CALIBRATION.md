@@ -130,25 +130,30 @@ no table at all.
 - **Marketing has no saturation cap** beyond the square root. At 1,000 M of spend the reach term is
   about 7, which is large but finite; no test currently covers absurd spend.
 
-## 9. Environment timeline and event deck (D18)
+## 9. Cycle template, trend and event deck (D18, D19)
 
-Round 1 is deliberately neutral (1.000 / 1.000 / 1.000), so the measured table in §6 is still exact
-under the environment model — the economy starts moving from round 2.
+The scenario stores **one cycle**, four positions long. A run expands it to as many cycles as the
+facilitator chooses (default 2, so 8 rounds; `rounds` can stretch it) and applies a small drift so
+the second cycle is not a carbon copy.
 
-| Round | Demand index | Cost index | Wage index | Note |
-|---|---|---|---|---|
-| 1 | 1.000 | 1.000 | 1.000 | steady |
-| 2 | 1.020 | 1.020 | 1.010 | mild expansion |
-| 3 | 0.950 | 1.050 | 1.020 | slowdown, input prices rising |
-| 4 | 0.900 | 1.080 | 1.030 | trough |
-| 5 | 0.930 | 1.060 | 1.030 | bottoming out |
-| 6 | 1.000 | 1.030 | 1.020 | recovery |
-| 7 | 1.060 | 1.010 | 1.020 | expansion |
-| 8 | 1.100 | 1.000 | 1.030 | peak |
+| Cycle position | Demand | Cost | Wage | Trend | Label |
+|---|---|---|---|---|---|
+| 1 | 1.000 | 1.000 | 1.000 | 0.00 | Stable |
+| 2 | 1.050 | 1.030 | 1.010 | +0.40 | Consumers trading up |
+| 3 | 0.920 | 1.070 | 1.030 | −0.40 | Consumers trading down |
+| 4 | 0.960 | 1.050 | 1.030 | −0.20 | Cautious |
 
-Income elasticity: **P1 0.40, P2 1.00, P3 1.80**. At the round-4 trough the premium line keeps
-`0.90^1.8 = 83%` of its market and the basic line `0.90^0.4 = 96%`. A trainee who only sells premium
-learns cyclicality the hard way; a mixed portfolio survives.
+Drift: **+2% demand, +1% cost and wage per cycle**. Cycle 2, position 1 is therefore 1.020 demand;
+position 3 of cycle 2 is 0.938. Round 1 is neutral (1.000), so the measured table in §6 stays exact.
+
+Income elasticity: **P1 0.40, P2 1.00, P3 1.80**. At position 3 the premium line keeps
+`0.92^1.8 = 86%` of its market from the economy alone — and then the consumer trend takes another
+`1 + (−0.40 × 0.50) = 80%`, so 69% in total. The basic line keeps `0.92^0.4 = 97%` and *gains* 20%
+from the trade-down, i.e. 116%. That asymmetry is the whole point: a premium-only portfolio is a bet
+on the cycle and on taste at the same time.
+
+Trend affinity: **P1 −0.50, P2 0.00, P3 +0.50**. The report shows the trend as a label and a signed
+strength; it never shows a per-product forecast (consequence 14).
 
 | Event | Window | Chance | Duration | Demand | Cost | Wage | Target |
 |---|---|---|---|---|---|---|---|
@@ -157,10 +162,10 @@ learns cyclicality the hard way; a mixed portfolio survives.
 | Consumer recession | 3–6 | 40% | 2 | ×0.88 | ×0.97 | — | all |
 | Premium segment boom | 4–6 | 35% | 2 | ×1.20 | — | — | P3 |
 
-Each card fires at most once per run, on a round drawn inside its window, and the result is frozen
-when the run is created. Two runs of the same scenario therefore differ — that is the point — but a
-replay of one run reproduces its schedule exactly, which is what makes the debrief defensible.
+Each card fires at most once per run, on a round drawn inside its window, frozen when the run is
+created. Two runs of the same scenario therefore differ — that is the point — but a replay of one run
+reproduces its schedule exactly, which is what makes the debrief defensible.
 
-Market review: 15 M per month, two rounds of forecast, ±8% band. On a 2,000 M balance that is 0.75%
-of starting cash to buy a slightly wrong view of next month — cheap enough to try, expensive enough
-to think about.
+Market review: 15 M per month, two rounds of forecast, ±8% band, and it includes the consumer-trend
+forecast alongside the economic one. On a 2,000 M balance that is 0.75% of starting cash to buy a
+slightly wrong view of next month — cheap enough to try, expensive enough to think about.

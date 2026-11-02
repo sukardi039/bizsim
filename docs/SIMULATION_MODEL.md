@@ -143,15 +143,27 @@ brand = brand × (1 − decay) + Σ_c α_c × sqrt(spend_c)      capped 0..100
 ### 5.4 Environment — the economy moves market size (D18)
 
 ```
-market size for j  = base_j × seasonality × companies/10
-                     × demand_index(r) ^ income_elasticity_j
-                     × (demand multiplier of any event targeting j)
+position p = ((r - 1) mod cycleLength) + 1        cycle k = (r - 1) / cycleLength
+demand_index(r) = template[p].demand × (1 + cycleDemandDrift)^k
+cost_index(r)   = template[p].cost   × (1 + cycleCostDrift)^k
+wage_index(r)   = template[p].wage   × (1 + cycleCostDrift)^k
+
+market size for j = base_j × seasonality × companies/10
+                    × demand_index(r) ^ income_elasticity_j
+                    × (1 + trend_strength(r) × trend_affinity_j)
+                    × (demand multiplier of any event targeting j)
 unit material cost = base cost × cost_index(r) × (event cost multipliers)
 payroll            = salary × headcount × wage_index(r) × (event wage multipliers)
 ```
 
-- The timeline lives in `scenario_round`: one row per round, missing rounds are neutral (1.0).
-- `income_elasticity` lives on the product: 0.40 basic, 1.00 standard, 1.80 premium in scenario #1.
+- The **cycle template** lives in `scenario_round`: one row per cycle *position*, missing positions
+  are neutral (1.0). A run chooses `cycles` at creation (default 2) and may pass an explicit `rounds`
+  to stretch the session; the template is expanded into `run_round_economy` and frozen, so two runs
+  may cover different numbers of cycles without touching the scenario.
+- `income_elasticity` and `trend_affinity` live on the product: 0.40 / 1.00 / 1.80 and
+  −0.50 / 0.00 / +0.50 in scenario #1. Elasticity is the economic cycle; affinity is the consumer
+  trend, so a "trading down" year moves demand from premium to basic without any per-product
+  forecast being produced.
   A 10% fall in the demand index costs the premium line 18% of its market and the basic line 4%.
   That is the "different customer groups react differently" requirement, in one number per product.
 - The event deck lives in `environment_event`. Each card has a window, a probability, a duration and

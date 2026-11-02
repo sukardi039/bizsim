@@ -28,6 +28,7 @@ public class RunService {
     }
 
     public record RunView(long id, String status, int currentRound, String scenarioKey,
+                          int rounds, int cycles,
                           List<RunRepository.TeamRow> teams,
                           List<RunRepository.PlayerRow> players) {
     }
@@ -52,7 +53,7 @@ public class RunService {
 
     @Transactional
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
-                             List<TeamSpec> teams) {
+                             List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles) {
         if (!runs.scenarioExists(scenarioKey)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown scenario " + scenarioKey);
         }
@@ -64,9 +65,21 @@ public class RunService {
                     "at most 10 teams per run (decision 5)");
         }
         Scenario scenario = scenarios.load(scenarioKey);
+
+        // D19: cycles are chosen when the simulation is set up, and rounds can be stretched if the
+        // cohort needs more time than the default two cycles give it.
+        int cycles = requestedCycles == null ? scenario.params().cycles() : requestedCycles;
+        int defaultRounds = Math.max(1, cycles) * Math.max(1, scenario.params().cycleLength());
+        int roundCount = requestedRounds == null ? defaultRounds : requestedRounds;
+        if (cycles < 1 || roundCount < 1 || roundCount > 48) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "rounds must be 1-48 and cycles at least 1");
+        }
+
         long simulationId = runs.insertSimulation(tenantId, name, scenarioKey, facilitatorId);
-        long runId = runs.insertRun(tenantId, simulationId, scenarioKey);
-        // The event deck is drawn once, here, and frozen for this run (D18).
+        long runId = runs.insertRun(tenantId, simulationId, scenarioKey, roundCount, cycles);
+        // The economy and the event deck are drawn once, here, and frozen for this run (D18/D19).
+        environment.generateTimeline(scenario, runId, roundCount);
         environment.scheduleEvents(scenario, runId);
         for (TeamSpec team : teams) {
             long teamId = runs.insertTeam(runId, blankToNull(team.name(), "team name"),
@@ -118,7 +131,7 @@ public class RunService {
                     "run is " + run.status() + ", rounds cannot advance");
         }
 
-        int maxRounds = maxRounds(run.scenarioKey());
+        int maxRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
         int next = run.currentRound() + 1;
         if (next > maxRounds) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -144,8 +157,10 @@ public class RunService {
 
     private RunView view(long tenantId, long runId) {
         RunRepository.RunRow run = requireRun(tenantId, runId);
+        int totalRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
+        int cycles = run.cycles() == null ? 0 : run.cycles();
         return new RunView(run.id(), run.status(), run.currentRound(), run.scenarioKey(),
-                runs.teams(runId), runs.players(runId));
+                totalRounds, cycles, runs.teams(runId), runs.players(runId));
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

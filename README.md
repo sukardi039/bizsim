@@ -70,7 +70,7 @@ GET  /api/ping                          no auth
 POST /api/auth/login                    {tenantCode, email, password} -> {token, ...}
 GET  /api/me                            Bearer token -> caller identity
 
-POST /api/runs                          create a run with 1..10 companies
+POST /api/runs                          create a run: 1..10 companies, optional rounds/cycles
 GET  /api/runs/{id}                     run, companies, players, current round
 POST /api/runs/{id}/teams               add a company (OPEN runs only)
 POST /api/runs/{id}/players             assign a player to a company
@@ -98,7 +98,7 @@ S1 complete: run/company/player management, round state machine.
   facilitator or by its own clock, and closing twice computes nothing twice.
   Scenario #1 is provisional and calibrated in `docs/SCENARIO_CALIBRATION.md` — the discount
   strategy wins share and loses profit, which is the lesson D14 asked for.
-  62 tests, all against real PostgreSQL.
+  64 tests, all against real PostgreSQL.
 
 Next: S3 STOMP push + facilitator console, S4 decision form, S5 debrief export.
 
