@@ -38,6 +38,35 @@ file in the same commit as the code that depends on it.
   native mobile apps, scenario-authoring UI, full Indonesian content translation (UI chrome only),
   cross-run historical analytics.
 
+## Domain rulings — 2026-11-02 (simulation model)
+
+Stated by the product owner in session 2026-11-02. These are rulings, not proposals. They
+**supersede** the role-split assumption in worksheet Q1 and the phrase "teams of managers" in
+brief §1.
+
+| # | Ruling |
+|---|---|
+| D1 | **One trainee = one company.** A run holds up to **10 individual players**, each owning one company and deciding **all** aspects of it. No role split, no shared company. |
+| D2 | All companies in a run **compete in the same market**. |
+| D3 | Each company sells **multiple products**. |
+| D4 | **One round = one month.** A session has about **8 cycles**, definable (scenario/run parameter, not a constant). |
+| D5 | Every month a company decides: **production volume per product**, **marketing channel + spend per channel**, **manpower deployed to production**, and **R&D investment per proposed project**. |
+| D6 | **R&D:** the system proposes projects. Each has a hidden expected cost and a different type/level of production advantage. Completion is decided by **dollars invested vs that hidden expected cost**. Hints about the cost may be shown; the exact figure is not. |
+| D7 | **Cash is the hard constraint.** All production and investment spending must fit inside the bank balance. **No fundraising** in v1. |
+
+### Consequences of D1–D7 (binding, not new rulings)
+
+1. `decision` is keyed **(round_id, team_id)** — one submission per company per month. The
+   `(round_id, team_id, role_key)` unique key from V1 is wrong and must change in the S2 migration.
+   `player.role_key` becomes informational; every player is `'OWNER'`.
+2. A company's **product line is state**, not an input: it needs its own table (price, quality/tech
+   level, unit cost, stock per product). Production volume is a decision; stock is carried state.
+3. Scoring needs **per-product demand pools** and a market of up to 10 sellers, replacing the
+   single-demand-pool sketch in worksheet Q2.
+4. Worksheet Q1 (four role lists) is **void**. One form per company per month covers all functions.
+5. The S2 estimate in the delivery plan was sized for "4 roles × 4 inputs". It must be re-based —
+   see `docs/SIMULATION_MODEL.md` §11.
+
 ## Consequences that are now binding
 
 1. Every business table carries `tenant_id`; no endpoint accepts a tenant parameter.
