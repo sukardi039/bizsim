@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlayerConsole from "./PlayerConsole";
+import Trainees from "./Trainees";
 import {
   api,
   ApiError,
@@ -381,6 +382,8 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <Trainees run={selected} onChanged={refreshRuns} />
 
             <section className="card">
               <h2>Live</h2>

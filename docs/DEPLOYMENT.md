@@ -109,6 +109,6 @@ Migrations replay from empty, so a dump plus this repository is a complete resto
 | Limit | Why | What it would take |
 |---|---|---|
 | One `api` replica | the event stream keeps subscribers in memory, so two replicas would each hold half the screens (D20) | a broker (Redis pub/sub or similar) behind `RunEventService` |
-| No self-service registration | accounts are created by the bootstrap variables or in SQL | `POST /api/users` restricted to facilitators |
+| No self-service registration | trainees never sign themselves up; a facilitator creates their account (console → **Trainees**) and hands over the initial credential | real email delivery + password reset |
 | One facilitator per simulation | D21: a second concurrent simulation is refused | create another facilitator account (rerun the bootstrap with a different email, or SQL) |
 | Images not built on the development machine | no Docker daemon there; every build step was run by hand instead | the first Dokploy build is the first real build — expect one iteration |

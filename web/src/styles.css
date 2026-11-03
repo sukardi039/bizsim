@@ -125,3 +125,14 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 .submit-bar { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; position: sticky; bottom: 0; }
 .submit-bar p { font-size: .85rem; }
 
+/* --------------------------------------------------------------- trainees */
+
+.seat { padding: .8rem 0; border-bottom: 1px solid #202733; }
+.seat:last-child { border-bottom: none; }
+.seat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: .5rem; }
+.seat-head span { font-size: .82rem; }
+.seat-form { display: grid; grid-template-columns: 1fr 1.2fr 1.2fr auto; gap: .6rem; align-items: end; }
+.seat-form label { margin: 0; }
+.seat-form button { height: 38px; }
+
+

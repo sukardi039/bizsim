@@ -186,6 +186,97 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_facilitator_creates_a_trainee_account_and_seats_it() throws Exception {
+        MvcResult created = mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "newcomer@acme.test", "displayName", "Newcomer",
+                                "password", "learner1234"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.role").value("PLAYER"))
+                .andExpect(jsonPath("$.email").value("newcomer@acme.test"))
+                .andReturn();
+        long newcomerId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        // The account works with the credential the facilitator chose.
+        MvcResult login = mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", "acme", "email", "newcomer@acme.test",
+                                "password", "learner1234"))))
+                .andExpect(status().isOk())
+                .andReturn();
+        String newcomer = json.readTree(login.getResponse().getContentAsString()).get("token").asText();
+
+        // Seated on a company, the trainee sees that company's form.
+        mvc.perform(post("/api/runs/" + runId + "/players")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "teamId", teamOne, "userId", newcomerId, "roleKey", "OWNER"))))
+                .andExpect(status().isCreated());
+        openRound();
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + newcomer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submitted").value(false));
+    }
+
+    @Test
+    void account_creation_is_facilitator_only_and_guarded() throws Exception {
+        Map<String, Object> body = Map.of(
+                "email", "dupe@acme.test", "password", "learner1234");
+
+        // A trainee cannot mint accounts.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + playerOneToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isForbidden());
+
+        // A short initial credential is refused.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "short@acme.test", "password", "short"))))
+                .andExpect(status().isBadRequest());
+
+        // The same email twice in one tenant is a conflict, not a second account.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isConflict());
+
+        // A facilitator may not create another facilitator; an admin may (D21: one per cohort).
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "trainer9@acme.test", "password", "learner1234",
+                                "role", "FACILITATOR"))))
+                .andExpect(status().isForbidden());
+
+        user(tenantId, "boss@acme.test", "ADMIN");
+        String admin = loginOn("acme", "boss@acme.test");
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "trainer9@acme.test", "password", "learner1234",
+                                "role", "FACILITATOR"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.role").value("FACILITATOR"));
+    }
+
+    @Test
     void a_trainee_cannot_read_a_rival_companys_numbers() throws Exception {
         openRound();
 

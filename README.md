@@ -104,6 +104,11 @@ investment per project, and the paid market review. The same email address alway
 screen, decided by the role in the token. A trainee can read only their own company — asking for
 another company's context, statement or market report is a 403.
 
+Trainee accounts are made in the console: pick a run, and the **Trainees** card has one row per
+company with a name, the email they sign in with, and an initial password. **Create and seat** does
+both steps at once — it creates the account and puts it on that company. Hand the trainee the email
+and password; there is no email delivery in this product.
+
 ## Deploy
 
 Dokploy (one image, one port, TLS at the proxy): see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).

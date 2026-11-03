@@ -213,6 +213,17 @@ export const api = {
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>
     request<DecisionFormContext>(`/runs/${runId}/teams/${teamId}/context`),
+  /** Facilitator/admin only: makes the account a trainee signs in with. */
+  createUser: (email: string, displayName: string, password: string, role = "PLAYER") =>
+    request<{ id: number; email: string; displayName: string; role: string }>("/users", {
+      method: "POST",
+      body: JSON.stringify({ email, displayName, password, role }),
+    }),
+  addPlayer: (runId: number, teamId: number, userId: number, roleKey = "OWNER") =>
+    request<RunPlayer>(`/runs/${runId}/players`, {
+      method: "POST",
+      body: JSON.stringify({ teamId, userId, roleKey }),
+    }),
   submitDecision: (runId: number, teamId: number, decision: DecisionInput) =>
     request<{ submitted: boolean }>(`/runs/${runId}/teams/${teamId}/decisions`, {
       method: "POST",

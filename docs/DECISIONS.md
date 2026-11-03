@@ -134,3 +134,8 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
    `market-report` answer 403 for another company's id when the caller is a `PLAYER`; facilitators
    and admins read any company in their tenant. The check lives in one place
    (`RoundService.requireTeamReadable`) so a new read endpoint cannot quietly skip it.
+7. Accounts are created, never self-registered. A facilitator mints `PLAYER` accounts for their own
+   cohort (`POST /api/users`, tenant from the token, unique email inside the tenant, initial
+   credential at least 8 characters); only an `ADMIN` may mint another `FACILITATOR`, because D21
+   makes a second facilitator the way to run a second cohort and that is not a facilitator's call.
+   There is no email delivery: the facilitator hands over the credential.

@@ -48,4 +48,25 @@ public class UserRepository {
                 "select * from app_user where id = ? and tenant_id = ?", MAPPER, id, tenantId);
         return rows.stream().findFirst();
     }
+
+    /** Every account of one tenant, for the facilitator's trainee list. Never returns password_hash. */
+    public List<AppUser> findAllInTenant(long tenantId) {
+        return jdbc.query("select * from app_user where tenant_id = ? order by role, email",
+                MAPPER, tenantId);
+    }
+
+    public Optional<AppUser> findByEmailInTenant(long tenantId, String email) {
+        return jdbc.query("select * from app_user where tenant_id = ? and email = ?",
+                MAPPER, tenantId, email).stream().findFirst();
+    }
+
+    /** Creates an account inside the caller's tenant. The tenant never comes from the request body. */
+    public AppUser insert(long tenantId, String email, String displayName, String passwordHash,
+                          String role) {
+        return jdbc.queryForObject("""
+                insert into app_user (tenant_id, email, password_hash, display_name, role)
+                values (?, ?, ?, ?, ?)
+                returning *
+                """, MAPPER, tenantId, email, passwordHash, displayName, role);
+    }
 }
