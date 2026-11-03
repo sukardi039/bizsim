@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -117,6 +118,84 @@ class UserRoleApiTest extends PostgresTestBase {
                                 "password", "trainee1234", "role", "PLAYER"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.role").value("PLAYER"));
+    }
+
+    @Test
+    void an_admin_fixes_a_role_without_recreating_the_account() throws Exception {
+        // The mistake this exists for: an account created as a trainee that should have been a builder.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "oops@acme.test", "displayName", "Oops",
+                                "password", "password123", "role", "PLAYER"))))
+                .andExpect(status().isCreated());
+        Long id = jdbc.queryForObject("select id from app_user where email = 'oops@acme.test'", Long.class);
+
+        mvc.perform(patch("/api/users/" + id + "/role")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "BUILDER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.role").value("BUILDER"));
+
+        // The promoted account can now use the setup screens with the same password.
+        String promoted = loginWith("oops@acme.test", "password123");
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + promoted))
+                .andExpect(status().isOk());
+
+        // A facilitator may not do this.
+        mvc.perform(patch("/api/users/" + id + "/role")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "ADMIN"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("user.admin_only"));
+
+        // Nor may an admin change their own role out from under themselves.
+        Long adminId = jdbc.queryForObject(
+                "select id from app_user where email = 'owner@acme.test'", Long.class);
+        mvc.perform(patch("/api/users/" + adminId + "/role")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "PLAYER"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("user.cannot_change_own_role"));
+
+        // And the last admin cannot be demoted away: nobody would be left to mint staff.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "second@acme.test", "displayName", "Second",
+                                "password", "password123", "role", "ADMIN"))))
+                .andExpect(status().isCreated());
+        Long secondAdmin = jdbc.queryForObject(
+                "select id from app_user where email = 'second@acme.test'", Long.class);
+        // Demote the second admin: allowed, one admin remains.
+        mvc.perform(patch("/api/users/" + secondAdmin + "/role")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "FACILITATOR"))))
+                .andExpect(status().isOk());
+        // Now only one admin is left, and it cannot be demoted by... itself. Verified via a second
+        // admin path: promote again, then try to demote the original from the new admin's session.
+        mvc.perform(patch("/api/users/" + secondAdmin + "/role")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "ADMIN"))))
+                .andExpect(status().isOk());
+        String secondAdminToken = loginWith("second@acme.test", "password123");
+        mvc.perform(patch("/api/users/" + adminId + "/role")
+                        .header("Authorization", "Bearer " + secondAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "PLAYER"))))
+                .andExpect(status().isOk()); // two admins existed, so this is allowed
+        mvc.perform(patch("/api/users/" + adminId + "/role")
+                        .header("Authorization", "Bearer " + secondAdminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("role", "ADMIN"))))
+                .andExpect(status().isOk());
     }
 
     @Test

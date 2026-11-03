@@ -10,6 +10,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,18 +67,20 @@ public class UserController {
         TenantContext.Principal me = requireFacilitator();
 
         String role = request.role() == null || request.role().isBlank() ? "PLAYER" : request.role();
-        if (!"PLAYER".equals(role) && !"FACILITATOR".equals(role) && !"BUILDER".equals(role)) {
+        // ADMIN is creatable too: the "make another admin before demoting the last one" rule needs a
+        // way to make one, and a tenant with a single admin is one forgotten password from stuck.
+        if (!List.of("PLAYER", "FACILITATOR", "BUILDER", "ADMIN").contains(role)) {
             throw ProblemException.badRequest("user.role_invalid",
-                    "role must be PLAYER, FACILITATOR or BUILDER");
+                    "role must be PLAYER, FACILITATOR, BUILDER or ADMIN");
         }
         // D21: a second facilitator is how two cohorts run at once, but that is an admin's call --
         // a facilitator adding another facilitator could quietly take over the next class's account.
         // Preparing is a separate job from running (ruling 3 Nov 2026): a builder account is an
         // admin's call, exactly like a facilitator's -- a facilitator must not mint the person who
         // will rewrite the economy next term.
-        if (("FACILITATOR".equals(role) || "BUILDER".equals(role)) && !"ADMIN".equals(me.role())) {
+        if (!"PLAYER".equals(role) && !"ADMIN".equals(me.role())) {
             throw ProblemException.forbidden("user.facilitator_needs_admin",
-                    "only an admin may create a facilitator or builder account");
+                    "only an admin may create a staff account");
         }
         if (request.password().length() < MIN_LENGTH) {
             throw ProblemException.badRequest("user.password_too_short",
@@ -120,6 +123,40 @@ public class UserController {
     }
 
     /** A trainee who left: the login stops working, the history stays. */
+    public record RoleRequest(String role) {
+    }
+
+    /**
+     * Changes an account's role. Admin only, and never your own: a mistyped role is the commonest
+     * onboarding mistake, and deleting and recreating the account loses its history.
+     *
+     * <p>The last active admin cannot be demoted — that would leave the tenant with nobody who can
+     * create staff accounts.
+     */
+    @PatchMapping("/{id}/role")
+    public UserView setRole(@PathVariable long id, @RequestBody RoleRequest request) {
+        TenantContext.Principal me = requireAdmin();
+        String role = request == null || request.role() == null ? "" : request.role().trim().toUpperCase();
+        if (!List.of("PLAYER", "FACILITATOR", "BUILDER", "ADMIN").contains(role)) {
+            throw ProblemException.badRequest("user.role_invalid",
+                    "role must be PLAYER, FACILITATOR, BUILDER or ADMIN", "field", "role");
+        }
+        if (id == me.userId()) {
+            throw ProblemException.badRequest("user.cannot_change_own_role",
+                    "ask another admin to change your role");
+        }
+        UserRepository.AppUser target = users.findByIdInTenant(id, me.tenantId()).orElseThrow(
+                () -> ProblemException.notFound("user.not_found", "no such account in this tenant"));
+        if ("ADMIN".equals(target.role()) && !"ADMIN".equals(role) && users.countAdmins(me.tenantId()) <= 1) {
+            throw ProblemException.conflict("user.last_admin",
+                    "this is the only admin left; make another admin first");
+        }
+        users.setRole(me.tenantId(), id, role);
+        UserRepository.AppUser updated = users.findByIdInTenant(id, me.tenantId()).orElseThrow();
+        return new UserView(updated.id(), updated.email(), updated.displayName(), updated.role(),
+                updated.active());
+    }
+
     @PostMapping("/{id}/deactivate")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deactivate(@PathVariable long id) {
@@ -137,6 +174,15 @@ public class UserController {
         if (!users.setActive(me.tenantId(), id, active)) {
             throw ProblemException.notFound("user.not_found", "no such trainee in this tenant");
         }
+    }
+
+    private static TenantContext.Principal requireAdmin() {
+        TenantContext.Principal me = TenantContext.require();
+        if (!"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("user.admin_only",
+                    "only an admin may change a role");
+        }
+        return me;
     }
 
     private static TenantContext.Principal requireFacilitator() {

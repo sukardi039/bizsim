@@ -74,6 +74,23 @@ export default function PeoplePanel() {
     }
   };
 
+  /** Fix a role without deleting the account: the commonest onboarding mistake. */
+  const changeRole = async (user: UserRow, role: string) => {
+    setBusy(user.id);
+    setProblem(null);
+    setNotice(null);
+    try {
+      const updated = await api.setUserRole(user.id, role);
+      setNotice(t("people.roleChanged", { email: updated.email, role: updated.role.toLowerCase() }));
+      await load();
+    } catch (error) {
+      setProblem(errorText(error, t));
+      await load(); // put the select back to the stored value
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const toggle = async (user: UserRow) => {
     setBusy(user.id);
     setProblem(null);
@@ -129,7 +146,22 @@ export default function PeoplePanel() {
               <tr key={user.id}>
                 <td>{user.displayName}</td>
                 <td>{user.email}</td>
-                <td className="muted">{user.role.toLowerCase()}</td>
+                <td className="muted">
+                  {canMintStaff ? (
+                    <select
+                      value={user.role}
+                      onChange={(e) => void changeRole(user, e.target.value)}
+                      disabled={busy === user.id}
+                    >
+                      <option value="PLAYER">{t("people.player")}</option>
+                      <option value="FACILITATOR">{t("people.facilitator")}</option>
+                      <option value="BUILDER">{t("people.builder")}</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  ) : (
+                    user.role.toLowerCase()
+                  )}
+                </td>
                 <td>
                   <span className={`tag ${user.active ? "round-closed" : ""}`}>
                     {user.active ? t("people.active") : t("people.deactivated")}

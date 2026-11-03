@@ -76,6 +76,20 @@ public class UserRepository {
      * Turns an account off (or back on). A trainee who leaves the school is deactivated, not deleted:
      * the login stops working, the seats and the results stay readable for the debrief.
      */
+    /** Moves an account between roles: people get hired into a different job than they started in. */
+    public boolean setRole(long tenantId, long id, String role) {
+        return jdbc.update("update app_user set role = ? where id = ? and tenant_id = ?",
+                role, id, tenantId) > 0;
+    }
+
+    /** How many admins the tenant still has: the last one must not be demoted out of existence. */
+    public int countAdmins(long tenantId) {
+        Integer count = jdbc.queryForObject(
+                "select count(*) from app_user where tenant_id = ? and role = 'ADMIN' and active",
+                Integer.class, tenantId);
+        return count == null ? 0 : count;
+    }
+
     public boolean setActive(long tenantId, long id, boolean active) {
         int changed = jdbc.update(
                 "update app_user set active = ? where id = ? and tenant_id = ? and role = 'PLAYER'",

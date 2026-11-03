@@ -480,6 +480,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  setUserRole: (id: number, role: string) =>
+    request<{ id: number; email: string; displayName: string; role: string; active: boolean }>(
+      `/users/${id}/role`,
+      { method: "PATCH", body: JSON.stringify({ role }) },
+    ),
   deleteUser: (id: number) => request<unknown>(`/users/${id}`, { method: "DELETE" }),
   setUserActive: (id: number, active: boolean) =>
     request<unknown>(`/users/${id}/${active ? "activate" : "deactivate"}`, { method: "POST" }),

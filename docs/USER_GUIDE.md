@@ -238,8 +238,12 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 **People** lists every account in the tenant with role and status.
 
 - **Add a trainee** — name, email, initial password (8+), and the **Role** selector:
-  **Trainee** / **Facilitator** / **Builder**. Only an admin sees the role selector; the server
-  refuses staff roles for anyone else.
+  **Trainee** / **Facilitator** / **Builder** / **Admin**. Only an admin sees the role selector; the
+  server refuses staff roles for anyone else.
+- **Change a role** — the role cell in the list is a dropdown for admins. Pick the new role and it
+  saves immediately; the account keeps its password and its history. Two guards: you cannot change
+  your **own** role (ask another admin), and the **last active admin** cannot be demoted — create a
+  second admin first.
 - **Deactivate** stops a login and keeps their history — use this when a person leaves. **Activate**
   reverses it.
 - **Delete** removes an account that never played. Once someone has a computed decision, deletion is
@@ -286,6 +290,8 @@ accounts are never rewritten by this; remove the variables once you have signed 
 | `No published packages yet` | a builder has not published one; see §5 |
 | `you already have a simulation in progress` | finish or delete the current run, or use another facilitator |
 | `the shipped profile is read-only` | duplicate it first |
+| **no Role dropdown when adding someone** | you are signed in as a facilitator, or the deployed build predates the selector — an admin sees it; otherwise redeploy (§10, `api/version`) |
+| **created an account with the wrong role** | **People** → the role cell is a dropdown for admins → pick the right role; no need to delete and recreate |
 | `this package has been retired` | publish a new package |
 | Blank screen after a deploy | check `https://<domain>/api/version` — `latest` must match the newest migration; if not, redeploy |
 
