@@ -45,6 +45,7 @@ class RoundFlowApiTest extends PostgresTestBase {
     private String facilitatorToken;
     private String playerOneToken;
     private String playerTwoToken;
+    private String adminToken;
 
     @BeforeEach
     void seed() throws Exception {
@@ -60,9 +61,12 @@ class RoundFlowApiTest extends PostgresTestBase {
         user(tenant, "trainer@acme.test", "FACILITATOR");
         user(tenant, "one@acme.test", "PLAYER");
         user(tenant, "two@acme.test", "PLAYER");
+        // POST /api/runs is admin-only now; an admin bootstraps the run for the facilitator (D24).
+        user(tenant, "admin@acme.test", "ADMIN");
         facilitatorToken = login("trainer@acme.test");
         playerOneToken = login("one@acme.test");
         playerTwoToken = login("two@acme.test");
+        adminToken = login("admin@acme.test");
 
         JsonNode run = createRun();
         runId = run.get("id").asLong();
@@ -258,7 +262,8 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         // D21 counts unfinished runs: with the run gone the facilitator is free to start the next one.
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Clean slate", "scenarioKey", "standard-v1",
@@ -283,7 +288,8 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         // And they can be seated again in the next session — the whole point of a personal account.
         MvcResult created = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Next cohort", "scenarioKey", "standard-v1",
@@ -572,7 +578,8 @@ class RoundFlowApiTest extends PostgresTestBase {
     void cycles_are_configurable_and_rounds_can_exceed_the_default() throws Exception {
         // D21: this facilitator already has a simulation in progress in this fixture.
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Second at once", "scenarioKey", "standard-v1",
@@ -584,7 +591,8 @@ class RoundFlowApiTest extends PostgresTestBase {
         String secondFacilitator = loginOn("acme", "trainer2@acme.test");
 
         MvcResult created = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + secondFacilitator)
+                        .param("facilitatorId", String.valueOf(idOf("trainer2@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Three cycles", "scenarioKey", "standard-v1", "cycles", 3,
@@ -621,7 +629,8 @@ class RoundFlowApiTest extends PostgresTestBase {
         String trainer = loginOn("acme", "trainer5@acme.test");
 
         MvcResult created = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + trainer)
+                        .param("facilitatorId", String.valueOf(idOf("trainer5@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "One round", "scenarioKey", "standard-v1", "rounds", 1,
@@ -647,7 +656,8 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         // A finished run is no longer "in flight", so the same facilitator may start the next one.
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + trainer)
+                        .param("facilitatorId", String.valueOf(idOf("trainer5@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "The next cohort", "scenarioKey", "standard-v1",
@@ -732,7 +742,8 @@ class RoundFlowApiTest extends PostgresTestBase {
         String third = loginOn("acme", "trainer3@acme.test");
 
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + third)
+                        .param("facilitatorId", String.valueOf(idOf("trainer3@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Theirs", "scenarioKey", "standard-v1",
@@ -787,7 +798,8 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     private JsonNode createRun() throws Exception {
         MvcResult result = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Cohort",
@@ -831,6 +843,10 @@ class RoundFlowApiTest extends PostgresTestBase {
                 .andExpect(status().isOk())
                 .andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
+    }
+
+    private long idOf(String email) {
+        return jdbc.queryForObject("select id from app_user where email = ?", Long.class, email);
     }
 
     private String login(String email) throws Exception {

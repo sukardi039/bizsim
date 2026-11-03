@@ -1,6 +1,7 @@
 package com.bizsim.run;
 
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.user.UserRepository;
 import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,16 +37,37 @@ public class RunController {
     }
 
     private final RunService runs;
+    private final UserRepository users;
 
-    public RunController(RunService runs) {
+    public RunController(RunService runs, UserRepository users) {
         this.runs = runs;
+        this.users = users;
     }
 
+    /**
+     * Bootstraps a run without a package — an administrator's tool, not a facilitator's (ruling
+     * 3 Nov 2026). Facilitators start sessions from a published package; this path exists for support,
+     * data repair and tests, and `facilitatorId` lets an admin hand the run to the person who will
+     * drive it, so D21 ownership stays with the facilitator rather than the admin.
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public RunService.RunView create(@RequestBody CreateRunRequest request) {
-        TenantContext.Principal me = requireFacilitator();
-        return runs.createRun(me.tenantId(), me.userId(),
+    public RunService.RunView create(@RequestBody CreateRunRequest request,
+                                     @RequestParam(required = false) Long facilitatorId) {
+        TenantContext.Principal me = TenantContext.require();
+        if (!"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.admin_only",
+                    "only an administrator may create a run without a package");
+        }
+        long owner = me.userId();
+        if (facilitatorId != null) {
+            users.findInTenant(me.tenantId(), facilitatorId)
+                    .filter(user -> "FACILITATOR".equals(user.role()) || "ADMIN".equals(user.role()))
+                    .orElseThrow(() -> ProblemException.badRequest("user.not_found",
+                            "no facilitator with id " + facilitatorId + " in this tenant"));
+            owner = facilitatorId;
+        }
+        return runs.createRun(me.tenantId(), owner,
                 request.name() == null || request.name().isBlank() ? "Untitled" : request.name(),
                 request.scenarioKey(), request.teams(), request.rounds(), request.cycles());
     }

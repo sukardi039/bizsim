@@ -41,6 +41,7 @@ class RunApiTest extends PostgresTestBase {
     private long acmeFacilitator;
     private String facilitatorToken;
     private String playerToken;
+    private String adminToken;
 
     @BeforeEach
     void seed() throws Exception {
@@ -60,14 +61,29 @@ class RunApiTest extends PostgresTestBase {
         acmeFacilitator = user(acmeTenant, "trainer@acme.test", "FACILITATOR");
         user(acmeTenant, "player@acme.test", "PLAYER");
         user(globexTenant, "trainer@globex.test", "FACILITATOR");
+        user(acmeTenant, "admin@acme.test", "ADMIN");
 
         facilitatorToken = login("acme", "trainer@acme.test");
         playerToken = login("acme", "player@acme.test");
+        adminToken = login("acme", "admin@acme.test");
     }
 
     @Test
-    void facilitator_creates_a_run_with_teams() throws Exception {
-        mvc.perform(post("/api/runs").header("Authorization", "Bearer " + facilitatorToken)
+    void an_admin_bootstraps_a_run_for_a_facilitator_and_nobody_else_may() throws Exception {
+        // The facilitator cannot create a run without a package any more (ruling 3 Nov 2026).
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Mine", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "A", "companyName", "A"))))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("auth.admin_only"));
+
+        // An admin may, and the run belongs to the facilitator who will drive it.
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .param("facilitatorId", String.valueOf(acmeFacilitator))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Cohort November",
@@ -80,12 +96,18 @@ class RunApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.currentRound").value(0))
                 .andExpect(jsonPath("$.teams.length()").value(2))
                 .andExpect(jsonPath("$.teams[0].companyName").value("Alpha Industries"))
-                .andExpect(jsonPath("$.teams[0].cash").value(2000000000.00));
+                .andExpect(jsonPath("$.teams[0].cash").value(2000000000.00))
+                .andReturn();
+        long bootstrapped = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        // The run belongs to the facilitator, so they can open it and drive it.
+        mvc.perform(get("/api/runs/" + bootstrapped).header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
     }
 
     @Test
     void players_cannot_create_runs() throws Exception {
-        mvc.perform(post("/api/runs").header("Authorization", "Bearer " + playerToken)
+        mvc.perform(post("/api/runs").param("facilitatorId", String.valueOf(acmeFacilitator))
+                        .header("Authorization", "Bearer " + playerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Nope", "scenarioKey", "standard-v1",
@@ -95,7 +117,8 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void unknown_scenario_is_400() throws Exception {
-        mvc.perform(post("/api/runs").header("Authorization", "Bearer " + facilitatorToken)
+        mvc.perform(post("/api/runs").param("facilitatorId", String.valueOf(acmeFacilitator))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "X", "scenarioKey", "does-not-exist",
@@ -105,7 +128,7 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void another_tenants_run_is_404_not_403() throws Exception {
-        long runId = createRun(facilitatorToken);
+        long runId = createRun(acmeFacilitator);
 
         String globexToken = login("globex", "trainer@globex.test");
         mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + globexToken))
@@ -114,7 +137,7 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void advancing_closes_the_previous_round_and_opens_the_next() throws Exception {
-        long runId = createRun(facilitatorToken);
+        long runId = createRun(acmeFacilitator);
 
         mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                         .header("Authorization", "Bearer " + facilitatorToken))
@@ -138,7 +161,7 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void advancing_past_the_scenario_round_count_is_409() throws Exception {
-        long runId = createRun(facilitatorToken);
+        long runId = createRun(acmeFacilitator);
         int rounds = jdbc.queryForObject(
                 "select (definition->>'rounds')::int from scenario where key = 'standard-v1'",
                 Integer.class);
@@ -159,7 +182,7 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void a_player_from_another_tenant_cannot_be_added() throws Exception {
-        long runId = createRun(facilitatorToken);
+        long runId = createRun(acmeFacilitator);
         long teamId = jdbc.queryForObject(
                 "select id from team where run_id = ? order by id limit 1", Long.class, runId);
         Long globexUserId = jdbc.queryForObject(
@@ -175,7 +198,7 @@ class RunApiTest extends PostgresTestBase {
 
     @Test
     void duplicate_team_names_conflict() throws Exception {
-        long runId = createRun(facilitatorToken);
+        long runId = createRun(acmeFacilitator);
         mvc.perform(post("/api/runs/" + runId + "/teams")
                         .header("Authorization", "Bearer " + facilitatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -186,9 +209,10 @@ class RunApiTest extends PostgresTestBase {
 
     // ------------------------------------------------------------------ helpers
 
-    private long createRun(String token) throws Exception {
+    private long createRun(long facilitatorId) throws Exception {
         MvcResult result = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + token)
+                        .param("facilitatorId", String.valueOf(facilitatorId))
+                        .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Cohort",

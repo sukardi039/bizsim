@@ -91,10 +91,14 @@ class RunStreamApiTest extends PostgresTestBase {
                 "insert into tenant (code, name) values ('stream', 'Stream') returning id", Long.class);
         user(tenant, "trainer@stream.test", "FACILITATOR");
         user(tenant, "player@stream.test", "PLAYER");
+        user(tenant, "admin@stream.test", "ADMIN");
 
-        String facilitator = login("trainer@stream.test");
+        String admin = login("admin@stream.test");
+        Long facilitatorId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@stream.test'", Long.class);
         MvcResult created = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + facilitator)
+                        .param("facilitatorId", String.valueOf(facilitatorId))
+                        .header("Authorization", "Bearer " + admin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Stream", "scenarioKey", "standard-v1",

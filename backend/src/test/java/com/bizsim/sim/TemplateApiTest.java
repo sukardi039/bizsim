@@ -51,6 +51,7 @@ class TemplateApiTest extends PostgresTestBase {
     private long other;
     private String acmeFacilitator;
     private String acmeExecutor;
+    private String acmeAdmin;
     private String acmePlayer;
     private String otherFacilitator;
     private String otherBuilder;
@@ -71,6 +72,7 @@ class TemplateApiTest extends PostgresTestBase {
         other = tenant("other", "Other");
         user(acme, "trainer@acme.test", "FACILITATOR");
         user(acme, "builder@acme.test", "BUILDER");
+        user(acme, "admin@acme.test", "ADMIN");
         user(acme, "player@acme.test", "PLAYER");
         user(other, "trainer@other.test", "FACILITATOR");
         user(other, "builder@other.test", "BUILDER");
@@ -78,6 +80,7 @@ class TemplateApiTest extends PostgresTestBase {
         // Templates are built, not run (ruling 3 Nov 2026): the writer account is a builder.
         acmeFacilitator = login("acme", "builder@acme.test");
         acmeExecutor = login("acme", "trainer@acme.test");
+        acmeAdmin = login("acme", "admin@acme.test");
         acmePlayer = login("acme", "player@acme.test");
         otherFacilitator = login("other", "trainer@other.test");
         otherBuilder = login("other", "builder@other.test");
@@ -297,7 +300,8 @@ class TemplateApiTest extends PostgresTestBase {
 
         // Once a session exists, the catalogue is frozen: its companies and decisions name these codes.
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + acmeExecutor)
+                        .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
+                        .header("Authorization", "Bearer " + acmeAdmin)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Live cohort", "scenarioKey", key,
@@ -364,6 +368,10 @@ class TemplateApiTest extends PostgresTestBase {
     private int count(String table, String scenarioKey) {
         return jdbc.queryForObject("select count(*) from " + table + " where scenario_key = ?",
                 Integer.class, scenarioKey);
+    }
+
+    private long idOf(String email) {
+        return jdbc.queryForObject("select id from app_user where email = ?", Long.class, email);
     }
 
     private String login(String tenantCode, String email) throws Exception {
