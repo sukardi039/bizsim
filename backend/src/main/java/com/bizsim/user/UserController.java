@@ -66,14 +66,18 @@ public class UserController {
         TenantContext.Principal me = requireFacilitator();
 
         String role = request.role() == null || request.role().isBlank() ? "PLAYER" : request.role();
-        if (!"PLAYER".equals(role) && !"FACILITATOR".equals(role)) {
-            throw ProblemException.badRequest("user.role_invalid", "role must be PLAYER or FACILITATOR");
+        if (!"PLAYER".equals(role) && !"FACILITATOR".equals(role) && !"BUILDER".equals(role)) {
+            throw ProblemException.badRequest("user.role_invalid",
+                    "role must be PLAYER, FACILITATOR or BUILDER");
         }
         // D21: a second facilitator is how two cohorts run at once, but that is an admin's call --
         // a facilitator adding another facilitator could quietly take over the next class's account.
-        if ("FACILITATOR".equals(role) && !"ADMIN".equals(me.role())) {
+        // Preparing is a separate job from running (ruling 3 Nov 2026): a builder account is an
+        // admin's call, exactly like a facilitator's -- a facilitator must not mint the person who
+        // will rewrite the economy next term.
+        if (("FACILITATOR".equals(role) || "BUILDER".equals(role)) && !"ADMIN".equals(me.role())) {
             throw ProblemException.forbidden("user.facilitator_needs_admin",
-                    "only an admin may create a facilitator account");
+                    "only an admin may create a facilitator or builder account");
         }
         if (request.password().length() < MIN_LENGTH) {
             throw ProblemException.badRequest("user.password_too_short",

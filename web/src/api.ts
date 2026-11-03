@@ -254,6 +254,16 @@ export interface CompanyProfile {
   basedOn?: number | null;
 }
 
+export interface SimulationPackage {
+  id: number;
+  name: string;
+  templateKey: string;
+  templateVersion: number;
+  companyProfileIds: number[];
+  status: string;
+  publishedAt: string;
+}
+
 export interface UserRow {
   id: number;
   email: string;
@@ -393,6 +403,17 @@ export const api = {
     }),
   users: () => request<UserRow[]>("/users"),
   companies: () => request<CompanyProfile[]>("/companies"),
+  packages: () => request<SimulationPackage[]>("/packages"),
+  publishPackage: (body: { name: string; templateKey: string; companyProfileIds: number[] }) =>
+    request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
+  retirePackage: (id: number) =>
+    request<unknown>(`/packages/${id}/retire`, { method: "POST" }),
+  /** Execution: a facilitator starts a session from a published package. */
+  startSession: (packageId: number, body: { name: string; traineeIds: number[] }) =>
+    request<Run>(`/packages/${packageId}/sessions`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   copyCompany: (id: number) =>
     request<CompanyProfile>(`/companies/${id}/copy`, { method: "POST" }),
   saveCompany: (id: number, body: { name: string; companyName: string; products: string[]; notes?: string }) =>

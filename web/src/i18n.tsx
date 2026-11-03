@@ -32,6 +32,8 @@ const en: Dict = {
   "nav.templates": "Templates",
   "nav.people": "People",
   "nav.companies": "Companies",
+  "nav.packages": "Packages",
+  "nav.newRun": "New run",
   "app.signOut": "sign out",
 
   "login.title": "bizsim",
@@ -258,8 +260,11 @@ const en: Dict = {
   "field.overfunding": "Over-funding",
 
   "start.title": "Start a session",
+  "start.package": "Package",
+  "start.competing": "Competing companies",
+  "start.noPackages": "No published packages yet. A builder prepares them in Setup → Packages.",
   "start.hint":
-    "Everything comes from what you prepared: a template, the companies, and the trainees. Tick the companies you want in this cohort — their product lines come from their profiles.",
+    "Pick a published package and seat the class. The template and the companies were prepared by a builder — you cannot change them here, which is the point: the economy a class is graded on does not move once it is published.",
   "start.name": "Session name",
   "start.defaultName": "Session",
   "start.template": "Template",
@@ -272,6 +277,22 @@ const en: Dict = {
   "start.start": "Start session",
   "start.starting": "Starting…",
   "start.tooManyTrainees": "There are more trainees ticked than companies to seat them in.",
+
+  "packages.title": "Packages",
+  "packages.hint":
+    "A package is what you hand over: a template plus the companies that will compete, published as one immutable bundle. Sessions are started from it later, and it cannot be changed afterwards — retire it and publish a new one instead.",
+  "packages.empty": "No packages yet. Pick a template and the companies below.",
+  "packages.name": "Package",
+  "packages.namePlaceholder": "Autumn 2026 cohort",
+  "packages.status": "Status",
+  "packages.publishedAt": "Published",
+  "packages.retire": "Retire",
+  "packages.retireConfirm": "Retire \"{name}\"? Sessions already run from it keep their history; no new session can use it.",
+  "packages.retired": "\"{name}\" is retired.",
+  "packages.published": "Published \"{name}\". A facilitator can now start sessions from it.",
+  "packages.publish": "Publish a package",
+  "packages.publishAction": "Publish",
+  "packages.publishing": "Publishing…",
 
   "companies.title": "Companies",
   "companies.hint":
@@ -293,6 +314,8 @@ const zh: Dict = {
   "nav.templates": "模板",
   "nav.people": "人员",
   "nav.companies": "公司",
+  "nav.packages": "模拟包",
+  "nav.newRun": "新建模拟",
   "app.signOut": "退出登录",
 
   "login.title": "bizsim",
@@ -513,8 +536,11 @@ const zh: Dict = {
   "field.overfunding": "超额处理",
 
   "start.title": "开始模拟",
+  "start.package": "模拟包",
+  "start.competing": "参与公司",
+  "start.noPackages": "尚无已发布的模拟包。请由构建者在“设置 → 模拟包”中准备。",
   "start.hint":
-    "全部来自已准备的内容：模板、公司与学员。勾选本次参与的公司，其产品线来自各自的档案。",
+    "选择已发布的模拟包并安排学员。模板与公司由构建者事先准备，此处不可更改——这正是关键：一旦发布，班级评分所依据的经济环境不再变动。",
   "start.name": "模拟名称",
   "start.defaultName": "模拟",
   "start.template": "模板",
@@ -527,6 +553,22 @@ const zh: Dict = {
   "start.start": "开始模拟",
   "start.starting": "正在开始…",
   "start.tooManyTrainees": "勾选的学员多于可分配的公司数量。",
+
+  "packages.title": "模拟包",
+  "packages.hint":
+    "模拟包是交付物：一个模板加上参与竞争的公司，作为不可更改的整体发布。之后由教师从它开始模拟，发布后不可修改——如需调整请停用并发布新包。",
+  "packages.empty": "尚无模拟包。请在下方选择模板与公司。",
+  "packages.name": "模拟包",
+  "packages.namePlaceholder": "2026 秋季班",
+  "packages.status": "状态",
+  "packages.publishedAt": "发布时间",
+  "packages.retire": "停用",
+  "packages.retireConfirm": "停用“{name}”？已进行的模拟保留记录，但不能再用于新模拟。",
+  "packages.retired": "“{name}”已停用。",
+  "packages.published": "已发布“{name}”。教师现在可以从它开始模拟。",
+  "packages.publish": "发布模拟包",
+  "packages.publishAction": "发布",
+  "packages.publishing": "正在发布…",
 
   "companies.title": "公司档案",
   "companies.hint": "公司档案可重复使用：包含公司名称以及使用模板中的哪些产品。内置档案为只读，请复制后再修改。",

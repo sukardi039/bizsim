@@ -189,6 +189,13 @@ S1 complete: run/company/player management, round state machine.
   (unknown advantage type, missing target product, non-positive price); a template that already has a
   simulation refuses catalogue edits (`409 template.in_use`) because its companies and decisions name
   those codes.
+**D24 (3 Nov 2026): building and running are separate jobs.** A `BUILDER` prepares templates,
+companies and packages; a `FACILITATOR` runs sessions from published packages and cannot edit them; an
+`ADMIN` does both. A **package** is the immutable boundary — one template version plus the companies
+that compete — published by a builder, consumed by a facilitator, retired rather than deleted, and
+recorded on every run it produced (`run.package_id`). The console shows each role only its own
+workspace, and the API refuses the other direction rather than relying on a hidden button.
+
 **S6e complete (3 Nov 2026): the workbench closes the loop.** A **Companies** tab holds reusable
   company profiles (name + which products of a template it carries; the shipped one is read-only,
   copy it to adapt). A run is now started from what you prepared: **Start a session** → template,

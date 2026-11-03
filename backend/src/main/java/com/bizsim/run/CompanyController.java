@@ -36,13 +36,13 @@ public class CompanyController {
 
     @GetMapping
     public List<CompanyProfileRepository.ProfileRow> list() {
-        return profiles.listVisible(requireFacilitator().tenantId());
+        return profiles.listVisible(requireStaff().tenantId());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CompanyProfileRepository.ProfileRow create(@RequestBody ProfileRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         validate(request);
         long id = profiles.insert(me.tenantId(), request.name().trim(),
                 request.companyName() == null ? "" : request.companyName().trim(),
@@ -54,13 +54,13 @@ public class CompanyController {
     @PostMapping("/{id}/copy")
     @ResponseStatus(HttpStatus.CREATED)
     public CompanyProfileRepository.ProfileRow copy(@PathVariable long id) {
-        return profiles.copy(requireFacilitator().tenantId(), id);
+        return profiles.copy(requireBuilder().tenantId(), id);
     }
 
     @PutMapping("/{id}")
     public CompanyProfileRepository.ProfileRow update(@PathVariable long id,
                                                       @RequestBody ProfileRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         validate(request);
         profiles.findVisible(me.tenantId(), id)
                 .filter(profile -> profile.editable(me.tenantId()))
@@ -83,10 +83,21 @@ public class CompanyController {
         }
     }
 
-    private static TenantContext.Principal requireFacilitator() {
+    /** Building is a separate job from running: companies are prepared, not improvised. */
+    private static TenantContext.Principal requireBuilder() {
         TenantContext.Principal me = TenantContext.require();
-        if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw ProblemException.forbidden("auth.facilitator_only", "facilitator only");
+        if (!"BUILDER".equals(me.role()) && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.builder_only",
+                    "only a builder prepares companies; ask your administrator");
+        }
+        return me;
+    }
+
+    private static TenantContext.Principal requireStaff() {
+        TenantContext.Principal me = TenantContext.require();
+        if (!"BUILDER".equals(me.role()) && !"FACILITATOR".equals(me.role())
+                && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.facilitator_only", "staff only");
         }
         return me;
     }

@@ -66,6 +66,10 @@ public class RunController {
     @GetMapping
     public List<RunService.RunView> list() {
         TenantContext.Principal me = TenantContext.require();
+        // Sessions are execution data: a builder prepares packages and does not watch classes run.
+        if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.facilitator_only", "sessions are for facilitators");
+        }
         return runs.runs(me.tenantId(), me.userId(), me.role());
     }
 

@@ -46,10 +46,12 @@ public class RunService {
     private final JdbcTemplate jdbc;
     private final CompanyProfileRepository profiles;
     private final UserRepository users;
+    private final PackageRepository packages;
 
     public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
                       EnvironmentService environment, JdbcTemplate jdbc,
-                      CompanyProfileRepository profiles, UserRepository users) {
+                      CompanyProfileRepository profiles, UserRepository users,
+                      PackageRepository packages) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
@@ -57,6 +59,7 @@ public class RunService {
         this.jdbc = jdbc;
         this.profiles = profiles;
         this.users = users;
+        this.packages = packages;
     }
 
     @Transactional
@@ -176,6 +179,31 @@ public class RunService {
         for (int i = 0; i < seats.size(); i++) {
             addPlayer(tenantId, view.id(), view.teams().get(i).id(), seats.get(i), "OWNER");
         }
+        return view(tenantId, view.id());
+    }
+
+    /**
+     * Starts a session from a published package (ruling of 3 Nov 2026).
+     *
+     * <p>The facilitator picks a package and seats trainees; the template, the companies and their
+     * product lines come from the package. They cannot change any of it — that is the builder's job
+     * and it happened earlier. The run records which package it came from, so a cohort can always be
+     * traced back to the preparation that produced it.
+     */
+    @Transactional
+    public RunView startFromPackage(long tenantId, long facilitatorId, long packageId, String name,
+                                    List<Long> traineeIds, Integer requestedRounds,
+                                    Integer requestedCycles) {
+        PackageRepository.PackageRow pkg = packages.find(tenantId, packageId).orElseThrow(
+                () -> ProblemException.notFound("package.not_found", "no such package"));
+        if (!"PUBLISHED".equals(pkg.status())) {
+            throw ProblemException.conflict("package.retired",
+                    "this package has been retired; ask your builder for a current one",
+                    "package", pkg.name());
+        }
+        RunView view = startPrepared(tenantId, facilitatorId, name, pkg.templateKey(),
+                pkg.companyProfileIds(), traineeIds, requestedRounds, requestedCycles);
+        jdbc.update("update run set package_id = ? where id = ?", packageId, view.id());
         return view(tenantId, view.id());
     }
 

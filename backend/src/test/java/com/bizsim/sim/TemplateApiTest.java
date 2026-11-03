@@ -50,8 +50,10 @@ class TemplateApiTest extends PostgresTestBase {
     private long acme;
     private long other;
     private String acmeFacilitator;
+    private String acmeExecutor;
     private String acmePlayer;
     private String otherFacilitator;
+    private String otherBuilder;
 
     @BeforeEach
     void seed() throws Exception {
@@ -68,12 +70,17 @@ class TemplateApiTest extends PostgresTestBase {
         acme = tenant("acme", "Acme");
         other = tenant("other", "Other");
         user(acme, "trainer@acme.test", "FACILITATOR");
+        user(acme, "builder@acme.test", "BUILDER");
         user(acme, "player@acme.test", "PLAYER");
         user(other, "trainer@other.test", "FACILITATOR");
+        user(other, "builder@other.test", "BUILDER");
 
-        acmeFacilitator = login("acme", "trainer@acme.test");
+        // Templates are built, not run (ruling 3 Nov 2026): the writer account is a builder.
+        acmeFacilitator = login("acme", "builder@acme.test");
+        acmeExecutor = login("acme", "trainer@acme.test");
         acmePlayer = login("acme", "player@acme.test");
         otherFacilitator = login("other", "trainer@other.test");
+        otherBuilder = login("other", "builder@other.test");
     }
 
     @Test
@@ -129,9 +136,13 @@ class TemplateApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.length()").value(2));
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + otherFacilitator))
                 .andExpect(jsonPath("$.length()").value(1));
+        // Another tenant's builder cannot see it either — 404, and their facilitator is refused first.
+        mvc.perform(post("/api/templates/" + key + "/copy")
+                        .header("Authorization", "Bearer " + otherBuilder))
+                .andExpect(status().isNotFound());
         mvc.perform(post("/api/templates/" + key + "/copy")
                         .header("Authorization", "Bearer " + otherFacilitator))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -151,12 +162,19 @@ class TemplateApiTest extends PostgresTestBase {
     }
 
     @Test
-    void templates_are_facilitator_material() throws Exception {
+    void templates_are_staff_material_and_only_a_builder_may_change_them() throws Exception {
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmePlayer))
                 .andExpect(status().isForbidden());
         mvc.perform(post("/api/templates/standard-v1/copy")
                         .header("Authorization", "Bearer " + acmePlayer))
                 .andExpect(status().isForbidden());
+        // A facilitator reads the economy they run, and cannot edit it.
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeExecutor))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/templates/standard-v1/copy")
+                        .header("Authorization", "Bearer " + acmeExecutor))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("auth.builder_only"));
         mvc.perform(get("/api/templates"))
                 .andExpect(status().isUnauthorized());
     }
@@ -279,7 +297,7 @@ class TemplateApiTest extends PostgresTestBase {
 
         // Once a session exists, the catalogue is frozen: its companies and decisions name these codes.
         mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .header("Authorization", "Bearer " + acmeExecutor)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Live cohort", "scenarioKey", key,

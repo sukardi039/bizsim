@@ -5,11 +5,11 @@ import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
 import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
+import PackagesPanel from "./PackagesPanel";
 import { useI18n, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
   api,
-  type TemplateRow,
   clearToken,
   eventStreamUrl,
   getToken,
@@ -143,11 +143,7 @@ export default function App() {
   const [identity, setIdentity] = useState<{ userId: number; role: string } | null>(null);
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   /** Sessions drive a class; Templates is the setup workbench. Same shell, two views. */
-  const [view, setView] = useState<"runs" | "templates" | "companies" | "people">("runs");
-  // The quick "New run" path uses a real template too: hardcoding a scenario key made the workbench
-  // pointless for anyone whose economy is not the shipped one.
-  const [templates, setTemplates] = useState<TemplateRow[]>([]);
-  const [templateKey, setTemplateKey] = useState("");
+  const [view, setView] = useState<"runs" | "packages" | "templates" | "companies" | "people">("runs");
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -158,11 +154,14 @@ export default function App() {
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const [name, setName] = useState("Pilot session");
-  const [teamCount, setTeamCount] = useState(3);
-  const [cycles, setCycles] = useState(2);
+
+  // Ruling of 3 Nov 2026: preparing and running are separate jobs. A builder never loads sessions;
+  // a facilitator never sees the builders' tools.
+  const canRun = identity === null || identity.role !== "BUILDER";
+  const canBuild = identity === null || identity.role === "BUILDER" || identity.role === "ADMIN";
 
   const refreshRuns = useCallback(async () => {
+    if (!canRun) return;
     try {
       setRuns(await api.runs());
     } catch (error) {
@@ -184,6 +183,12 @@ export default function App() {
   useEffect(() => {
     if (signedIn) void refreshRuns();
   }, [signedIn, refreshRuns]);
+
+  // A builder lands in the setup workspace; a facilitator lands in sessions.
+  useEffect(() => {
+    if (identity?.role === "BUILDER") setView("packages");
+    if (identity?.role === "FACILITATOR") setView("runs");
+  }, [identity]);
 
   useEffect(() => {
     if (selectedId !== null) void refreshBoard(selectedId);
@@ -234,30 +239,6 @@ export default function App() {
   }, [refreshRuns, refreshBoard, selectedId]);
 
   useRunStream(selectedId, note);
-
-  useEffect(() => {
-    if (!signedIn || identity?.role === "PLAYER") return;
-    api
-      .templates()
-      .then((list) => {
-        setTemplates(list);
-        setTemplateKey((current) => current || list[0]?.key || "");
-      })
-      .catch(() => undefined); // the Start-session card reports its own failures
-  }, [signedIn, identity]);
-
-  const create = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setProblem(null);
-    try {
-      const teamNames = Array.from({ length: teamCount }, (_, i) => `Company ${i + 1}`);
-      const run = await api.createRun(name, templateKey || templates[0]?.key || "", teamNames, cycles);
-      setSelectedId(run.id);
-      await refreshRuns();
-    } catch (error) {
-      setProblem(errorText(error, t));
-    }
-  };
 
   const act = async (action: "next" | "close") => {
     if (!selected) return;
@@ -338,60 +319,29 @@ export default function App() {
         </div>
 
         <div className="nav">
-          <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
-            {t("nav.sessions")}
-          </button>
-          <button className={view === "templates" ? "active" : ""} onClick={() => setView("templates")}>
-            {t("nav.templates")}
-          </button>
-          <button className={view === "companies" ? "active" : ""} onClick={() => setView("companies")}>
-            {t("nav.companies")}
-          </button>
+          {canRun && (
+            <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
+              {t("nav.sessions")}
+            </button>
+          )}
+          {canBuild && (
+            <>
+              <button className={view === "packages" ? "active" : ""} onClick={() => setView("packages")}>
+                {t("nav.packages")}
+              </button>
+              <button className={view === "templates" ? "active" : ""} onClick={() => setView("templates")}>
+                {t("nav.templates")}
+              </button>
+              <button className={view === "companies" ? "active" : ""} onClick={() => setView("companies")}>
+                {t("nav.companies")}
+              </button>
+            </>
+          )}
           <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
             {t("nav.people")}
           </button>
         </div>
 
-        <form className="card" onSubmit={create}>
-          <h2>New run</h2>
-          <label>
-            Name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <label>
-            {t("start.template")}
-            <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
-              {templates.map((template) => (
-                <option key={template.key} value={template.key}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="row">
-            <label>
-              Companies (1–10)
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={teamCount}
-                onChange={(e) => setTeamCount(Number(e.target.value))}
-              />
-            </label>
-            <label>
-              Cycles
-              <input
-                type="number"
-                min={1}
-                max={6}
-                value={cycles}
-                onChange={(e) => setCycles(Number(e.target.value))}
-              />
-            </label>
-          </div>
-          <button type="submit">Create</button>
-        </form>
 
         <h2>Runs</h2>
         <ul className="runs">
@@ -412,7 +362,9 @@ export default function App() {
       <main>
         {problem && <p className="error">{problem}</p>}
 
-        {view === "companies" ? (
+        {view === "packages" ? (
+          <PackagesPanel />
+        ) : view === "companies" ? (
           <CompaniesPanel />
         ) : view === "people" ? (
           <PeoplePanel />

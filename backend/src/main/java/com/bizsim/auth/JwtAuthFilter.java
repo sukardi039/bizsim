@@ -40,6 +40,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // header, because EventSource cannot set headers (see RunStreamController).
         return path.equals("/api/auth/login")
                 || path.equals("/api/ping")
+                // The deploy fingerprint must answer before anyone can sign in: that is exactly when
+                // you need to know which build is live.
+                || path.equals("/api/version")
                 || path.endsWith("/events");
     }
 

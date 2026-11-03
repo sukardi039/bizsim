@@ -70,14 +70,14 @@ public class TemplateController {
 
     @GetMapping
     public List<ScenarioRepository.TemplateRow> list() {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
         return scenarios.listVisible(me.tenantId());
     }
 
     /** Everything the editor needs in one call: the editable settings and the environment timeline. */
     @GetMapping("/{key}")
     public Detail detail(@PathVariable String key) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
         ScenarioRepository.TemplateRow row = scenarios.findVisible(me.tenantId(), key)
                 .orElseThrow(() -> ProblemException.notFound("template.not_found", "no such template"));
         return detail(me, row);
@@ -87,7 +87,7 @@ public class TemplateController {
     @ResponseStatus(HttpStatus.CREATED)
     public ScenarioRepository.TemplateRow copy(@PathVariable String key,
                                                @RequestBody(required = false) CopyRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         String copy = scenarios.copy(key, me.tenantId(), me.tenantCode(),
                 request == null ? null : request.name());
         return scenarios.findVisible(me.tenantId(), copy).orElseThrow();
@@ -96,7 +96,7 @@ public class TemplateController {
     /** Merges the submitted settings into the copy. Unknown fields are ignored, never invented. */
     @PutMapping("/{key}/settings")
     public Detail saveSettings(@PathVariable String key, @RequestBody Map<String, Object> settings) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         validateSettings(settings);
         scenarios.saveSettings(key, settings);
@@ -106,7 +106,7 @@ public class TemplateController {
     /** Replaces the environment timeline: positions are a table, so a partial edit has no meaning. */
     @PutMapping("/{key}/environment")
     public Detail saveEnvironment(@PathVariable String key, @RequestBody EnvironmentRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         List<ScenarioRepository.RoundRow> rounds = request == null ? null : request.rounds();
         validateEnvironment(rounds);
@@ -117,7 +117,7 @@ public class TemplateController {
     /** Replaces the product catalogue. Refused once the template has sessions: they name these codes. */
     @PutMapping("/{key}/products")
     public Detail saveProducts(@PathVariable String key, @RequestBody ProductsRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         requireUnused(me, key);
         List<ScenarioRepository.ProductRow> products = request == null ? null : request.products();
@@ -128,7 +128,7 @@ public class TemplateController {
 
     @PutMapping("/{key}/channels")
     public Detail saveChannels(@PathVariable String key, @RequestBody ChannelsRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         requireUnused(me, key);
         List<ScenarioRepository.ChannelRow> channels = request == null ? null : request.channels();
@@ -139,7 +139,7 @@ public class TemplateController {
 
     @PutMapping("/{key}/projects")
     public Detail saveProjects(@PathVariable String key, @RequestBody ProjectsRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         requireUnused(me, key);
         List<ScenarioRepository.ProjectRow> projects = request == null ? null : request.projects();
@@ -366,10 +366,22 @@ public class TemplateController {
                 scenarios.projects(row.key()));
     }
 
-    private static TenantContext.Principal requireFacilitator() {
+    /** Building is a separate job from running (ruling 3 Nov 2026): a facilitator consumes, never edits. */
+    private static TenantContext.Principal requireBuilder() {
         TenantContext.Principal me = TenantContext.require();
-        if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw ProblemException.forbidden("auth.facilitator_only", "facilitator only");
+        if (!"BUILDER".equals(me.role()) && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.builder_only",
+                    "only a builder prepares templates; ask your administrator");
+        }
+        return me;
+    }
+
+    /** Reading is open to staff: a facilitator must see the economy they are about to run. */
+    private static TenantContext.Principal requireStaff() {
+        TenantContext.Principal me = TenantContext.require();
+        if (!"BUILDER".equals(me.role()) && !"FACILITATOR".equals(me.role())
+                && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.facilitator_only", "staff only");
         }
         return me;
     }

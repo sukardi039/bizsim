@@ -47,6 +47,7 @@ class PreparedSessionApiTest extends PostgresTestBase {
     private long acme;
     private long other;
     private String facilitator;
+    private String builder;
     private String player;
     private String otherFacilitator;
 
@@ -66,10 +67,12 @@ class PreparedSessionApiTest extends PostgresTestBase {
         acme = tenant("acme");
         other = tenant("other");
         user(acme, "trainer@acme.test", "FACILITATOR");
+        user(acme, "builder@acme.test", "BUILDER");
         user(acme, "ada@acme.test", "PLAYER");
         user(acme, "budi@acme.test", "PLAYER");
         user(other, "trainer@other.test", "FACILITATOR");
         facilitator = login("acme", "trainer@acme.test");
+        builder = login("acme", "builder@acme.test");
         player = login("acme", "ada@acme.test");
         otherFacilitator = login("other", "trainer@other.test");
     }
@@ -83,14 +86,14 @@ class PreparedSessionApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$[0].tenantId").doesNotExist());
 
         MvcResult copied = mvc.perform(post("/api/companies/" + profileId("Standard manufacturer") + "/copy")
-                        .header("Authorization", "Bearer " + facilitator))
+                        .header("Authorization", "Bearer " + builder))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.tenantId").value((int) acme))
                 .andReturn();
         long copyId = json.readTree(copied.getResponse().getContentAsString()).get("id").asLong();
 
         mvc.perform(put("/api/companies/" + copyId)
-                        .header("Authorization", "Bearer " + facilitator)
+                        .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Alpha Industries", "companyName", "Alpha Industries",
@@ -101,7 +104,7 @@ class PreparedSessionApiTest extends PostgresTestBase {
 
         // The shipped profile itself stays read-only.
         mvc.perform(put("/api/companies/" + profileId("Standard manufacturer"))
-                        .header("Authorization", "Bearer " + facilitator)
+                        .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("name", "Mine", "products", List.of()))))
                 .andExpect(status().isConflict())

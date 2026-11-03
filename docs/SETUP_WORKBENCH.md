@@ -1,6 +1,6 @@
 # Setup workbench — the pre-session build
 
-Status: **S6a–S6e shipped (3 Nov 2026).** This file is the agreed scope for the
+Status: **S6a–S6e shipped (3 Nov 2026), and the workbench is now a separate job from execution (D24).** This file is the agreed scope for the
 next phase, so the slices can be cut without re-litigating the shape.
 
 Glossary, because it caused a question: a **session** is one simulation run (one `run` row, one class
@@ -152,6 +152,20 @@ class always has one person who is not in the roster.
 S6a and S6b are shipped; S6c is next (the settings and environment editor), then S6d, then S6e.
 
 ---
+
+## 7a. Who does what (D24)
+
+| Role | Job | Sees |
+|---|---|---|
+| `BUILDER` | prepares templates, companies and **packages** | Packages · Templates · Companies · People |
+| `FACILITATOR` | runs sessions from published packages | Sessions · People |
+| `ADMIN` | both jobs | everything |
+| `PLAYER` | competes | the decision form for their company |
+
+The boundary artefact is a **package**: `simulation_package` (V12) records one template *version*, the
+company profiles in it, and who published it. `POST /api/packages` (builder) → `POST
+/api/packages/{id}/sessions` (facilitator). A package is retired, never deleted; `run.package_id`
+records which package a cohort came from.
 
 ## 8. Open questions for the product owner
 
