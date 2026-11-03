@@ -196,7 +196,20 @@ guard. The console shows the list with a confirmation before deleting anything.
 3. **Trainee identity — answered 3 Nov 2026.** Personal: one account per person, re-seated per
    session. Deleting a session removes the seat and any account that exists only for it, and keeps a
    person who is seated in another session (already enforced and tested).
-4. **Credential delivery.** Printed list, CSV export, or paste-into-WhatsApp from the roster screen?
+4. **Class list on a published package — deferred 3 Nov 2026 ("keep your suggestion in mind, we keep
+   the current arrangement first").** *Current arrangement, in force:* the class list is part of the
+   frozen package (D27). To change who sits where before a session you either publish a new package,
+   or pass an explicit `traineeIds` on the start request (which overrides the package without
+   touching it); after the session starts the Trainees card can fill or replace a seat. *The
+   suggestion, held for later:* split the seat table out of the freeze — seats editable on a
+   published package, template + companies still frozen. That would let a builder fix a roster
+   without minting a new package version, at the cost of one more "what did this package mean when it
+   ran?" distinction: the seating a class actually played would no longer be implied by the package
+   row, so the run would have to record its own seating snapshot (it already does, via `player`) and
+   a debrief would have to read that, not the package. Not built; revisit if rostering churn becomes
+   routine.
+
+5. **Credential delivery.** Printed list, CSV export, or paste-into-WhatsApp from the roster screen?
    There is no email delivery in this product and adding it is its own decision.
 
 Answers to 1–3 change the migrations; 4 is a screen detail.
