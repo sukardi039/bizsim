@@ -139,3 +139,8 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
    credential at least 8 characters); only an `ADMIN` may mint another `FACILITATOR`, because D21
    makes a second facilitator the way to run a second cohort and that is not a facilitator's call.
    There is no email delivery: the facilitator hands over the credential.
+8. Deleting a simulation is a facilitator power, not an admin chore: its owner may delete it, an
+   admin may delete any in the tenant, and nobody else may delete anything (`DELETE /api/runs/{id}`,
+   204). It is the only delete in the API and it cascades — rounds, decisions, results, statements,
+   teams, seats — so a rehearsal can be cleared before a real class. The simulation row goes too once
+   it has no runs, and the D21 "one in flight" guard releases with it.

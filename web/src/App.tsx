@@ -248,6 +248,30 @@ export default function App() {
     }
   };
 
+  /**
+   * Deletes the whole simulation. A confirm dialog, not a typed name: this is a pilot tool, the data
+   * is a rehearsal, and two clicks is the right friction. The list refresh is what proves it worked.
+   */
+  const remove = async () => {
+    if (!selected) return;
+    const sure = window.confirm(
+      `Delete run ${selected.id} and everything played in it?\n\n` +
+        `Rounds, decisions, results and the trainee seats go with it. This cannot be undone.`,
+    );
+    if (!sure) return;
+    setProblem(null);
+    try {
+      await api.deleteRun(selected.id);
+      setSelectedId(null);
+      setBoard([]);
+      setBoardRound(null);
+      setFeed([]);
+      await refreshRuns();
+    } catch (error) {
+      setProblem(errorText(error));
+    }
+  };
+
   if (!signedIn) return <Login onDone={() => setSignedIn(true)} />;
   if (identityProblem) {
     return (
@@ -347,6 +371,9 @@ export default function App() {
                 </button>
                 <button className="primary" onClick={() => act("close")} disabled={selected.status !== "OPEN"}>
                   Compute round
+                </button>
+                <button className="danger" onClick={remove}>
+                  Delete run
                 </button>
               </div>
             </header>

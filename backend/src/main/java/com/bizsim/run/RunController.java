@@ -2,6 +2,7 @@ package com.bizsim.run;
 
 import com.bizsim.tenant.TenantContext;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,6 +52,14 @@ public class RunController {
     @GetMapping("/{id}")
     public RunService.RunView get(@PathVariable long id) {
         return runs.get(TenantContext.require().tenantId(), id);
+    }
+
+    /** Deletes a simulation and everything played in it. Owner or admin only; cannot be undone. */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id) {
+        TenantContext.Principal me = requireFacilitator();
+        runs.deleteRun(me.tenantId(), me.userId(), me.role(), id);
     }
 
     @PostMapping("/{id}/teams")

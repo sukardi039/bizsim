@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -221,6 +222,63 @@ class RoundFlowApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + newcomer))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submitted").value(false));
+    }
+
+    @Test
+    void a_facilitator_deletes_a_simulation_and_can_start_again() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(100, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        long simulationId = jdbc.queryForObject(
+                "select simulation_id from run where id = ?", Long.class, runId);
+        long roundId = jdbc.queryForObject(
+                "select id from round where run_id = ?", Long.class, runId);
+
+        mvc.perform(delete("/api/runs/" + runId)
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNoContent());
+
+        // Everything that belonged to the run is gone, and so is the empty simulation shell.
+        for (String table : List.of("round", "team")) {
+            assertThat(jdbc.queryForObject("select count(*) from " + table + " where run_id = ?",
+                    Integer.class, runId)).as(table).isZero();
+        }
+        for (String table : List.of("decision", "round_result", "round_statement")) {
+            assertThat(jdbc.queryForObject("select count(*) from " + table + " where round_id = ?",
+                    Integer.class, roundId)).as(table).isZero();
+        }
+        assertThat(jdbc.queryForObject("select count(*) from simulation where id = ?",
+                Integer.class, simulationId)).isZero();
+        mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNotFound());
+
+        // D21 counts unfinished runs: with the run gone the facilitator is free to start the next one.
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Clean slate", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "A", "companyName", "A Inc"))))))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void deleting_a_simulation_is_owner_and_role_guarded() throws Exception {
+        // A trainee cannot delete anything.
+        mvc.perform(delete("/api/runs/" + runId)
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isForbidden());
+
+        // Another facilitator of the same tenant cannot delete it, and must not learn it exists.
+        user(tenantId, "trainer6@acme.test", "FACILITATOR");
+        mvc.perform(delete("/api/runs/" + runId)
+                        .header("Authorization", "Bearer " + loginOn("acme", "trainer6@acme.test")))
+                .andExpect(status().isForbidden());
+
+        // An admin runs the tenant and may.
+        user(tenantId, "boss3@acme.test", "ADMIN");
+        mvc.perform(delete("/api/runs/" + runId)
+                        .header("Authorization", "Bearer " + loginOn("acme", "boss3@acme.test")))
+                .andExpect(status().isNoContent());
     }
 
     @Test

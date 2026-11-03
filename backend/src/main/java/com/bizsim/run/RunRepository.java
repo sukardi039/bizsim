@@ -90,6 +90,29 @@ public class RunRepository {
         return count == null ? 0 : count;
     }
 
+    /** Who owns the simulation behind a run, so a delete can be checked against the caller (D21). */
+    public Optional<Long> facilitatorOf(long tenantId, long runId) {
+        return jdbc.query("""
+                select s.facilitator_id from run r join simulation s on s.id = r.simulation_id
+                where r.tenant_id = ? and r.id = ?
+                """, (rs, i) -> rs.getLong(1), tenantId, runId).stream().findFirst();
+    }
+
+    /**
+     * Deletes a run and, by cascade, every round, decision, result, statement, team and player under
+     * it. The simulation that held it is removed too once it has no runs left, so a facilitator's
+     * list does not accumulate empty shells.
+     */
+    public boolean deleteRun(long tenantId, long runId) {
+        int deleted = jdbc.update("delete from run where tenant_id = ? and id = ?", tenantId, runId);
+        jdbc.update("""
+                delete from simulation s
+                where s.tenant_id = ?
+                  and not exists (select 1 from run r where r.simulation_id = s.id)
+                """, tenantId);
+        return deleted > 0;
+    }
+
     public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles) {
         return jdbc.queryForObject("""
                 insert into run (tenant_id, simulation_id, scenario_key, status, current_round,

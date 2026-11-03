@@ -209,6 +209,8 @@ export const api = {
     }),
   nextRound: (runId: number) => request<{ number: number }>(`/runs/${runId}/rounds/next`, { method: "POST" }),
   closeRound: (runId: number) => request<unknown>(`/runs/${runId}/rounds/close`, { method: "POST" }),
+  /** Deletes the simulation and everything played in it. Owner or admin only; not undoable. */
+  deleteRun: (runId: number) => request<unknown>(`/runs/${runId}`, { method: "DELETE" }),
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>

@@ -94,9 +94,10 @@ BIZSIM_WEB_DIR=$PWD/web/dist BIZSIM_PORT=8080 mvn -f backend/pom.xml spring-boot
 If the directory does not exist, the backend runs API-only and behaves exactly as before.
 
 Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
-then drive the session with **Open next round** and **Compute round**. The scoreboard refreshes from a
-server-sent event stream, so a second browser on the same run sees the same round land within a
-second.
+then drive the session with **Open next round** and **Compute round**. **Delete run** removes a
+simulation and everything played in it — the way to clear a rehearsal before the real class. The
+scoreboard refreshes from a server-sent event stream, so a second browser on the same run sees the
+same round land within a second.
 
 A trainee signs in with the player account and gets the **decision form** instead of the console:
 production and prices per product, marketing per channel, production staff and machines, R&D

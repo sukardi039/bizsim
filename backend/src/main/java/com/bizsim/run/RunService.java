@@ -165,6 +165,27 @@ public class RunService {
         return view(tenantId, runId);
     }
 
+    /**
+     * Removes a simulation a facilitator no longer wants — a botched setup, a rehearsal, a run that
+     * was never finished. Only its owner, or an admin, may do it: the data is gone for good, which is
+     * also why this is the only delete the API offers.
+     */
+    @Transactional
+    public void deleteRun(long tenantId, long userId, String role, long runId) {
+        requireRun(tenantId, runId);
+        if (!"ADMIN".equals(role)) {
+            long owner = runs.facilitatorOf(tenantId, runId).orElseThrow(
+                    () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+            if (owner != userId) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "this simulation belongs to another facilitator");
+            }
+        }
+        if (!runs.deleteRun(tenantId, runId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run");
+        }
+    }
+
     /** Runs of the caller's tenant, newest first. Feeds the console sidebar. */
     @Transactional(readOnly = true)
     public List<RunView> runs(long tenantId, long userId, String role) {

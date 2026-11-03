@@ -35,6 +35,8 @@ button {
 button:hover:not(:disabled) { border-color: var(--accent); }
 button:disabled { opacity: .45; cursor: not-allowed; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #06121f; font-weight: 600; }
+button.danger { border-color: #5a2b2b; color: var(--bad); }
+button.danger:hover:not(:disabled) { border-color: var(--bad); background: #2a1a1a; }
 button.link { background: none; border: none; padding: 0; text-align: left; color: inherit; }
 
 input {
