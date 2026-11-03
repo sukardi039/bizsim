@@ -9,6 +9,7 @@ import { useI18n, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
   api,
+  type TemplateRow,
   clearToken,
   eventStreamUrl,
   getToken,
@@ -143,6 +144,10 @@ export default function App() {
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   /** Sessions drive a class; Templates is the setup workbench. Same shell, two views. */
   const [view, setView] = useState<"runs" | "templates" | "companies" | "people">("runs");
+  // The quick "New run" path uses a real template too: hardcoding a scenario key made the workbench
+  // pointless for anyone whose economy is not the shipped one.
+  const [templates, setTemplates] = useState<TemplateRow[]>([]);
+  const [templateKey, setTemplateKey] = useState("");
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -230,12 +235,23 @@ export default function App() {
 
   useRunStream(selectedId, note);
 
+  useEffect(() => {
+    if (!signedIn || identity?.role === "PLAYER") return;
+    api
+      .templates()
+      .then((list) => {
+        setTemplates(list);
+        setTemplateKey((current) => current || list[0]?.key || "");
+      })
+      .catch(() => undefined); // the Start-session card reports its own failures
+  }, [signedIn, identity]);
+
   const create = async (event: React.FormEvent) => {
     event.preventDefault();
     setProblem(null);
     try {
       const teamNames = Array.from({ length: teamCount }, (_, i) => `Company ${i + 1}`);
-      const run = await api.createRun(name, "standard-v1", teamNames, cycles);
+      const run = await api.createRun(name, templateKey || templates[0]?.key || "", teamNames, cycles);
       setSelectedId(run.id);
       await refreshRuns();
     } catch (error) {
@@ -341,6 +357,16 @@ export default function App() {
           <label>
             Name
             <input value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label>
+            {t("start.template")}
+            <select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
+              {templates.map((template) => (
+                <option key={template.key} value={template.key}>
+                  {template.name}
+                </option>
+              ))}
+            </select>
           </label>
           <div className="row">
             <label>
