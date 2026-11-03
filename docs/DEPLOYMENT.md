@@ -55,6 +55,10 @@ containers read, so no credential is ever written into a tracked file.
  "migrations":14,"latest":"14","latestDescription":"frozen package templates", ...}
 ```
 
+The console has its own probe, because the API and the console are separate containers:
+`GET /build.json` returns `{"builtAt":"...","commit":"..."}` for the web bundle actually being served.
+If `/api/version` is fresh but `/build.json` is old, only the api service rebuilt.
+
 If `builtAt` is fresh but the console still looks like the previous release, that is the *web*
 container, not the API: `index.html` is now served with `Cache-Control: no-store`, because a cached
 copy keeps naming the previous bundle. Hard-refresh once after this deploy; it should not recur.
