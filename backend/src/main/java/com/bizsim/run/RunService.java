@@ -124,8 +124,11 @@ public class RunService {
     public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
                                  List<Long> profileIds, List<Long> traineeIds,
                                  Integer requestedRounds, Integer requestedCycles) {
-        scenarios.findVisible(tenantId, templateKey).orElseThrow(
-                () -> ProblemException.notFound("template.not_found", "no such template"));
+        // A package's template is a frozen copy, which the library hides on purpose; existence is the
+        // right question here, not visibility.
+        if (!scenarios.existsForTenant(tenantId, templateKey)) {
+            throw ProblemException.notFound("template.not_found", "no such template");
+        }
         if (profileIds == null || profileIds.isEmpty()) {
             throw ProblemException.badRequest("run.teams_required", "at least one company is required");
         }

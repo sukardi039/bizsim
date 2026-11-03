@@ -81,8 +81,14 @@ public class PackageController {
                             "no such company profile in this tenant"));
         }
 
-        long id = packages.insert(me.tenantId(), request.name().trim(), template.key(),
+        // Freeze first: the package must point at a row that nothing can edit afterwards. The draft
+        // stays a working document; this copy is what the class will actually play.
+        String frozenKey = frozenKey(me.tenantCode());
+        templates.freeze(template.key(), me.tenantId(), frozenKey,
+                request.name().trim() + " (v" + template.version() + ")");
+        long id = packages.insert(me.tenantId(), request.name().trim(), frozenKey, template.key(),
                 template.version(), profileIds, me.userId());
+        templates.markFrozen(frozenKey, id);
         return packages.find(me.tenantId(), id).orElseThrow();
     }
 
@@ -119,6 +125,12 @@ public class PackageController {
                     "only a facilitator runs a session");
         }
         return me;
+    }
+
+    /** `pkg-<tenant>-<8 hex>`: recognisable in logs, never colliding with a builder's own keys. */
+    private static String frozenKey(String tenantCode) {
+        String suffix = java.util.UUID.randomUUID().toString().substring(0, 8);
+        return ("pkg-" + tenantCode + "-" + suffix).toLowerCase().replaceAll("[^a-z0-9-]", "-");
     }
 
     private static TenantContext.Principal requireBuilder() {

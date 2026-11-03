@@ -56,8 +56,15 @@ class PackageApiTest extends PostgresTestBase {
     @BeforeEach
     void seed() throws Exception {
         for (String table : List.of("round_statement", "round_result", "decision", "round", "player",
-                "company_product", "company_staff", "company_rnd", "team", "run", "simulation",
-                "simulation_package", "company_profile", "app_user", "tenant")) {
+                "company_product", "company_staff", "company_rnd", "team", "run", "simulation")) {
+            jdbc.update("delete from " + table);
+        }
+        // scenario.frozen_for_package -> package, and package.template_key -> scenario: a cycle, so
+        // it is broken explicitly before either side is deleted.
+        jdbc.update("update scenario set frozen_for_package = null");
+        jdbc.update("delete from simulation_package");
+        jdbc.update("delete from scenario where key like 'pkg-%'");
+        for (String table : List.of("company_profile", "app_user", "tenant")) {
             jdbc.update("delete from " + table);
         }
         jdbc.update("""
@@ -144,28 +151,59 @@ class PackageApiTest extends PostgresTestBase {
     }
 
     @Test
-    void a_package_is_a_snapshot_not_a_live_link() throws Exception {
-        long packageId = publish("Frozen package");
+    void publishing_freezes_a_copy_so_a_later_edit_cannot_reach_the_class() throws Exception {
+        // A tenant draft the builder can edit, published as a package.
+        String draft = copyTemplate();
+        long packageId = publishFrom(draft, "Frozen package");
+        String frozenKey = jdbc.queryForObject(
+                "select template_key from simulation_package where id = ?", String.class, packageId);
+        assertThat(frozenKey).startsWith("pkg-");
+        assertThat(jdbc.queryForObject("select source_template_key from simulation_package where id = ?",
+                String.class, packageId)).isEqualTo(draft);
 
-        // The builder edits the template afterwards...
-        mvc.perform(put("/api/templates/standard-v1/settings")
-                        .header("Authorization", "Bearer " + builder)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("rounds", 6))))
-                .andExpect(status().isConflict()); // the shipped template is still read-only
-        String copy = copyTemplate();
-        mvc.perform(put("/api/templates/" + copy + "/settings")
+        // The builder edits the draft afterwards: 8 rounds become 6, catalogue untouched.
+        mvc.perform(put("/api/templates/" + draft + "/settings")
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("rounds", 6))))
                 .andExpect(status().isOk());
 
-        // ...and the package still says which version it was built on.
-        assertThat(jdbc.queryForObject(
-                "select template_version from simulation_package where id = ?", Integer.class, packageId))
-                .isEqualTo(1);
-        assertThat(jdbc.queryForObject(
-                "select version from scenario where key = ?", Integer.class, copy)).isEqualTo(2);
+        // The class runs on the frozen copy: it still has the eight rounds it was published with.
+        long ada = jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'", Long.class);
+        MvcResult started = mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Monday class", "traineeIds", List.of(ada)))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long runId = json.readTree(started.getResponse().getContentAsString()).get("id").asLong();
+
+        assertThat(jdbc.queryForObject("select scenario_key from run where id = ?", String.class, runId))
+                .isEqualTo(frozenKey);
+        assertThat(jdbc.queryForObject("select definition->>'rounds' from scenario where key = ?",
+                String.class, frozenKey)).isEqualTo("8");
+        assertThat(jdbc.queryForObject("select definition->>'rounds' from scenario where key = ?",
+                String.class, draft)).isEqualTo("6");
+
+        // The frozen copy is not a template a builder can pick or edit.
+        assertThat(jdbc.queryForObject("""
+                select count(*) from scenario s join simulation_package p on p.id = s.frozen_for_package
+                where s.key = ?
+                """, Integer.class, frozenKey)).isEqualTo(1);
+        mvc.perform(put("/api/templates/" + frozenKey + "/settings")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", 3))))
+                .andExpect(status().isNotFound());
+
+        // Re-publishing the edited draft makes a *new* package on a *new* frozen copy.
+        long second = publishFrom(draft, "Second cohort");
+        String secondFrozen = jdbc.queryForObject(
+                "select template_key from simulation_package where id = ?", String.class, second);
+        assertThat(secondFrozen).isNotEqualTo(frozenKey);
+        assertThat(jdbc.queryForObject("select definition->>'rounds' from scenario where key = ?",
+                String.class, secondFrozen)).isEqualTo("6");
     }
 
     @Test
@@ -203,11 +241,15 @@ class PackageApiTest extends PostgresTestBase {
     // ------------------------------------------------------------------ helpers
 
     private long publish(String name) throws Exception {
+        return publishFrom("standard-v1", name);
+    }
+
+    private long publishFrom(String templateKey, String name) throws Exception {
         MvcResult published = mvc.perform(post("/api/packages")
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", name, "templateKey", "standard-v1",
+                                "name", name, "templateKey", templateKey,
                                 "companyProfileIds", List.of(profileId)))))
                 .andExpect(status().isCreated())
                 .andReturn();

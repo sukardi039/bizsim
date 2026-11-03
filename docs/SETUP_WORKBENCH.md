@@ -169,13 +169,13 @@ records which package a cohort came from.
 
 ## 8. Open questions for the product owner
 
-0. **How tightly does a package bind to its template?** Today a package *records* `template_version`
-   at publish, but a session loads the template by key (`ScenarioRepository.load`), i.e. whatever the
-   row holds when the class starts. So editing a draft between publishing and the session still
-   changes the class — and removing a product the profile carries makes the session refuse to start
-   (`run.unknown_product`). Three ways to close it: freeze a copy of the template at publish and point
-   the package at the frozen row; version the templates themselves (`scenario_version`, packages pin
-   key+version); or accept it and treat `template_version` as information only.
+0. **How tightly does a package bind to its template? — answered 3 Nov 2026 (option A: freeze on
+   publish).** `POST /api/packages` clones the draft into a private immutable row
+   (`scenario.frozen_for_package`), and the package's `template_key` is that frozen copy; execution
+   loads it, so a later edit to the draft cannot reach a class. Re-publishing an edited draft makes a
+   **new** package on a **new** frozen copy; the old package retires. Frozen rows are hidden from the
+   template library and refuse edits. (Option B — a `scenario_version` table — remains the path if
+   templates ever need real version history.)
 
 1. **Template ownership — answered 3 Nov 2026.** `standard-v1` stays global; a tenant copies it and
    modifies its own copy if needed. Shipped as S6b.

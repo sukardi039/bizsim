@@ -29,8 +29,8 @@ class VersionApiTest extends PostgresTestBase {
         mvc.perform(get("/api/version"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").isString())
-                .andExpect(jsonPath("$.migrations").value(13))
-                .andExpect(jsonPath("$.latest").value("13"))
+                .andExpect(jsonPath("$.migrations").value(14))
+                .andExpect(jsonPath("$.latest").value("14"))
                 .andExpect(jsonPath("$.latestAppliedAt").isString())
                 .andExpect(jsonPath("$.serverTime").isString());
     }

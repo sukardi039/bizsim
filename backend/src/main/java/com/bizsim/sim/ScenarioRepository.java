@@ -161,12 +161,24 @@ public class ScenarioRepository {
                        (select count(*) from product p where p.scenario_key = s.key) as products,
                        (select count(*) from scenario_round r where r.scenario_key = s.key) as rounds
                 from scenario s
-                where s.tenant_id is null or s.tenant_id = ?
+                where (s.tenant_id is null or s.tenant_id = ?) and s.frozen_for_package is null
                 order by s.tenant_id nulls first, s.name
                 """, (rs, i) -> new TemplateRow(
                 rs.getString("key"), rs.getString("name"),
                 (Long) rs.getObject("tenant_id"), rs.getString("status"), rs.getString("based_on"),
                 rs.getInt("version"), rs.getInt("products"), rs.getInt("rounds")), tenantId);
+    }
+
+    /**
+     * Whether a scenario exists for this tenant — including the frozen copies packages run on, which
+     * are deliberately absent from the template library. Used by session start, not by the editor.
+     */
+    public boolean existsForTenant(long tenantId, String key) {
+        Integer count = jdbc.queryForObject("""
+                select count(*) from scenario
+                where key = ? and (tenant_id is null or tenant_id = ?)
+                """, Integer.class, key, tenantId);
+        return count != null && count > 0;
     }
 
     public Optional<ScenarioRepository.TemplateRow> findVisible(long tenantId, String key) {
@@ -199,10 +211,40 @@ public class ScenarioRepository {
 
         String name = requestedName == null || requestedName.isBlank()
                 ? source.name() + " (copy)" : requestedName.trim();
+        cloneInto(sourceKey, key, name, tenantId, "DRAFT");
+        return key;
+    }
+
+    @Transactional
+    public String freeze(String sourceKey, long tenantId, String frozenKey, String name) {
+        // PUBLISHED, not DRAFT: a frozen copy is what a class runs on, not something to be edited.
+        cloneInto(sourceKey, frozenKey, name, tenantId, "PUBLISHED");
+        return frozenKey;
+    }
+
+    /** Marks the frozen row as belonging to the package that produced it. */
+    public void markFrozen(String key, long packageId) {
+        jdbc.update("update scenario set frozen_for_package = ? where key = ?", packageId, key);
+    }
+
+    /** True for the private copies packages run on: invisible in the template library, never editable. */
+    public boolean isFrozen(String key) {
+        Boolean frozen = jdbc.queryForObject(
+                "select frozen_for_package is not null from scenario where key = ?", Boolean.class, key);
+        return Boolean.TRUE.equals(frozen);
+    }
+
+    /**
+     * One clone routine, used by both "copy this template into my drafts" and "freeze this template
+     * into a package". Same five catalogue tables either way — a copy that missed one would load with
+     * no products and only fail at the first round.
+     */
+    @Transactional
+    public void cloneInto(String sourceKey, String key, String name, long tenantId, String status) {
         jdbc.update("""
                 insert into scenario (key, name, definition, version, tenant_id, status, based_on)
-                select ?, ?, definition, version, ?, 'DRAFT', key from scenario where key = ?
-                """, key, name, tenantId, sourceKey);
+                select ?, ?, definition, version, ?, ?, key from scenario where key = ?
+                """, key, name, tenantId, status, sourceKey);
 
         jdbc.update("""
                 insert into product (scenario_key, code, name, base_price, base_unit_cost, base_quality,
@@ -242,7 +284,6 @@ public class ScenarioRepository {
                 from environment_event where scenario_key = ?
                 """, key, sourceKey);
 
-        return key;
     }
 
     // ------------------------------------------------------------------ template editing (S6c)
