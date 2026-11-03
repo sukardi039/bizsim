@@ -238,6 +238,61 @@ class PackageApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @Test
+    void tidy_up_removes_retired_packages_that_never_ran_a_session() throws Exception {
+        long abandoned = publish("Abandoned draft");
+        mvc.perform(post("/api/packages/" + abandoned + "/retire")
+                        .header("Authorization", "Bearer " + builder))
+                .andExpect(status().isNoContent());
+        String abandonedFrozen = jdbc.queryForObject(
+                "select template_key from simulation_package where id = ?", String.class, abandoned);
+
+        long used = publish("Ran a class");
+        mvc.perform(post("/api/packages/" + used + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "A class"))))
+                .andExpect(status().isCreated());
+        mvc.perform(post("/api/packages/" + used + "/retire")
+                        .header("Authorization", "Bearer " + builder))
+                .andExpect(status().isNoContent());
+
+        long live = publish("Still published");
+
+        // Only the abandoned one is offered: a package that ran a class is history, and a published
+        // one is not retired at all.
+        mvc.perform(get("/api/packages/tidy-up").header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value((int) abandoned));
+
+        // A facilitator cannot collect anything.
+        mvc.perform(post("/api/packages/tidy-up").header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("auth.builder_only"));
+
+        mvc.perform(post("/api/packages/tidy-up").header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.removed").value(1))
+                .andExpect(jsonPath("$.names[0]").value("Abandoned draft"));
+
+        // The frozen copy and its catalogue went with it.
+        assertThat(jdbc.queryForObject("select count(*) from scenario where key = ?",
+                Integer.class, abandonedFrozen)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from product where scenario_key = ?",
+                Integer.class, abandonedFrozen)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from simulation_package where id = ?",
+                Integer.class, abandoned)).isZero();
+
+        // The used and the live packages survive.
+        assertThat(jdbc.queryForObject("select count(*) from simulation_package where id in (?, ?)",
+                Integer.class, used, live)).isEqualTo(2);
+
+        // ...and a second pass is a no-op, not an error.
+        mvc.perform(post("/api/packages/tidy-up").header("Authorization", "Bearer " + builder))
+                .andExpect(jsonPath("$.removed").value(0));
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private long publish(String name) throws Exception {

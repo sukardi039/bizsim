@@ -201,6 +201,12 @@ package) is a builder's tool and requires `?facilitatorId=` — the run belongs 
 will drive it, because a builder never does. The console shows each role only its own
 workspace, and the API refuses the other direction rather than relying on a hidden button.
 
+**S5 complete (3 Nov 2026): the debrief.** The facilitator's run view now carries a **Debrief** card:
+pick a round, see one row per company (revenue, cost, profit, cash, share, lost sales, capacity used)
+with the cost broken into its charged lines, plus a Class footer. It reads `round_statement` for that
+round — the debrief cannot disagree with what the engine charged. Builders also get **Tidy up** in
+Packages: retired packages that never ran a session, removable with a confirmation.
+
 **S6e complete (3 Nov 2026): the workbench closes the loop.** A **Companies** tab holds reusable
   company profiles (name + which products of a template it carries; the shipped one is read-only,
   copy it to adapt). A run is now started from what you prepared: **Start a session** → template,

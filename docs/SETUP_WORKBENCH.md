@@ -167,6 +167,12 @@ company profiles in it, and who published it. `POST /api/packages` (builder) →
 /api/packages/{id}/sessions` (facilitator). A package is retired, never deleted; `run.package_id`
 records which package a cohort came from.
 
+## 7b. Lifecycle after publishing
+
+`GET /api/packages/tidy-up` lists retired packages that never ran a session; `POST` removes them and
+their frozen template copies. A package that ran a class is never offered — `run.package_id` is the
+guard. The console shows the list with a confirmation before deleting anything.
+
 ## 8. Open questions for the product owner
 
 0. **How tightly does a package bind to its template? — answered 3 Nov 2026 (option A: freeze on

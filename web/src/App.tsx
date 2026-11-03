@@ -6,6 +6,7 @@ import PeoplePanel from "./PeoplePanel";
 import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
+import DebriefPanel from "./DebriefPanel";
 import { useI18n, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
@@ -161,13 +162,16 @@ export default function App() {
   const canBuild = identity === null || identity.role === "BUILDER" || identity.role === "ADMIN";
 
   const refreshRuns = useCallback(async () => {
-    if (!canRun) return;
+    // Wait for the role: a builder asking for sessions gets 403 and would flash an error banner.
+    if (!identity || identity.role === "BUILDER") return;
     try {
       setRuns(await api.runs());
     } catch (error) {
       setProblem(errorText(error, t));
     }
-  }, []);
+    // Depends on identity: the guard above reads it, and a stale closure would keep returning early
+    // after the role finally arrives (it did, and the run list stayed empty).
+  }, [identity]);
 
   const refreshBoard = useCallback(async (runId: number) => {
     try {
@@ -182,7 +186,7 @@ export default function App() {
 
   useEffect(() => {
     if (signedIn) void refreshRuns();
-  }, [signedIn, refreshRuns]);
+  }, [signedIn, identity, refreshRuns]);
 
   // A builder lands in the setup workspace; a facilitator lands in sessions.
   useEffect(() => {
@@ -343,7 +347,8 @@ export default function App() {
         </div>
 
 
-        <h2>Runs</h2>
+        {canRun && <h2>{t("nav.runs")}</h2>}
+        {canRun && (
         <ul className="runs">
           {runs.map((run) => (
             <li key={run.id} className={selected?.id === run.id ? "active" : ""}>
@@ -355,8 +360,9 @@ export default function App() {
               </button>
             </li>
           ))}
-          {runs.length === 0 && <li className="muted">no runs yet</li>}
+          {runs.length === 0 && <li className="muted">{t("nav.noRuns")}</li>}
         </ul>
+        )}
       </aside>
 
       <main>
@@ -432,6 +438,13 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <DebriefPanel
+              runId={selected.id}
+              teams={selected.teams}
+              rounds={selected.rounds}
+              currentRound={selected.currentRound}
+            />
 
             <Trainees run={selected} onChanged={refreshRuns} />
 

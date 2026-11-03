@@ -25,15 +25,18 @@ export default function PackagesPanel() {
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [tidy, setTidy] = useState<{ id: number; name: string; publishedAt: string }[]>([]);
 
   const load = useCallback(async () => {
     try {
-      const [packageList, templateList, companyList] = await Promise.all([
+      const [packageList, templateList, companyList, tidyList] = await Promise.all([
         api.packages(),
         api.templates(),
         api.companies(),
+        api.tidyPreview(),
       ]);
       setPackages(packageList);
+      setTidy(tidyList);
       setTemplates(templateList);
       setCompanies(companyList);
       setDraft((current) => ({
@@ -86,6 +89,22 @@ export default function PackagesPanel() {
     }
   };
 
+  const tidyUp = async () => {
+    if (!window.confirm(t("packages.tidyConfirm", { count: tidy.length }))) return;
+    setBusy("new");
+    setProblem(null);
+    setNotice(null);
+    try {
+      const result = await api.tidyUp();
+      setNotice(t("packages.tidied", { count: result.removed }));
+      await load();
+    } catch (error) {
+      setProblem(describeError(error, t));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const toggle = (id: number) =>
     setDraft((current) => ({
       ...current,
@@ -123,7 +142,7 @@ export default function PackagesPanel() {
                 <tr key={entry.id}>
                   <td>{entry.name}</td>
                   <td className="muted">
-                    {entry.templateKey} · v{entry.templateVersion}
+                    {entry.sourceTemplateKey} · v{entry.templateVersion}
                   </td>
                   <td className="muted">
                     {entry.companyProfileIds.map(companyName).join(" · ")}
@@ -147,6 +166,25 @@ export default function PackagesPanel() {
           </table>
         )}
       </section>
+
+      {tidy.length > 0 && (
+        <section className="card">
+          <h2>{t("packages.tidy")}</h2>
+          <p className="muted">{t("packages.tidyHint")}</p>
+          <ul>
+            {tidy.map((entry) => (
+              <li key={entry.id}>
+                {entry.name} <small className="muted">· {entry.publishedAt}</small>
+              </li>
+            ))}
+          </ul>
+          <div className="buttons">
+            <button className="danger" onClick={tidyUp} disabled={busy === "new"}>
+              {t("packages.tidyAction", { count: tidy.length })}
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="card">
         <h2>{t("packages.publish")}</h2>

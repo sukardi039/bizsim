@@ -118,6 +118,29 @@ public class PackageController {
                 body.traineeIds(), body.rounds(), body.cycles());
     }
 
+    /**
+     * Tidy up: what a builder may remove — retired packages that never ran a session. Preview first,
+     * because deleting a template copy is irreversible.
+     */
+    @GetMapping("/tidy-up")
+    public List<PackageRepository.TidyRow> tidyPreview() {
+        return packages.collectable(requireBuilder().tenantId());
+    }
+
+    public record TidyResult(int removed, List<String> names) {
+    }
+
+    @PostMapping("/tidy-up")
+    public TidyResult tidy() {
+        TenantContext.Principal me = requireBuilder();
+        List<PackageRepository.TidyRow> doomed = packages.collectable(me.tenantId());
+        List<String> names = new java.util.ArrayList<>();
+        for (PackageRepository.TidyRow row : doomed) {
+            names.add(packages.collect(me.tenantId(), row.id()).name());
+        }
+        return new TidyResult(names.size(), names);
+    }
+
     private static TenantContext.Principal requireFacilitator() {
         TenantContext.Principal me = TenantContext.require();
         if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {

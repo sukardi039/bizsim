@@ -114,7 +114,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
           <p className="muted">
             {t("start.competing")}: <strong>{companyNames(chosen)}</strong>
             {" · "}
-            {chosen.templateKey} v{chosen.templateVersion}
+            {chosen.sourceTemplateKey} v{chosen.templateVersion}
           </p>
         )}
 

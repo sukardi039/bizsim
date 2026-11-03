@@ -118,6 +118,26 @@ export interface Run {
   players: RunPlayer[];
 }
 
+export interface StatementRow {
+  round: number;
+  revenue: number;
+  cogs: number;
+  payroll: number;
+  marketing: number;
+  rnd_spend: number;
+  fixed_cost: number;
+  holding_cost: number;
+  hiring_cost: number;
+  capacity_cost: number;
+  report_cost: number;
+  profit: number;
+  cash_after: number;
+  brand_after: number;
+  lost_sales: number;
+  capacity_used: number;
+  capacity_available: number;
+}
+
 export interface ScoreRow {
   round: number;
   team_id: number;
@@ -257,7 +277,10 @@ export interface CompanyProfile {
 export interface SimulationPackage {
   id: number;
   name: string;
+  /** The frozen copy sessions run on. */
   templateKey: string;
+  /** The draft the builder published from, for display. */
+  sourceTemplateKey: string;
   templateVersion: number;
   companyProfileIds: number[];
   status: string;
@@ -353,6 +376,8 @@ export const api = {
   closeRound: (runId: number) => request<unknown>(`/runs/${runId}/rounds/close`, { method: "POST" }),
   /** Deletes the simulation and everything played in it. Owner or admin only; not undoable. */
   deleteRun: (runId: number) => request<unknown>(`/runs/${runId}`, { method: "DELETE" }),
+  statements: (runId: number, teamId: number) =>
+    request<StatementRow[]>(`/runs/${runId}/teams/${teamId}/statements`),
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>
@@ -404,6 +429,10 @@ export const api = {
   users: () => request<UserRow[]>("/users"),
   companies: () => request<CompanyProfile[]>("/companies"),
   packages: () => request<SimulationPackage[]>("/packages"),
+  tidyPreview: () =>
+    request<{ id: number; name: string; frozenKey: string; publishedAt: string }[]>("/packages/tidy-up"),
+  tidyUp: () =>
+    request<{ removed: number; names: string[] }>("/packages/tidy-up", { method: "POST" }),
   publishPackage: (body: { name: string; templateKey: string; companyProfileIds: number[] }) =>
     request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
   retirePackage: (id: number) =>
