@@ -151,6 +151,16 @@ public class RoundService {
 
         rounds.markComputed(round.id());
 
+        // D12/D21: computing the last round ends the session. Leaving it OPEN here had two effects —
+        // the console kept offering a round that openNextRound refuses to open, and the D21 guard
+        // (which counts every run that is not FINISHED as in flight) blocked the facilitator from
+        // starting their next simulation. The debrief reads the same computed rows either way.
+        int planned = run.rounds() == null ? round.number() : run.rounds();
+        boolean lastRound = round.number() >= planned;
+        if (lastRound) {
+            runs.finishRun(runId);
+        }
+
         List<Map<String, Object>> summary = new ArrayList<>();
         for (ScoringEngine.TeamOutcome outcome : outcomes) {
             summary.add(Map.of(

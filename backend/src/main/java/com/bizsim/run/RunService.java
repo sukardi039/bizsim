@@ -154,7 +154,8 @@ public class RunService {
         runs.setCurrentRound(runId, next);
 
         if (next == maxRounds) {
-            // Last round opened; the run still finishes explicitly so the debrief can be generated.
+            // Opening the last round is not the end of the session: the run is finished when that
+            // round is computed (RoundService.closeAndCompute), so the debrief has its last numbers.
         }
         return new RoundState(next, "OPEN");
     }

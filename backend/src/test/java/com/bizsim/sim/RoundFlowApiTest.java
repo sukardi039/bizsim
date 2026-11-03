@@ -314,6 +314,48 @@ class RoundFlowApiTest extends PostgresTestBase {
                 .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isConflict());
     }
 
+    @Test
+    void computing_the_last_round_finishes_the_run_and_frees_the_facilitator() throws Exception {
+        // D21 refuses a second simulation while one is unfinished, so this scenario gets its own
+        // facilitator; that is also what lets the test prove the guard is released afterwards.
+        user(tenantId, "trainer5@acme.test", "FACILITATOR");
+        String trainer = loginOn("acme", "trainer5@acme.test");
+
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + trainer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "One round", "scenarioKey", "standard-v1", "rounds", 1,
+                                "teams", List.of(Map.of("name", "Solo", "companyName", "Solo Inc"))))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long shortRun = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        mvc.perform(post("/api/runs/" + shortRun + "/rounds/next")
+                        .header("Authorization", "Bearer " + trainer))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + shortRun + "/rounds/close")
+                        .header("Authorization", "Bearer " + trainer))
+                .andExpect(status().isOk());
+
+        // Round 1 of 1 computed: the run leaves OPEN, and the finish is stamped.
+        mvc.perform(get("/api/runs/" + shortRun).header("Authorization", "Bearer " + trainer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FINISHED"))
+                .andExpect(jsonPath("$.currentRound").value(1));
+        assertThat(jdbc.queryForObject("select finished_at from run where id = ?",
+                java.sql.Timestamp.class, shortRun)).isNotNull();
+
+        // A finished run is no longer "in flight", so the same facilitator may start the next one.
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + trainer)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "The next cohort", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "Next", "companyName", "Next Inc"))))))
+                .andExpect(status().isCreated());
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void advance() throws Exception {

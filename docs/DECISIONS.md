@@ -110,11 +110,14 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 13. `run.rounds` is the length of a session (D19); `scenario.rounds` is only the length of the cycle
     template. Anything that asks "how many rounds" reads the run, and a run may be longer than the
     template by any whole number of positions.
-15. The scoreboard is a snapshot of one round, not a history (D21). A list that grows one row per
-    company per round is a debrief table, not a scoreboard.
 14. A consumer trend is not a forecast per product (D19): it is one number per round, and the
     per-product effect comes from the product's affinity. No screen may show a per-product forecast
     as though the system predicted it.
+15. The scoreboard is a snapshot of one round, not a history (D21). A list that grows one row per
+    company per round is a debrief table, not a scoreboard.
+16. A run leaves `OPEN` when its **last** round is *computed*, not when that round is opened (D12,
+    D19). The finish is stamped in the same transaction that writes the final results, so the debrief
+    and the D21 "one simulation in flight" guard agree on when a session has ended.
 
 ## Consequences that are now binding
 
