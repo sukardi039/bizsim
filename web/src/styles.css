@@ -91,7 +91,10 @@ main { padding: 1.25rem 1.5rem; min-width: 0; }
 .brand-right { display: flex; align-items: center; gap: .5rem; }
 select.lang { width: auto; padding: .2rem .4rem; font-size: .8rem; }
 
-.nav { display: flex; gap: .4rem; margin-bottom: 1rem; }
+/* A vertical menu, not a row of buttons: five buttons in a 320px sidebar overflowed, and the last
+   one (People) was pushed out of the sidebar and hidden behind the main panel. A menu also has room
+   for the sections still to come. */
+.nav { display: flex; flex-direction: column; gap: .15rem; margin-bottom: 1rem; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .7rem; margin-bottom: 1rem; }
 .settings-grid small { display: block; margin-top: .15rem; }
 .role-badge {
@@ -107,8 +110,21 @@ select.lang { width: auto; padding: .2rem .4rem; font-size: .8rem; }
 .picks { list-style: none; margin: 0; padding: 0; }
 .picks li { padding: .2rem 0; }
 .picks small { display: block; margin-left: 1.6rem; }
-.nav button { flex: 1; font-size: .85rem; }
-.nav button.active { border-color: var(--accent); color: var(--accent); background: #17222f; }
+.nav button {
+  width: 100%;
+  text-align: left;
+  font-size: .92rem;
+  padding: .5rem .65rem;
+  border-color: transparent;
+  background: transparent;
+}
+.nav button:hover:not(:disabled) { background: #1d2634; border-color: var(--line); }
+.nav button.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: #17222f;
+  font-weight: 600;
+}
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
 

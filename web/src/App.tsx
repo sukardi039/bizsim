@@ -326,7 +326,7 @@ export default function App() {
           </span>
         </div>
 
-        <div className="nav">
+        <nav className="nav" aria-label={t("nav.sections")}>
           {canRun && (
             <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
               {t("nav.sessions")}
@@ -348,7 +348,7 @@ export default function App() {
           <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
             {t("nav.people")}
           </button>
-        </div>
+        </nav>
 
 
         {canRun && <h2>{t("nav.runs")}</h2>}
