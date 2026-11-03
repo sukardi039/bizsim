@@ -107,8 +107,10 @@ another company's context, statement or market report is a 403.
 
 Trainee accounts are made in the console: pick a run, and the **Trainees** card has one row per
 company with a name, the email they sign in with, and an initial password. **Create and seat** does
-both steps at once — it creates the account and puts it on that company. Hand the trainee the email
-and password; there is no email delivery in this product.
+both steps at once — it creates the account and puts it on that company. Trainees who already exist
+are seated from the **Seat an existing trainee** picker in the same row. Accounts themselves live in
+**People**: prepare them before the session, deactivate them when a trainee leaves. Hand the trainee
+the email and password; there is no email delivery in this product.
 
 ## Deploy
 

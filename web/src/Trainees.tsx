@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { api, ApiError, type Run, type Team } from "./api";
+import { useCallback, useEffect, useState } from "react";
+import { api, ApiError, type Run, type Team, type UserRow } from "./api";
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) {
@@ -10,18 +10,20 @@ function errorText(error: unknown): string {
 }
 
 /**
- * One row per company: who is seated, and a form that creates the account and seats it in one step.
+ * Seating for one company: an existing account (D22: the person already exists) or a new one.
  *
- * <p>Both halves are needed: an account alone cannot see a company, and a seat alone needs an account
- * that already exists. The facilitator hands the trainee the email and the initial credential they
- * typed here; there is no email delivery in this product, deliberately.
+ * Both halves are needed. Preparing a roster in Setup → People and seating it here is the normal
+ * path; creating an account on the spot stays as the walk-in fallback, because a real class always
+ * has one person who is not on the list.
  */
-function SeatRow({ run, team, seated, onSeated }: {
+function SeatRow({ run, team, seated, available, onChanged }: {
   run: Run;
   team: Team;
   seated: { displayName: string; roleKey: string }[];
-  onSeated: () => void;
+  available: UserRow[];
+  onChanged: () => void;
 }) {
+  const [pick, setPick] = useState("");
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [secret, setSecret] = useState("");
@@ -29,7 +31,24 @@ function SeatRow({ run, team, seated, onSeated }: {
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
-  const submit = async (event: React.FormEvent) => {
+  const seatExisting = async () => {
+    if (!pick) return;
+    setBusy(true);
+    setProblem(null);
+    setDone(null);
+    try {
+      await api.addPlayer(run.id, team.id, Number(pick));
+      setDone("Seated. They can sign in and see this company.");
+      setPick("");
+      onChanged();
+    } catch (error) {
+      setProblem(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
     setProblem(null);
@@ -37,11 +56,11 @@ function SeatRow({ run, team, seated, onSeated }: {
     try {
       const created = await api.createUser(email.trim(), displayName.trim() || email.trim(), secret);
       await api.addPlayer(run.id, team.id, created.id);
-      setDone(`${created.email} can now sign in and sees ${team.companyName}.`);
+      setDone(`${created.email} created and seated on ${team.companyName}.`);
       setEmail("");
       setDisplayName("");
       setSecret("");
-      onSeated();
+      onChanged();
     } catch (error) {
       setProblem(errorText(error));
     } finally {
@@ -59,13 +78,33 @@ function SeatRow({ run, team, seated, onSeated }: {
             : seated.map((p) => `${p.displayName} (${p.roleKey.toLowerCase()})`).join(" · ")}
         </span>
       </div>
-      <form className="seat-form" onSubmit={submit}>
+
+      {available.length > 0 && (
+        <div className="seat-form">
+          <label style={{ gridColumn: "span 3" }}>
+            Seat an existing trainee
+            <select value={pick} onChange={(e) => setPick(e.target.value)}>
+              <option value="">— pick an account —</option>
+              {available.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.displayName} · {user.email}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={seatExisting} disabled={!pick || busy}>
+            {busy ? "Seating…" : "Seat"}
+          </button>
+        </div>
+      )}
+
+      <form className="seat-form" onSubmit={create}>
         <label>
-          Trainee name
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Ada" />
+          …or create a new one — name
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Walk-in trainee" />
         </label>
         <label>
-          Email they sign in with
+          Email
           <input
             type="email"
             value={email}
@@ -75,20 +114,20 @@ function SeatRow({ run, team, seated, onSeated }: {
           />
         </label>
         <label>
-          Initial password (8+ characters)
+          Initial password (8+)
           <input
             type="text"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
-            placeholder="hand this to the trainee"
-            minLength={8}
+            placeholder="hand this over"
             required
           />
         </label>
         <button type="submit" disabled={busy || !email.trim() || secret.length < 8}>
-          {busy ? "Creating…" : "Create and seat"}
+          Create and seat
         </button>
       </form>
+
       {done && <p className="banner good">{done}</p>}
       {problem && <p className="error">{problem}</p>}
     </div>
@@ -96,12 +135,35 @@ function SeatRow({ run, team, seated, onSeated }: {
 }
 
 export default function Trainees({ run, onChanged }: { run: Run; onChanged: () => void }) {
+  const [users, setUsers] = useState<UserRow[]>([]);
+
+  const loadUsers = useCallback(async () => {
+    try {
+      setUsers(await api.users());
+    } catch {
+      setUsers([]); // the roster is a convenience; seating still works without it
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadUsers();
+  }, [loadUsers, run.id]);
+
+  // An account already seated in this run cannot be seated twice, and a deactivated one cannot sign in.
+  const unseated = users.filter(
+    (user) =>
+      user.role === "PLAYER" &&
+      user.active &&
+      !run.players.some((seat) => seat.userId === user.id),
+  );
+
   return (
     <section className="card">
       <h2>Trainees</h2>
       <p className="muted">
-        Each company needs one account. Create it here, then hand the trainee the email and password —
-        they sign in on the same page and land on their company's decision form.
+        A trainee is a person, not a seat (D22): prepare accounts in <strong>People</strong>, then seat
+        them here. Each company needs one seat. Hand the trainee their email and password — they sign in
+        on this same page and land on their company's decision form.
       </p>
       {run.teams.map((team) => (
         <SeatRow
@@ -109,7 +171,11 @@ export default function Trainees({ run, onChanged }: { run: Run; onChanged: () =
           run={run}
           team={team}
           seated={run.players.filter((p) => p.teamId === team.id)}
-          onSeated={onChanged}
+          available={unseated}
+          onChanged={() => {
+            void loadUsers();
+            onChanged();
+          }}
         />
       ))}
     </section>

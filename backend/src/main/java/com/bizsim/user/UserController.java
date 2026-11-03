@@ -6,7 +6,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,7 +41,7 @@ public class UserController {
     }
 
     /** What the console shows: never the hash, never the password. */
-    public record UserView(long id, String email, String displayName, String role) {
+    public record UserView(long id, String email, String displayName, String role, boolean active) {
     }
 
     private final UserRepository users;
@@ -53,7 +55,7 @@ public class UserController {
     public List<UserView> list() {
         TenantContext.Principal me = requireFacilitator();
         return users.findAllInTenant(me.tenantId()).stream()
-                .map(u -> new UserView(u.id(), u.email(), u.displayName(), u.role()))
+                .map(u -> new UserView(u.id(), u.email(), u.displayName(), u.role(), u.active()))
                 .toList();
     }
 
@@ -86,7 +88,52 @@ public class UserController {
                 ? request.email() : request.displayName().trim();
         UserRepository.AppUser created = users.insert(me.tenantId(), request.email().trim(),
                 displayName, encoder.encode(request.password()), role);
-        return new UserView(created.id(), created.email(), created.displayName(), created.role());
+        return new UserView(created.id(), created.email(), created.displayName(), created.role(),
+                created.active());
+    }
+
+    /**
+     * Removes a trainee who never played. Once they have submitted a decision the account is history —
+     * the decision references it — so the answer is 409 and the tool for "they left" is deactivation.
+     */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable long id) {
+        TenantContext.Principal me = requireFacilitator();
+        if (me.userId() == id) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "you cannot delete your own account");
+        }
+        if (users.hasHistory(me.tenantId(), id)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "this trainee has already played; deactivate the account instead of deleting it");
+        }
+        if (!users.delete(me.tenantId(), id)) {
+            // Either unknown, another tenant's, or not a trainee: one answer, no enumeration.
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "no such trainee in this tenant (only PLAYER accounts can be deleted)");
+        }
+    }
+
+    /** A trainee who left: the login stops working, the history stays. */
+    @PostMapping("/{id}/deactivate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deactivate(@PathVariable long id) {
+        setActive(id, false);
+    }
+
+    @PostMapping("/{id}/activate")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void activate(@PathVariable long id) {
+        setActive(id, true);
+    }
+
+    private void setActive(long id, boolean active) {
+        TenantContext.Principal me = requireFacilitator();
+        if (!users.setActive(me.tenantId(), id, active)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "no such trainee in this tenant");
+        }
     }
 
     private static TenantContext.Principal requireFacilitator() {

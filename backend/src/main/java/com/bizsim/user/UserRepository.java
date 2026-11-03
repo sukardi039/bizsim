@@ -49,6 +49,40 @@ public class UserRepository {
         return rows.stream().findFirst();
     }
 
+    /**
+     * Deletes a trainee account outright. Only safe for someone who never played: a submitted
+     * decision references the account that made it, and rewriting history is not an option, so the
+     * service asks first and the database refuses anyway.
+     */
+    public boolean delete(long tenantId, long id) {
+        int deleted = jdbc.update(
+                "delete from app_user where id = ? and tenant_id = ? and role = 'PLAYER'",
+                id, tenantId);
+        return deleted > 0;
+    }
+
+    /** True once the trainee has submitted anything: their account is history, not a spare row. */
+    public boolean hasHistory(long tenantId, long id) {
+        Boolean played = jdbc.queryForObject("""
+                select exists (select 1 from decision d
+                               join team t on t.id = d.team_id
+                               join run r on r.id = t.run_id
+                               where d.submitted_by = ? and r.tenant_id = ?)
+                """, Boolean.class, id, tenantId);
+        return Boolean.TRUE.equals(played);
+    }
+
+    /**
+     * Turns an account off (or back on). A trainee who leaves the school is deactivated, not deleted:
+     * the login stops working, the seats and the results stay readable for the debrief.
+     */
+    public boolean setActive(long tenantId, long id, boolean active) {
+        int changed = jdbc.update(
+                "update app_user set active = ? where id = ? and tenant_id = ? and role = 'PLAYER'",
+                active, id, tenantId);
+        return changed > 0;
+    }
+
     /** Every account of one tenant, for the facilitator's trainee list. Never returns password_hash. */
     public List<AppUser> findAllInTenant(long tenantId) {
         return jdbc.query("select * from app_user where tenant_id = ? order by role, email",

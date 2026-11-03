@@ -98,36 +98,17 @@ public class RunRepository {
                 """, (rs, i) -> rs.getLong(1), tenantId, runId).stream().findFirst();
     }
 
-    /** The trainee accounts seated in this run, captured before the seats are cascaded away. */
-    public List<Long> traineeIdsOf(long tenantId, long runId) {
-        return jdbc.query("""
-                select distinct p.user_id from player p
-                join run r on r.id = p.run_id
-                join app_user u on u.id = p.user_id
-                where r.tenant_id = ? and r.id = ? and u.role = 'PLAYER'
-                """, (rs, i) -> rs.getLong(1), tenantId, runId);
-    }
-
     /**
      * Deletes a run and, by cascade, every round, decision, result, statement, team and player under
      * it. The simulation that held it is removed too once it has no runs left, so a facilitator's
      * list does not accumulate empty shells.
      *
-     * <p>The trainee accounts that were seated here go as well: deleting a rehearsal must leave
-     * nothing behind that blocks the real session (an orphan account makes re-creating the same email
-     * a 409). An account seated in another run, and every facilitator/admin account, is kept — a
-     * person is not owned by one simulation.
+     * <p>Accounts are **not** touched (D22: a trainee is a person, an account outlives a session).
+     * Deleting a session removes the seats and the play data; the person stays available to be
+     * seated in the next session, and is removed only from Setup → People.
      */
     public boolean deleteRun(long tenantId, long runId) {
-        List<Long> trainees = traineeIdsOf(tenantId, runId);
         int deleted = jdbc.update("delete from run where tenant_id = ? and id = ?", tenantId, runId);
-        for (long traineeId : trainees) {
-            jdbc.update("""
-                    delete from app_user u
-                    where u.id = ? and u.tenant_id = ? and u.role = 'PLAYER'
-                      and not exists (select 1 from player p where p.user_id = u.id)
-                    """, traineeId, tenantId);
-        }
         jdbc.update("""
                 delete from simulation s
                 where s.tenant_id = ?

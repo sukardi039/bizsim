@@ -49,6 +49,16 @@ input {
   color: var(--text);
 }
 
+select {
+  font: inherit;
+  width: 100%;
+  padding: .5rem .6rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #0f1319;
+  color: var(--text);
+}
+
 label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .6rem; }
 label input { margin-top: .25rem; }
 

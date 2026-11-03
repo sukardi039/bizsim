@@ -155,6 +155,14 @@ export interface MarketForecast {
   outlook: string;
 }
 
+export interface UserRow {
+  id: number;
+  email: string;
+  displayName: string;
+  role: string;
+  active: boolean;
+}
+
 export interface TemplateRow {
   key: string;
   name: string;
@@ -244,6 +252,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ name: name ?? "" }),
     }),
+  users: () => request<UserRow[]>("/users"),
+  deleteUser: (id: number) => request<unknown>(`/users/${id}`, { method: "DELETE" }),
+  setUserActive: (id: number, active: boolean) =>
+    request<unknown>(`/users/${id}/${active ? "activate" : "deactivate"}`, { method: "POST" }),
   submitDecision: (runId: number, teamId: number, decision: DecisionInput) =>
     request<{ submitted: boolean }>(`/runs/${runId}/teams/${teamId}/decisions`, {
       method: "POST",

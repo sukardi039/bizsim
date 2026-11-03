@@ -248,10 +248,11 @@ class RoundFlowApiTest extends PostgresTestBase {
         }
         assertThat(jdbc.queryForObject("select count(*) from simulation where id = ?",
                 Integer.class, simulationId)).isZero();
-        // The trainee accounts created for this run go with it, so the same emails can be used again.
+        // D22: accounts are people, sessions are disposable. The seats go; the accounts stay.
         assertThat(jdbc.queryForObject(
                 "select count(*) from app_user where email in ('one@acme.test', 'two@acme.test')",
-                Integer.class)).isZero();
+                Integer.class)).isEqualTo(2);
+        assertThat(login("one@acme.test")).isNotBlank();
         mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isNotFound());
 
@@ -266,44 +267,98 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     @Test
-    void deleting_a_run_keeps_a_trainee_who_is_seated_in_another_run() throws Exception {
-        // one@acme.test plays in this run AND in a second run owned by another facilitator.
-        user(tenantId, "trainer7@acme.test", "FACILITATOR");
-        String other = loginOn("acme", "trainer7@acme.test");
-        MvcResult created = mvc.perform(post("/api/runs")
-                        .header("Authorization", "Bearer " + other)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of(
-                                "name", "Second cohort", "scenarioKey", "standard-v1",
-                                "teams", List.of(Map.of("name", "Z", "companyName", "Z Inc"))))))
-                .andExpect(status().isCreated())
-                .andReturn();
-        JsonNode otherRun = json.readTree(created.getResponse().getContentAsString());
-        long otherTeam = otherRun.get("teams").get(0).get("id").asLong();
+    void a_trainee_account_outlives_the_session_and_can_be_seated_again() throws Exception {
         long playerOneId = jdbc.queryForObject(
                 "select id from app_user where email = 'one@acme.test'", Long.class);
-        mvc.perform(post("/api/runs/" + otherRun.get("id").asLong() + "/players")
-                        .header("Authorization", "Bearer " + other)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of(
-                                "teamId", otherTeam, "userId", playerOneId, "roleKey", "OWNER"))))
-                .andExpect(status().isCreated());
 
         mvc.perform(delete("/api/runs/" + runId)
                         .header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isNoContent());
 
-        // The person is kept because another simulation still needs them; the one who was only here
-        // is removed. A person is not owned by a single run.
-        assertThat(login("one@acme.test")).isNotBlank();
-        assertThat(jdbc.queryForObject("select count(*) from app_user where email = 'two@acme.test'",
-                Integer.class)).isZero();
+        // D22: the person is unchanged by the session ending. Their seat is gone, their account is not.
+        assertThat(jdbc.queryForObject("select count(*) from player where user_id = ?",
+                Integer.class, playerOneId)).isZero();
+        String returning = login("one@acme.test");
+        assertThat(returning).isNotBlank();
+
+        // And they can be seated again in the next session — the whole point of a personal account.
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Next cohort", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "A", "companyName", "A Inc"))))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode next = json.readTree(created.getResponse().getContentAsString());
+        mvc.perform(post("/api/runs/" + next.get("id").asLong() + "/players")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "teamId", next.get("teams").get(0).get("id").asLong(),
+                                "userId", playerOneId, "roleKey", "OWNER"))))
+                .andExpect(status().isCreated());
+
+        openRound(next.get("id").asLong());
+        mvc.perform(get("/api/runs/" + next.get("id").asLong()
+                        + "/teams/" + next.get("teams").get(0).get("id").asLong() + "/context")
+                        .header("Authorization", "Bearer " + returning))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void a_facilitator_removes_a_trainee_from_the_school() throws Exception {
+        long playerOneId = jdbc.queryForObject(
+                "select id from app_user where email = 'one@acme.test'", Long.class);
+        long facilitatorId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@acme.test'", Long.class);
+
+        // A trainee cannot remove or disable anyone.
+        mvc.perform(delete("/api/users/" + playerOneId)
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/users/" + playerOneId + "/deactivate")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isForbidden());
+
+        // Another facilitator is not a trainee: 404. Nobody deletes themselves: 400.
+        user(tenantId, "trainer8@acme.test", "FACILITATOR");
+        long otherFacilitator = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer8@acme.test'", Long.class);
+        mvc.perform(delete("/api/users/" + otherFacilitator)
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/users/" + facilitatorId)
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isBadRequest());
+
+        // A trainee who has played cannot be deleted: their decision references the account.
+        openRound();
+        submit(playerOneToken, teamOne, payload(100, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        mvc.perform(delete("/api/users/" + playerOneId)
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isConflict());
+
+        // Deactivation is the tool for "this person left": login stops, history and seat stay.
+        mvc.perform(post("/api/users/" + playerOneId + "/deactivate")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNoContent());
         mvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "tenantCode", "acme", "email", "two@acme.test",
-                                "password", "pw-two@acme.test"))))
+                                "tenantCode", "acme", "email", "one@acme.test",
+                                "password", "pw-one@acme.test"))))
                 .andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("select count(*) from player where user_id = ?",
+                Integer.class, playerOneId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from app_user where id = ?",
+                Integer.class, playerOneId)).isEqualTo(1);
+
+        // And it is reversible.
+        mvc.perform(post("/api/users/" + playerOneId + "/activate")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNoContent());
+        assertThat(login("one@acme.test")).isNotBlank();
     }
 
     @Test
@@ -692,7 +747,11 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     private void openRound() throws Exception {
-        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+        openRound(runId);
+    }
+
+    private void openRound(long id) throws Exception {
+        mvc.perform(post("/api/runs/" + id + "/rounds/next")
                 .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
     }
 
