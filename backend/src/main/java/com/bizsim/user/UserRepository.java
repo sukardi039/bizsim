@@ -83,6 +83,24 @@ public class UserRepository {
         return changed > 0;
     }
 
+    /**
+     * The language this person sees: their own choice, else the tenant default, else English. One
+     * query so the resolution order lives in one place.
+     */
+    public String localeOf(long tenantId, long userId) {
+        return jdbc.query("""
+                select coalesce(u.locale, t.locale, 'en')
+                from app_user u join tenant t on t.id = u.tenant_id
+                where u.id = ? and u.tenant_id = ?
+                """, (rs, i) -> rs.getString(1), userId, tenantId).stream().findFirst().orElse("en");
+    }
+
+    /** Sets the person's own language. Null means "follow the tenant" again. */
+    public boolean setLocale(long tenantId, long userId, String locale) {
+        return jdbc.update("update app_user set locale = ? where id = ? and tenant_id = ?",
+                locale, userId, tenantId) > 0;
+    }
+
     /** Every account of one tenant, for the facilitator's trainee list. Never returns password_hash. */
     public List<AppUser> findAllInTenant(long tenantId) {
         return jdbc.query("select * from app_user where tenant_id = ? order by role, email",

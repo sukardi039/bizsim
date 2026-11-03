@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useI18n } from "./i18n";
 import {
   api,
   ApiError,
@@ -10,12 +11,6 @@ import {
 } from "./api";
 
 /* ------------------------------------------------------------------ helpers */
-
-const money = (value: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
-
-const plain = (value: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) {
@@ -107,6 +102,7 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
 /* ------------------------------------------------------------------ screen */
 
 export default function PlayerConsole({ userId, onSignOut }: { userId: number; onSignOut: () => void }) {
+  const { t, money, number: plain } = useI18n();
   const [run, setRun] = useState<Run | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [context, setContext] = useState<DecisionFormContext | null>(null);
@@ -284,21 +280,21 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           <div>
             <h2 style={{ marginBottom: ".2rem" }}>{team.companyName}</h2>
             <p className="muted" style={{ margin: 0 }}>
-              Round {context.round} of {run.rounds} · market {context.market.outlook.toLowerCase()} ·{" "}
-              {context.market.trendLabel.toLowerCase()}
+              {t("player.round", { round: context.round, total: run.rounds })} · {context.market.outlook} ·{" "}
+              {context.market.trendLabel}
             </p>
           </div>
           <div className="stats">
             <span>
-              <small className="muted">Cash</small>
+              <small className="muted">{t("player.cash")}</small>
               <strong className={context.cash < 0 ? "negative" : ""}>{money(context.cash)}</strong>
             </span>
             <span>
-              <small className="muted">Brand</small>
+              <small className="muted">{t("player.brand")}</small>
               <strong>{plain(context.brand)}</strong>
             </span>
             <span>
-              <small className="muted">Machines</small>
+              <small className="muted">{t("player.machines")}</small>
               <strong>{plain(context.machineWorkers ?? 0)}</strong>
             </span>
           </div>
@@ -325,16 +321,16 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </div>
 
       <section className="card">
-        <h2>Production and price</h2>
+        <h2>{t("player.production")}</h2>
         <table>
           <thead>
             <tr>
-              <th>Product</th>
-              <th className="num">Stock</th>
-              <th className="num">Unit cost</th>
-              <th className="num">Units to produce</th>
-              <th className="num">Workers</th>
-              <th className="num">Price</th>
+              <th>{t("player.product")}</th>
+              <th className="num">{t("player.stock")}</th>
+              <th className="num">{t("player.unitCost")}</th>
+              <th className="num">{t("player.units")}</th>
+              <th className="num">{t("player.workers")}</th>
+              <th className="num">{t("player.price")}</th>
             </tr>
           </thead>
           <tbody>
@@ -371,13 +367,13 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </tbody>
         </table>
         <p className={overCapacity ? "error" : "muted"} style={{ marginBottom: 0 }}>
-          Workforce: {plain(workers.needed)} of {plain(workers.available)} workers used
+          {t("player.workforce", { used: plain(workers.needed), available: plain(workers.available) })}
           {overCapacity ? " — hire production staff or buy machines, the round will be refused otherwise." : "."}
         </p>
       </section>
 
       <section className="card">
-        <h2>Marketing</h2>
+        <h2>{t("player.marketing")}</h2>
         <div className="row">
           {context.channels.map((channel) => (
             <label key={channel.code}>
@@ -395,10 +391,10 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </section>
 
       <section className="card">
-        <h2>Workforce and capacity</h2>
+        <h2>{t("player.capacity")}</h2>
         <div className="row">
           <label>
-            Production staff
+            {t("player.staff")}
             <input
               type="number"
               min={0}
@@ -429,7 +425,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </section>
 
       <section className="card">
-        <h2>Research and development</h2>
+        <h2>{t("player.rnd")}</h2>
         {context.rndProjects.map((project) => (
           <div className="project" key={project.code}>
             <div>
@@ -444,7 +440,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
               </p>
             </div>
             <label className="project-input">
-              This month
+              {t("player.rndThisMonth")}
               <input
                 type="number"
                 min={0}
@@ -458,7 +454,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </section>
 
       <section className="card">
-        <h2>Market review</h2>
+        <h2>{t("player.review")}</h2>
         <label className="inline">
           <input
             type="checkbox"
@@ -473,14 +469,14 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {plain(context.market.wageIndex)}
         </p>
         <button type="button" onClick={buyReport} disabled={!context.submitted}>
-          {report ? "Refresh the purchased review" : "Show the purchased review"}
+          {t("player.showReview")}
         </button>
         {report && (
           <ul className="forecast">
             {report.forecast.map((row) => (
               <li key={row.round}>
                 <span className="muted">Round {row.round}</span>{" "}
-                {row.outlook.toLowerCase()} · {row.trendLabel.toLowerCase()} · demand{" "}
+                {row.outlook} · {row.trendLabel} · demand{" "}
                 {plain(row.demandIndex)} · costs {plain(row.costIndex)}
               </li>
             ))}
@@ -496,7 +492,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </p>
         </div>
         <button className="primary" type="submit" disabled={busy}>
-          {busy ? "Submitting…" : context.submitted ? "Replace decision" : `Submit round ${context.round}`}
+          {busy ? t("player.submitting") : context.submitted ? t("player.replace") : t("player.submit", { round: context.round })}
         </button>
       </section>
     </form>

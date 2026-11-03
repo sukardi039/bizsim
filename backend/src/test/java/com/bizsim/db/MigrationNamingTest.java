@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -101,13 +102,21 @@ class MigrationNamingTest {
     private static List<String> files() {
         assertThat(DIRECTORY).as("tests run from the backend module").isDirectory();
         try (Stream<Path> entries = Files.list(DIRECTORY)) {
+            // Numeric order, not lexicographic: "V10" sorts before "V2" as a string, and the first
+            // two-digit migration would otherwise look like a gap in the sequence.
             return entries.map(path -> path.getFileName().toString())
                     .filter(name -> name.endsWith(".sql"))
-                    .sorted()
+                    .sorted(Comparator.comparingInt(MigrationNamingTest::versionOf))
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /** The number in `V<n>__...`, for ordering; files are already validated by name in the test. */
+    private static int versionOf(String name) {
+        Matcher matcher = NAME.matcher(name);
+        return matcher.matches() ? Integer.parseInt(matcher.group(1)) : Integer.MAX_VALUE;
     }
 
     private static String read(String name) {

@@ -3,6 +3,7 @@ import PlayerConsole from "./PlayerConsole";
 import Trainees from "./Trainees";
 import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
+import { useI18n, LOCALES, type Locale } from "./i18n";
 import {
   api,
   ApiError,
@@ -81,6 +82,7 @@ function useRunStream(runId: number | null, onEvent: (type: string, data: any) =
 /* ------------------------------------------------------------------ login */
 
 function Login({ onDone }: { onDone: () => void }) {
+  const { t } = useI18n();
   const [tenantCode, setTenant] = useState("demo");
   const [email, setEmail] = useState("trainer@demo.test");
   const [secret, setSecret] = useState("demo1234");
@@ -104,18 +106,18 @@ function Login({ onDone }: { onDone: () => void }) {
 
   return (
     <form className="card login" onSubmit={submit}>
-      <h1>bizsim</h1>
-      <p className="muted">Facilitator console</p>
+      <h1>{t("login.title")}</h1>
+      <p className="muted">{t("login.subtitle")}</p>
       <label>
-        Tenant
+        {t("login.tenant")}
         <input value={tenantCode} onChange={(e) => setTenant(e.target.value)} autoComplete="organization" />
       </label>
       <label>
-        Email
+        {t("login.email")}
         <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
       </label>
       <label>
-        Password
+        {t("login.password")}
         <input
           type="password"
           value={secret}
@@ -125,7 +127,7 @@ function Login({ onDone }: { onDone: () => void }) {
       </label>
       {problem && <p className="error">{problem}</p>}
       <button type="submit" disabled={busy}>
-        {busy ? "Signing in…" : "Sign in"}
+        {busy ? t("login.signingIn") : t("login.signIn")}
       </button>
     </form>
   );
@@ -134,6 +136,7 @@ function Login({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ console */
 
 export default function App() {
+  const { t, adopt, locale, setLocale } = useI18n();
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
   // Who is signed in decides the screen: a trainee gets the decision form, everything else gets the
   // facilitator console. The role comes from the token, never from the client.
@@ -192,7 +195,9 @@ export default function App() {
     api
       .me()
       .then((me) => {
-        if (!cancelled) setIdentity({ userId: me.userId, role: me.role });
+        if (cancelled) return;
+        setIdentity({ userId: me.userId, role: me.role });
+        adopt(me.locale);
       })
       .catch((error) => {
         if (!cancelled) setIdentityProblem(errorText(error));
@@ -258,11 +263,7 @@ export default function App() {
    */
   const remove = async () => {
     if (!selected) return;
-    const sure = window.confirm(
-      `Delete run ${selected.id} and everything played in it?\n\n` +
-        `Rounds, decisions, results, the trainee accounts and their seats go with it. ` +
-        `This cannot be undone.`,
-    );
+    const sure = window.confirm(t("run.deleteConfirm", { id: selected.id }));
     if (!sure) return;
     setProblem(null);
     try {
@@ -302,20 +303,34 @@ export default function App() {
       <aside>
         <div className="brand">
           <strong>bizsim</strong>
-          <button className="link" onClick={signOut}>
-            sign out
-          </button>
+          <span className="brand-right">
+            <select
+              className="lang"
+              value={locale}
+              onChange={(e) => setLocale(e.target.value as Locale)}
+              aria-label="language"
+            >
+              {LOCALES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+            <button className="link" onClick={signOut}>
+              {t("app.signOut")}
+            </button>
+          </span>
         </div>
 
         <div className="nav">
           <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
-            Sessions
+            {t("nav.sessions")}
           </button>
           <button className={view === "templates" ? "active" : ""} onClick={() => setView("templates")}>
-            Templates
+            {t("nav.templates")}
           </button>
           <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
-            People
+            {t("nav.people")}
           </button>
         </div>
 
@@ -374,7 +389,7 @@ export default function App() {
         ) : view === "templates" ? (
           <TemplatesPanel />
         ) : !selected ? (
-          <p className="muted">Select a run, or create one.</p>
+          <p className="muted">{t("run.select")}</p>
         ) : (
           <>
             <header className="run-head">
@@ -388,31 +403,31 @@ export default function App() {
               </div>
               <div className="buttons">
                 <button onClick={() => act("next")} disabled={selected.currentRound >= selected.rounds}>
-                  Open next round
+                  {t("run.openNext")}
                 </button>
                 <button className="primary" onClick={() => act("close")} disabled={selected.status !== "OPEN"}>
-                  Compute round
+                  {t("run.compute")}
                 </button>
                 <button className="danger" onClick={remove}>
-                  Delete run
+                  {t("run.delete")}
                 </button>
               </div>
             </header>
 
             <section className="card">
-              <h2>Scoreboard{boardRound !== null ? ` · round ${boardRound}` : ""}</h2>
+              <h2>{t("score.title")}{boardRound !== null ? ` · ${t("score.round", { round: boardRound })}` : ""}</h2>
               {board.length === 0 ? (
-                <p className="muted">No round computed yet.</p>
+                <p className="muted">{t("score.empty")}</p>
               ) : (
                 <table>
                   <thead>
                     <tr>
-                      <th className="num">#</th>
-                      <th>Company</th>
-                      <th className="num">Profit</th>
-                      <th className="num">Cash</th>
-                      <th className="num">Share</th>
-                      <th className="num">Stock</th>
+                      <th className="num">{t("score.rank")}</th>
+                      <th>{t("score.company")}</th>
+                      <th className="num">{t("score.profit")}</th>
+                      <th className="num">{t("score.cash")}</th>
+                      <th className="num">{t("score.share")}</th>
+                      <th className="num">{t("score.stock")}</th>
                     </tr>
                   </thead>
                   <tbody>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type UserRow } from "./api";
+import { useI18n } from "./i18n";
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) {
@@ -17,6 +18,7 @@ function errorText(error: unknown): string {
  * the tool for "they left" is deactivation, which stops the login and keeps the history.
  */
 export default function PeoplePanel() {
+  const { t } = useI18n();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -90,21 +92,19 @@ export default function PeoplePanel() {
   return (
     <>
       <section className="card">
-        <h2>People</h2>
+        <h2>{t("people.title")}</h2>
         <p className="muted">
-          Trainee accounts belong to the person and outlive a session: seat them in as many sessions as
-          you like from the Sessions view. A trainee who has already played is <em>deactivated</em>, not
-          deleted — their results stay readable.
+          {t("people.hint")}
         </p>
         {notice && <p className="banner good">{notice}</p>}
         {problem && <p className="error">{problem}</p>}
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
+              <th>{t("people.name")}</th>
+              <th>{t("people.email")}</th>
+              <th>{t("people.role")}</th>
+              <th>{t("people.status")}</th>
               <th />
             </tr>
           </thead>
@@ -116,17 +116,17 @@ export default function PeoplePanel() {
                 <td className="muted">{user.role.toLowerCase()}</td>
                 <td>
                   <span className={`tag ${user.active ? "round-closed" : ""}`}>
-                    {user.active ? "active" : "deactivated"}
+                    {user.active ? t("people.active") : t("people.deactivated")}
                   </span>
                 </td>
                 <td className="num">
                   {user.role === "PLAYER" && (
                     <span className="buttons">
                       <button onClick={() => toggle(user)} disabled={busy === user.id}>
-                        {user.active ? "Deactivate" : "Activate"}
+                        {user.active ? t("people.deactivate") : t("people.activate")}
                       </button>
                       <button className="danger" onClick={() => remove(user)} disabled={busy === user.id}>
-                        Delete
+                        {t("people.delete")}
                       </button>
                     </span>
                   )}
@@ -138,14 +138,14 @@ export default function PeoplePanel() {
       </section>
 
       <section className="card">
-        <h2>Add a trainee</h2>
+        <h2>{t("people.add")}</h2>
         <form className="seat-form" onSubmit={create}>
           <label>
-            Name
+            {t("people.name")}
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Ada" />
           </label>
           <label>
-            Email they sign in with
+            {t("people.email")}
             <input
               type="email"
               value={email}
@@ -165,7 +165,7 @@ export default function PeoplePanel() {
             />
           </label>
           <button type="submit" disabled={busy === "new" || !email.trim() || secret.length < 8}>
-            {busy === "new" ? "Creating…" : "Create account"}
+            {busy === "new" ? t("people.creating") : t("people.create")}
           </button>
         </form>
       </section>

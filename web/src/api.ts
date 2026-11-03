@@ -214,7 +214,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ tenantCode, email, password }),
     }),
-  me: () => request<{ userId: number; tenantId: number; tenantCode: string; role: string }>("/me"),
+  me: () =>
+    request<{
+      userId: number;
+      tenantId: number;
+      tenantCode: string;
+      role: string;
+      /** "en" or "zh"; resolved server-side (person, else tenant, else English). */
+      locale: string;
+    }>("/me"),
+  setMyLocale: (locale: string) =>
+    request<{ locale: string }>("/me/locale", {
+      method: "PUT",
+      body: JSON.stringify({ locale }),
+    }),
   runs: () => request<Run[]>("/runs"),
   run: (id: number) => request<Run>(`/runs/${id}`),
   createRun: (name: string, scenarioKey: string, teamNames: string[], cycles: number) =>

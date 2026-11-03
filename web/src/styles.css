@@ -83,6 +83,8 @@ aside { border-right: 1px solid var(--line); padding: 1rem; }
 main { padding: 1.25rem 1.5rem; }
 
 .brand { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
+.brand-right { display: flex; align-items: center; gap: .5rem; }
+select.lang { width: auto; padding: .2rem .4rem; font-size: .8rem; }
 
 .nav { display: flex; gap: .4rem; margin-bottom: 1rem; }
 .nav button { flex: 1; font-size: .85rem; }

@@ -105,6 +105,10 @@ investment per project, and the paid market review. The same email address alway
 screen, decided by the role in the token. A trainee can read only their own company — asking for
 another company's context, statement or market report is a 403.
 
+The interface is available in **English** and **中文**: the language switch sits next to *sign out*
+and the choice is stored on the account (tenant default when unset, D23). Only interface chrome is
+translated — template content such as product or project names is shown exactly as authored.
+
 Trainee accounts are made in the console: pick a run, and the **Trainees** card has one row per
 company with a name, the email they sign in with, and an initial password. **Create and seat** does
 both steps at once — it creates the account and puts it on that company. Trainees who already exist

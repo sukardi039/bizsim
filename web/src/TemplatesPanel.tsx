@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type TemplateRow } from "./api";
+import { useI18n } from "./i18n";
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) {
@@ -17,6 +18,7 @@ function errorText(error: unknown): string {
  * buttons that do nothing.
  */
 export default function TemplatesPanel() {
+  const { t } = useI18n();
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function TemplatesPanel() {
 
   return (
     <section className="card">
-      <h2>Templates</h2>
+      <h2>{t("templates.title")}</h2>
       <p className="muted">
         A template is the economy a session is played on: environment, product catalogue, channels, R&amp;D
         projects and the simulation settings. The shipped <strong>standard</strong> template is global and
@@ -64,12 +66,12 @@ export default function TemplatesPanel() {
       <table>
         <thead>
           <tr>
-            <th>Template</th>
-            <th>Owner</th>
-            <th>Status</th>
-            <th className="num">Products</th>
-            <th className="num">Rounds</th>
-            <th>Based on</th>
+            <th>{t("templates.title")}</th>
+            <th>{t("templates.owner")}</th>
+            <th>{t("templates.status")}</th>
+            <th className="num">{t("templates.products")}</th>
+            <th className="num">{t("templates.rounds")}</th>
+            <th>{t("templates.basedOn")}</th>
             <th />
           </tr>
         </thead>
@@ -80,7 +82,7 @@ export default function TemplatesPanel() {
                 {template.name}
                 <small className="muted" style={{ display: "block" }}>{template.key}</small>
               </td>
-              <td>{template.tenantId == null ? "global" : "yours"}</td>
+              <td>{template.tenantId == null ? t("templates.global") : t("templates.yours")}</td>
               <td>
                 <span className={`tag ${template.status === "PUBLISHED" ? "round-closed" : ""}`}>
                   {template.status.toLowerCase()}
@@ -91,7 +93,7 @@ export default function TemplatesPanel() {
               <td className="muted">{template.basedOn ?? "—"}</td>
               <td className="num">
                 <button onClick={() => duplicate(template)} disabled={busy === template.key}>
-                  {busy === template.key ? "Copying…" : "Duplicate"}
+                  {busy === template.key ? t("templates.copying") : t("templates.duplicate")}
                 </button>
               </td>
             </tr>

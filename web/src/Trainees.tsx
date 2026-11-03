@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type Run, type Team, type UserRow } from "./api";
+import { useI18n } from "./i18n";
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) {
@@ -23,6 +24,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
   available: UserRow[];
   onChanged: () => void;
 }) {
+  const { t } = useI18n();
   const [pick, setPick] = useState("");
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -38,7 +40,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
     setDone(null);
     try {
       await api.addPlayer(run.id, team.id, Number(pick));
-      setDone("Seated. They can sign in and see this company.");
+      setDone(t("trainees.seated"));
       setPick("");
       onChanged();
     } catch (error) {
@@ -74,7 +76,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
         <strong>{team.companyName}</strong>
         <span className="muted">
           {seated.length === 0
-            ? "no trainee yet"
+            ? t("trainees.none")
             : seated.map((p) => `${p.displayName} (${p.roleKey.toLowerCase()})`).join(" · ")}
         </span>
       </div>
@@ -82,9 +84,9 @@ function SeatRow({ run, team, seated, available, onChanged }: {
       {available.length > 0 && (
         <div className="seat-form">
           <label style={{ gridColumn: "span 3" }}>
-            Seat an existing trainee
+            {t("trainees.seatExisting")}
             <select value={pick} onChange={(e) => setPick(e.target.value)}>
-              <option value="">— pick an account —</option>
+              <option value="">{t("trainees.pick")}</option>
               {available.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.displayName} · {user.email}
@@ -93,18 +95,18 @@ function SeatRow({ run, team, seated, available, onChanged }: {
             </select>
           </label>
           <button type="button" onClick={seatExisting} disabled={!pick || busy}>
-            {busy ? "Seating…" : "Seat"}
+            {busy ? t("trainees.seating") : t("trainees.seat")}
           </button>
         </div>
       )}
 
       <form className="seat-form" onSubmit={create}>
         <label>
-          …or create a new one — name
-          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Walk-in trainee" />
+          {t("trainees.new")}
+          <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={t("trainees.namePlaceholder")} />
         </label>
         <label>
-          Email
+          {t("trainees.email")}
           <input
             type="email"
             value={email}
@@ -114,17 +116,17 @@ function SeatRow({ run, team, seated, available, onChanged }: {
           />
         </label>
         <label>
-          Initial password (8+)
+          {t("trainees.password")}
           <input
             type="text"
             value={secret}
             onChange={(e) => setSecret(e.target.value)}
-            placeholder="hand this over"
+            placeholder={t("trainees.passwordPlaceholder")}
             required
           />
         </label>
         <button type="submit" disabled={busy || !email.trim() || secret.length < 8}>
-          Create and seat
+          {t("trainees.createSeat")}
         </button>
       </form>
 
@@ -135,6 +137,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
 }
 
 export default function Trainees({ run, onChanged }: { run: Run; onChanged: () => void }) {
+  const { t } = useI18n();
   const [users, setUsers] = useState<UserRow[]>([]);
 
   const loadUsers = useCallback(async () => {
@@ -159,11 +162,9 @@ export default function Trainees({ run, onChanged }: { run: Run; onChanged: () =
 
   return (
     <section className="card">
-      <h2>Trainees</h2>
+      <h2>{t("trainees.title")}</h2>
       <p className="muted">
-        A trainee is a person, not a seat (D22): prepare accounts in <strong>People</strong>, then seat
-        them here. Each company needs one seat. Hand the trainee their email and password — they sign in
-        on this same page and land on their company's decision form.
+        {t("trainees.hint")}
       </p>
       {run.teams.map((team) => (
         <SeatRow
