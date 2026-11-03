@@ -1,5 +1,8 @@
 # bizsim — user guide
 
+*Printable PDF: `docs/bizsim-user-guide.pdf` (regenerate with
+`python scripts/md_to_pdf.py docs/USER_GUIDE.md docs/bizsim-user-guide.pdf`, needs `fpdf2`).*
+
 How to sign in, which section each role sees, and what to click to get a class from
 "nothing prepared" to "debrief on screen".
 
