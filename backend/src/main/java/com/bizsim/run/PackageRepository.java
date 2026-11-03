@@ -20,9 +20,13 @@ import java.util.Optional;
 @Repository
 public class PackageRepository {
 
+    /** One seat in the prepared class: which company position, and who sits there. */
+    public record Seat(int position, long userId, String displayName, String email) {
+    }
+
     public record PackageRow(long id, String name, String templateKey, String sourceTemplateKey,
-                             int templateVersion, List<Long> companyProfileIds, String status,
-                             String publishedAt) {
+                             int templateVersion, List<Long> companyProfileIds, List<Seat> seats,
+                             String status, String publishedAt) {
     }
 
     private final JdbcTemplate jdbc;
@@ -34,15 +38,33 @@ public class PackageRepository {
     }
 
     /** {@code templateKey} is the frozen copy that will run; {@code sourceTemplateKey} the draft. */
+    /**
+     * {@code seats} is positional: index i is the person in company i, or null for a company left
+     * open for a walk-in. Stored as rows so the database can refuse seating one person twice.
+     */
+    @Transactional
     public long insert(long tenantId, String name, String templateKey, String sourceTemplateKey,
-                       int templateVersion, List<Long> companyProfileIds, long publishedBy) {
-        return jdbc.queryForObject("""
+                       int templateVersion, List<Long> companyProfileIds, List<Long> seats,
+                       long publishedBy) {
+        long id = jdbc.queryForObject("""
                 insert into simulation_package
                     (tenant_id, name, template_key, source_template_key, template_version,
                      company_profile_ids, published_by)
                 values (?, ?, ?, ?, ?, ?::jsonb, ?) returning id
                 """, Long.class, tenantId, name, templateKey, sourceTemplateKey, templateVersion,
                 writeIds(companyProfileIds), publishedBy);
+        if (seats != null) {
+            for (int position = 0; position < seats.size(); position++) {
+                Long userId = seats.get(position);
+                if (userId != null) {
+                    jdbc.update("""
+                            insert into simulation_package_seat (package_id, position, user_id)
+                            values (?, ?, ?)
+                            """, id, position, userId);
+                }
+            }
+        }
+        return id;
     }
 
     public List<PackageRow> list(long tenantId) {
@@ -54,7 +76,18 @@ public class PackageRepository {
                 """, (rs, i) -> new PackageRow(rs.getLong("id"), rs.getString("name"),
                 rs.getString("template_key"), rs.getString("source_template_key"),
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
-                rs.getString("status"), rs.getString("published_at")), tenantId);
+                seatsOf(rs.getLong("id")), rs.getString("status"), rs.getString("published_at")),
+                tenantId);
+    }
+
+    /** The prepared class list for one package, in company order. */
+    public List<Seat> seatsOf(long packageId) {
+        return jdbc.query("""
+                select s.position, u.id, u.display_name, u.email
+                from simulation_package_seat s join app_user u on u.id = s.user_id
+                where s.package_id = ? order by s.position
+                """, (rs, i) -> new Seat(rs.getInt("position"), rs.getLong("id"),
+                rs.getString("display_name"), rs.getString("email")), packageId);
     }
 
     public Optional<PackageRow> find(long tenantId, long id) {

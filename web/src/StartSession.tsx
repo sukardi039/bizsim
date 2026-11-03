@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type CompanyProfile, type Run, type SimulationPackage, type UserRow } from "./api";
+import { api, type CompanyProfile, type Run, type SimulationPackage } from "./api";
 import { describeError } from "./errors";
 import { useI18n } from "./i18n";
 
@@ -15,24 +15,18 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
   const { t } = useI18n();
   const [packages, setPackages] = useState<SimulationPackage[]>([]);
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
-  const [trainees, setTrainees] = useState<UserRow[]>([]);
   const [name, setName] = useState("");
   const [packageId, setPackageId] = useState<number | "">("");
-  const [traineeIds, setTraineeIds] = useState<number[]>([]);
+
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [packageList, companyList, userList] = await Promise.all([
-        api.packages(),
-        api.companies(),
-        api.users(),
-      ]);
+      const [packageList, companyList] = await Promise.all([api.packages(), api.companies()]);
       const published = packageList.filter((entry) => entry.status === "PUBLISHED");
       setPackages(published);
       setCompanies(companyList);
-      setTrainees(userList.filter((user) => user.role === "PLAYER" && user.active));
       setPackageId((current) => current || published[0]?.id || "");
     } catch (error) {
       setProblem(describeError(error, t));
@@ -55,12 +49,12 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
     setBusy(true);
     setProblem(null);
     try {
+      // The class list travels with the package; the facilitator does not re-seat anyone here.
       const run = await api.startSession(packageId, {
         name: name.trim() || chosen?.name || t("start.defaultName"),
-        traineeIds,
+        traineeIds: [],
       });
       setName("");
-      setTraineeIds([]);
       onStarted(run);
     } catch (error) {
       setProblem(describeError(error, t));
@@ -118,55 +112,20 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
           </p>
         )}
 
-        <h3 className="pick-head">
-          {t("start.trainees")} <small className="muted">{t("start.optional")}</small>
-        </h3>
-        {trainees.length === 0 && <p className="muted">{t("start.noTrainees")}</p>}
+        {chosen && <h3 className="pick-head">{t("start.classList")}</h3>}
+        {chosen && <p className="muted">{t("start.classListHint")}</p>}
         <ul className="picks">
-          {trainees.map((trainee) => (
-            <li key={trainee.id}>
-              <label className="inline">
-                <input
-                  type="checkbox"
-                  checked={traineeIds.includes(trainee.id)}
-                  onChange={() =>
-                    setTraineeIds((current) =>
-                      current.includes(trainee.id)
-                        ? current.filter((value) => value !== trainee.id)
-                        : [...current, trainee.id],
-                    )
-                  }
-                />
-                {trainee.displayName}
-                <small className="muted">{trainee.email}</small>
-              </label>
-            </li>
-          ))}
+          {chosen?.companyProfileIds.map((id, index) => {
+            const seat = chosen.seats?.find((entry) => entry.position === index);
+            return (
+              <li key={id}>
+                <strong>{companies.find((company) => company.id === id)?.name ?? `#${id}`}</strong>
+                {" → "}
+                {seat ? `${seat.displayName}` : <span className="muted">{t("start.emptySeat")}</span>}
+              </li>
+            );
+          })}
         </ul>
-
-        {/* Tick order seats people in company order, which is easy to get wrong. Show the mapping. */}
-        {chosen && (
-          <>
-            <h3 className="pick-head">{t("start.mapping")}</h3>
-            <ul className="picks">
-              {chosen.companyProfileIds.map((id, index) => {
-                const seated = trainees.find((trainee) => trainee.id === traineeIds[index]);
-                return (
-                  <li key={id}>
-                    <strong>
-                      {companies.find((company) => company.id === id)?.name ?? `#${id}`}
-                    </strong>{" "}
-                    → {seated ? seated.displayName : <span className="muted">{t("start.emptySeat")}</span>}
-                  </li>
-                );
-              })}
-            </ul>
-          </>
-        )}
-
-        {chosen && traineeIds.length > chosen.companyProfileIds.length && (
-          <p className="error">{t("start.tooManyTrainees")}</p>
-        )}
 
         <div className="buttons">
           <button className="primary" type="submit" disabled={busy || packageId === ""}>

@@ -315,7 +315,14 @@ const en: Dict = {
   "start.start": "Start session",
   "start.starting": "Starting…",
   "start.tooManyTrainees": "There are more trainees ticked than companies to seat them in.",
+  "start.classList": "Class list",
+  "start.classListHint":
+    "Prepared with the package: one person per company. To change it, publish a new package, or adjust the seats after the session starts.",
   "start.mapping": "Who sits where",
+  "packages.classList": "Class list",
+  "packages.classListHint":
+    "One person per company, chosen now so the facilitator does not have to assemble the class on the day. Leave a seat open for a walk-in.",
+  "packages.seatOpen": "— open seat —",
   "start.emptySeat": "seat empty — fill it after the session starts",
 
   "packages.tidy": "Tidy up",
@@ -662,7 +669,12 @@ const zh: Dict = {
   "start.start": "开始模拟",
   "start.starting": "正在开始…",
   "start.tooManyTrainees": "勾选的学员多于可分配的公司数量。",
+  "start.classList": "班级名单",
+  "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包，或在模拟开始后调整座位。",
   "start.mapping": "座位安排",
+  "packages.classList": "班级名单",
+  "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。可留空位给临时加入者。",
+  "packages.seatOpen": "— 空位 —",
   "start.emptySeat": "座位空缺——可在模拟开始后补上",
 
   "packages.tidy": "清理",

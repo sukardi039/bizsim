@@ -37,9 +37,9 @@ class MigrationSafetyTest extends PostgresTestBase {
         Flyway flyway = Flyway.configure().dataSource(url, USER, USER)
                 .locations("classpath:db/migration").load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(14);
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(15);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
-        assertThat(flyway.info().applied()).hasSize(14);
+        assertThat(flyway.info().applied()).hasSize(15);
         flyway.validate();
     }
 

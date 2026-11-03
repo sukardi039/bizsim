@@ -298,6 +298,8 @@ export interface SimulationPackage {
   sourceTemplateKey: string;
   templateVersion: number;
   companyProfileIds: number[];
+  /** The prepared class list, in company order. */
+  seats: { position: number; userId: number; displayName: string; email: string }[];
   status: string;
   publishedAt: string;
 }
@@ -453,7 +455,12 @@ export const api = {
     request<{ id: number; name: string; frozenKey: string; publishedAt: string }[]>("/packages/tidy-up"),
   tidyUp: () =>
     request<{ removed: number; names: string[] }>("/packages/tidy-up", { method: "POST" }),
-  publishPackage: (body: { name: string; templateKey: string; companyProfileIds: number[] }) =>
+  publishPackage: (body: {
+    name: string;
+    templateKey: string;
+    companyProfileIds: number[];
+    traineeIds: (number | null)[];
+  }) =>
     request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
   retirePackage: (id: number) =>
     request<unknown>(`/packages/${id}/retire`, { method: "POST" }),

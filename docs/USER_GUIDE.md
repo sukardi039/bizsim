@@ -135,13 +135,19 @@ These profiles are what a package is built from, so make one per company that wi
 
 ## 5. Builder — Packages (the hand-over)
 
-A package is the immutable bundle you hand to the facilitator: **one template + the companies**.
+A package is the immutable bundle you hand to the facilitator: **one template + the companies + the
+class list**.
 
 1. **Packages** → **Publish a package**.
 2. Give it a name used in class, e.g. *Autumn 2026*.
 3. Choose the **Template** (your edited copy, not the global one).
 4. Tick the **Companies** that will compete.
-5. **Publish**.
+5. **Class list** — for each company, pick the trainee who will run it (accounts come from **People**).
+   Leave a seat open if a walk-in will fill it. One person per company; the same person cannot sit in
+   two competing companies.
+6. **Publish**.
+
+The class list is part of the package because preparing happens before the class, not on the day.
 
 Publishing **freezes a private copy of the template** and records its version. Editing your draft
 afterwards changes nothing about this package — to change a published economy, edit the draft and
@@ -162,12 +168,12 @@ frozen copies) after a confirmation. Packages that taught a class are never offe
 2. Type a **Session name** (defaults to the package name).
 3. Choose the **Package** — the line below shows the competing companies and the template version,
    so you can confirm you are running what you think you are.
-4. Optional: tick **Trainees**, one per company, in company order. More trainees than companies is
-   refused.
-5. **Start session**.
+4. Check the **Class list** shown under it: one line per company with the person prepared for it
+   (*seat empty* means a walk-in can be added after the session starts).
+5. **Start session** — everyone on the class list is seated automatically.
 
-The session opens with one company per profile, its product line already set, and the ticked
-trainees already seated. If a package is missing, no builder has published one yet.
+The session opens with one company per profile, its product line already set, and the prepared class
+already seated. If a package is missing, no builder has published one yet.
 
 ### 6.2 The run screen
 
@@ -186,8 +192,8 @@ facilitator accounts.
 
 Under the run you see one block per company.
 
-- **Seat an existing trainee** → pick an account → **Seat**. This is the normal path: accounts are
-  created once in **People** and re-seated as needed.
+- **Seat an existing trainee** → pick an account → **Seat**. Use this to fill a seat left open in the
+  package, or to replace someone who could not attend.
 - **…or create a new one** — name, email, initial password (8+) → **Create and seat**. This is the
   walk-in case; the new account outlives the session and can be seated again later.
 
@@ -310,8 +316,9 @@ accounts are never rewritten by this; remove the variables once you have signed 
 
 1. Duplicate the template, adjust settings / environment / events / catalogue, **Save** each tab.
 2. Create or copy the company profiles.
-3. Publish a package with those companies.
-4. Ask an admin for a facilitator account and trainee accounts (or create them, as admin).
+3. Create the trainee accounts (People) and a facilitator account — an admin does this.
+4. Publish a package with those companies **and the class list** (one trainee per company).
+5. Hand the package name to the facilitator.
 
 **On the day (facilitator)**
 

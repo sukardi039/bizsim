@@ -151,6 +151,88 @@ class PackageApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_class_list_is_prepared_with_the_package() throws Exception {
+        long beta = jdbc.queryForObject("""
+                insert into company_profile (tenant_id, name, company_name, products)
+                values (?, 'Beta Corp', 'Beta Corp', '[]'::jsonb) returning id
+                """, Long.class, acme);
+        Long ada = jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'", Long.class);
+
+        MvcResult published = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Autumn 2026", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId, beta),
+                                "traineeIds", java.util.Arrays.asList(ada, null)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.seats.length()").value(1))
+                .andExpect(jsonPath("$.seats[0].position").value(0))
+                .andExpect(jsonPath("$.seats[0].email").value("ada@acme.test"))
+                .andReturn();
+        long packageId = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
+
+        // The facilitator starts the session and the prepared class is seated: nobody is ticked here.
+        MvcResult started = mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Monday class"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.players.length()").value(1))
+                .andReturn();
+        long runId = json.readTree(started.getResponse().getContentAsString()).get("id").asLong();
+        long firstTeam = json.readTree(started.getResponse().getContentAsString())
+                .get("teams").get(0).get("id").asLong();
+        Long seatedTeam = jdbc.queryForObject(
+                "select team_id from player where run_id = ? and user_id = ?", Long.class, runId, ada);
+        assertThat(seatedTeam).isEqualTo(firstTeam);
+    }
+
+    @Test
+    void a_malformed_class_list_is_refused() throws Exception {
+        long beta = jdbc.queryForObject("""
+                insert into company_profile (tenant_id, name, company_name, products)
+                values (?, 'Beta Corp', 'Beta Corp', '[]'::jsonb) returning id
+                """, Long.class, acme);
+        Long ada = jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'", Long.class);
+        Long trainer = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@acme.test'", Long.class);
+
+        // One trainee per company, or none.
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Bad", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId, beta),
+                                "traineeIds", List.of(ada)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.seats_mismatch"));
+
+        // One person cannot run two competing companies.
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Bad", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId, beta),
+                                "traineeIds", List.of(ada, ada)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.trainee_twice"));
+
+        // Only an active trainee account can be seated.
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Bad", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "traineeIds", List.of(trainer)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("user.not_found"));
+    }
+
+    @Test
     void publishing_freezes_a_copy_so_a_later_edit_cannot_reach_the_class() throws Exception {
         // A tenant draft the builder can edit, published as a package.
         String draft = copyTemplate();

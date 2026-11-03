@@ -4,6 +4,7 @@ import {
   type CompanyProfile,
   type SimulationPackage,
   type TemplateRow,
+  type UserRow,
 } from "./api";
 import { describeError } from "./errors";
 import { useI18n } from "./i18n";
@@ -21,6 +22,9 @@ export default function PackagesPanel() {
   const [packages, setPackages] = useState<SimulationPackage[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
+  const [trainees, setTrainees] = useState<UserRow[]>([]);
+  /** company id -> trainee id: the class list is part of the package, so it is chosen here. */
+  const [seats, setSeats] = useState<Record<number, string>>({});
   const [draft, setDraft] = useState({ name: "", templateKey: "", companyIds: [] as number[] });
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -29,12 +33,14 @@ export default function PackagesPanel() {
 
   const load = useCallback(async () => {
     try {
-      const [packageList, templateList, companyList, tidyList] = await Promise.all([
+      const [packageList, templateList, companyList, tidyList, userList] = await Promise.all([
         api.packages(),
         api.templates(),
         api.companies(),
         api.tidyPreview(),
+        api.users(),
       ]);
+      setTrainees(userList.filter((user) => user.role === "PLAYER" && user.active));
       setPackages(packageList);
       setTidy(tidyList);
       setTemplates(templateList);
@@ -62,9 +68,12 @@ export default function PackagesPanel() {
         name: draft.name.trim(),
         templateKey: draft.templateKey,
         companyProfileIds: draft.companyIds,
+        // positional: one entry per company, null where the seat is left open
+        traineeIds: draft.companyIds.map((id) => (seats[id] ? Number(seats[id]) : null)),
       });
       setNotice(t("packages.published", { name: made.name }));
       setDraft({ name: "", templateKey: draft.templateKey, companyIds: [] });
+      setSeats({});
       await load();
     } catch (error) {
       setProblem(describeError(error, t));
@@ -233,6 +242,48 @@ export default function PackagesPanel() {
               </li>
             ))}
           </ul>
+
+          {draft.companyIds.length > 0 && (
+            <>
+              <h3 className="pick-head">{t("packages.classList")}</h3>
+              <p className="muted">{t("packages.classListHint")}</p>
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("start.companies")}</th>
+                    <th>{t("start.trainees")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {draft.companyIds.map((id) => (
+                    <tr key={id}>
+                      <td>{companyName(id)}</td>
+                      <td>
+                        <select
+                          value={seats[id] ?? ""}
+                          onChange={(e) => setSeats((c) => ({ ...c, [id]: e.target.value }))}
+                        >
+                          <option value="">{t("packages.seatOpen")}</option>
+                          {trainees
+                            .filter((trainee) =>
+                              Object.entries(seats).every(
+                                ([companyId, picked]) =>
+                                  Number(companyId) === id || picked !== String(trainee.id),
+                              ),
+                            )
+                            .map((trainee) => (
+                              <option key={trainee.id} value={trainee.id}>
+                                {trainee.displayName} · {trainee.email}
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
 
           <div className="buttons">
             <button

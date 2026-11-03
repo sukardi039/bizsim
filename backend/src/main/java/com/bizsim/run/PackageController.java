@@ -29,7 +29,12 @@ import java.util.List;
 @RequestMapping("/api/packages")
 public class PackageController {
 
-    public record PublishRequest(String name, String templateKey, List<Long> companyProfileIds) {
+    /**
+     * {@code traineeIds} is positional and optional: index i is the person who will sit in company i,
+     * or null to leave that company open for a walk-in. This is the prepared class list.
+     */
+    public record PublishRequest(String name, String templateKey, List<Long> companyProfileIds,
+                                 List<Long> traineeIds) {
     }
 
     /** What a facilitator sends when the class begins: a name and who to seat. Nothing else. */
@@ -42,11 +47,13 @@ public class PackageController {
     private final RunService runs;
 
     public PackageController(PackageRepository packages, ScenarioRepository templates,
-                             CompanyProfileRepository profiles, RunService runs) {
+                             CompanyProfileRepository profiles, RunService runs,
+                             com.bizsim.user.UserRepository users) {
         this.packages = packages;
         this.templates = templates;
         this.profiles = profiles;
         this.runs = runs;
+        this.users = users;
     }
 
     @GetMapping
@@ -86,8 +93,27 @@ public class PackageController {
         String frozenKey = frozenKey(me.tenantCode());
         templates.freeze(template.key(), me.tenantId(), frozenKey,
                 request.name().trim() + " (v" + template.version() + ")");
+        List<Long> seats = request.traineeIds() == null ? List.of() : request.traineeIds();
+        if (!seats.isEmpty() && seats.size() != profileIds.size()) {
+            throw ProblemException.badRequest("package.seats_mismatch",
+                    "give one trainee per company, or none", "companies", profileIds.size(),
+                    "trainees", seats.size());
+        }
+        java.util.Set<Long> seen = new java.util.HashSet<>();
+        for (Long traineeId : seats) {
+            if (traineeId == null) {
+                continue;
+            }
+            if (!seen.add(traineeId)) {
+                throw ProblemException.badRequest("package.trainee_twice",
+                        "the same person cannot sit in two companies of one package",
+                        "userId", traineeId);
+            }
+            profilesOf(me.tenantId(), traineeId);
+        }
+
         long id = packages.insert(me.tenantId(), request.name().trim(), frozenKey, template.key(),
-                template.version(), profileIds, me.userId());
+                template.version(), profileIds, seats, me.userId());
         templates.markFrozen(frozenKey, id);
         return packages.find(me.tenantId(), id).orElseThrow();
     }
@@ -148,6 +174,15 @@ public class PackageController {
                     "only a facilitator runs a session");
         }
         return me;
+    }
+
+    private final com.bizsim.user.UserRepository users;
+
+    private void profilesOf(long tenantId, long userId) {
+        users.findInTenant(tenantId, userId)
+                .filter(user -> "PLAYER".equals(user.role()) && user.active())
+                .orElseThrow(() -> ProblemException.badRequest("user.not_found",
+                        "no active trainee with id " + userId + " in this tenant", "userId", userId));
     }
 
     /** `pkg-<tenant>-<8 hex>`: recognisable in logs, never colliding with a builder's own keys. */

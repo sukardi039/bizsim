@@ -32,8 +32,8 @@ class VersionApiTest extends PostgresTestBase {
                 // Baked at build time: the only signal that distinguishes two deploys with the same
                 // migration count.
                 .andExpect(jsonPath("$.builtAt").isString())
-                .andExpect(jsonPath("$.migrations").value(14))
-                .andExpect(jsonPath("$.latest").value("14"))
+                .andExpect(jsonPath("$.migrations").value(15))
+                .andExpect(jsonPath("$.latest").value("15"))
                 .andExpect(jsonPath("$.latestAppliedAt").isString())
                 .andExpect(jsonPath("$.serverTime").isString());
     }

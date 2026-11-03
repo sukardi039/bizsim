@@ -157,6 +157,9 @@ public class RunService {
 
         List<Long> seats = traineeIds == null ? List.of() : traineeIds;
         for (Long traineeId : seats) {
+            if (traineeId == null) {
+                continue; // a company left open for a walk-in
+            }
             users.findInTenant(tenantId, traineeId)
                     .filter(user -> "PLAYER".equals(user.role()) && user.active())
                     .orElseThrow(() -> ProblemException.badRequest("user.not_found",
@@ -180,7 +183,9 @@ public class RunService {
             }
         }
         for (int i = 0; i < seats.size(); i++) {
-            addPlayer(tenantId, view.id(), view.teams().get(i).id(), seats.get(i), "OWNER");
+            if (seats.get(i) != null) {
+                addPlayer(tenantId, view.id(), view.teams().get(i).id(), seats.get(i), "OWNER");
+            }
         }
         return view(tenantId, view.id());
     }
@@ -204,8 +209,21 @@ public class RunService {
                     "this package has been retired; ask your builder for a current one",
                     "package", pkg.name());
         }
+        // The class list was prepared with the package (ruling 3 Nov 2026). An explicit list still
+        // wins, so a facilitator can seat a late arrival without republishing.
+        List<Long> seats = new ArrayList<>();
+        for (int i = 0; i < pkg.companyProfileIds().size(); i++) {
+            seats.add(null);
+        }
+        for (PackageRepository.Seat seat : pkg.seats()) {
+            if (seat.position() < seats.size()) {
+                seats.set(seat.position(), seat.userId());
+            }
+        }
+        List<Long> effective = traineeIds == null || traineeIds.isEmpty() ? seats : traineeIds;
+
         RunView view = startPrepared(tenantId, facilitatorId, name, pkg.templateKey(),
-                pkg.companyProfileIds(), traineeIds, requestedRounds, requestedCycles);
+                pkg.companyProfileIds(), effective, requestedRounds, requestedCycles);
         jdbc.update("update run set package_id = ? where id = ?", packageId, view.id());
         return view(tenantId, view.id());
     }
