@@ -68,6 +68,8 @@ label input { margin-top: .25rem; }
   border-radius: 12px;
   padding: 1rem;
   margin-bottom: 1rem;
+  /* A wide table scrolls inside its own card rather than pushing the page sideways. */
+  overflow-x: auto;
 }
 
 .muted { color: var(--muted); }
@@ -78,9 +80,12 @@ label input { margin-top: .25rem; }
 .login { max-width: 340px; margin: 12vh auto; }
 .login p.muted { margin-top: -.3rem; }
 
-.shell { display: grid; grid-template-columns: 320px 1fr; min-height: 100vh; }
+.shell { display: grid; grid-template-columns: 320px minmax(0, 1fr); min-height: 100vh; }
 aside { border-right: 1px solid var(--line); padding: 1rem; }
-main { padding: 1.25rem 1.5rem; }
+/* min-width: 0 is load-bearing: a grid item defaults to min-width auto, so a wide table inside
+   makes the column grow past the viewport instead of shrinking — the right-hand columns then sit
+   off-screen with nothing to scroll, which reads as the panel being "hidden behind" the layout. */
+main { padding: 1.25rem 1.5rem; min-width: 0; }
 
 .brand { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; }
 .brand-right { display: flex; align-items: center; gap: .5rem; }
@@ -117,6 +122,8 @@ select.lang { width: auto; padding: .2rem .4rem; font-size: .8rem; }
 .buttons { display: flex; gap: .5rem; }
 
 table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+/* Controls inside a cell must not dictate the column width. */
+td select, td input { max-width: 12rem; }
 th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 500; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -164,8 +171,24 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 .seat:last-child { border-bottom: none; }
 .seat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin-bottom: .5rem; }
 .seat-head span { font-size: .82rem; }
-.seat-form { display: grid; grid-template-columns: 1fr 1.2fr 1.2fr auto; gap: .6rem; align-items: end; }
+.seat-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: .6rem;
+  align-items: end;
+}
 .seat-form label { margin: 0; }
 .seat-form button { height: 38px; }
 
 
+
+/* Narrow windows: a 320px sidebar plus a table is unusable on a laptop at 125% zoom or a tablet.
+   Below this width the console stacks — the sidebar becomes a top bar. */
+@media (max-width: 960px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  aside { border-right: none; border-bottom: 1px solid var(--line); }
+  .nav { flex-wrap: wrap; }
+  main { padding: 1rem; }
+  .run-head { flex-wrap: wrap; }
+  .settings-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
