@@ -43,6 +43,7 @@ class RoundFlowApiTest extends PostgresTestBase {
     private long teamTwo;
     private String facilitatorToken;
     private String playerOneToken;
+    private String playerTwoToken;
 
     @BeforeEach
     void seed() throws Exception {
@@ -60,7 +61,7 @@ class RoundFlowApiTest extends PostgresTestBase {
         user(tenant, "two@acme.test", "PLAYER");
         facilitatorToken = login("trainer@acme.test");
         playerOneToken = login("one@acme.test");
-        String playerTwoToken = login("two@acme.test");
+        playerTwoToken = login("two@acme.test");
 
         JsonNode run = createRun();
         runId = run.get("id").asLong();
@@ -182,6 +183,55 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat(body).doesNotContain("hiddenCost");
         assertThat(body).contains("hintLow");
         assertThat(json.readTree(body).get("rndProjects").get(0).has("hintHigh")).isTrue();
+    }
+
+    @Test
+    void a_trainee_cannot_read_a_rival_companys_numbers() throws Exception {
+        openRound();
+
+        // Cash, stock, decisions and the P&L are the competitive information the simulation is about:
+        // another seat's numbers must not be readable by changing the team id in the URL.
+        for (String path : List.of("context", "statements", "market-report")) {
+            mvc.perform(get("/api/runs/" + runId + "/teams/" + teamTwo + "/" + path)
+                            .header("Authorization", "Bearer " + playerOneToken))
+                    .andExpect(status().isForbidden());
+        }
+
+        // Their own company still opens, and the facilitator runs the whole class.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamTwo + "/context")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void the_form_context_reports_what_was_already_submitted() throws Exception {
+        openRound();
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submitted").value(false))
+                .andExpect(jsonPath("$.decision").doesNotExist());
+
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0)).andExpect(status().isOk());
+
+        // The trainee has to be able to see and correct what they sent: the decision is an upsert
+        // until the round closes, and a reload must not look like an empty month.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submitted").value(true))
+                .andExpect(jsonPath("$.decision.production[0].product").value("P1"))
+                .andExpect(jsonPath("$.decision.production[0].units").value(600))
+                .andExpect(jsonPath("$.decision.manpower.production").value(30));
+
+        // Another company's submission is not visible here.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamTwo + "/context")
+                        .header("Authorization", "Bearer " + playerTwoToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.submitted").value(false));
     }
 
     @Test

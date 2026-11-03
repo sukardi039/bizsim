@@ -94,3 +94,34 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .tag { font-size: .7rem; padding: .1rem .4rem; border-radius: 999px; background: #202733; color: var(--muted); }
 .tag.round-closed { background: #14301f; color: var(--good); }
 .tag.round-opened { background: #17222f; color: var(--accent); }
+
+/* ------------------------------------------------------------ trainee screen */
+
+.player { max-width: 980px; margin: 0 auto; padding: 1.25rem 1.5rem 4rem; }
+
+.stats { display: flex; gap: 1.4rem; text-align: right; }
+.stats span { display: flex; flex-direction: column; }
+.stats small { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; }
+.stats strong { font-variant-numeric: tabular-nums; }
+
+.banner { padding: .5rem .7rem; border-radius: 8px; font-size: .88rem; margin: .5rem 0 0; }
+.banner.good { background: #14301f; color: var(--good); }
+
+.shortfall { border: 1px solid var(--bad); border-radius: 8px; padding: .6rem .8rem; margin-top: .6rem; }
+.shortfall ul { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .88rem; }
+.shortfall li { display: flex; justify-content: space-between; gap: 1rem; }
+
+.project { display: grid; grid-template-columns: 1fr 140px; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid #202733; }
+.project:last-of-type { border-bottom: none; }
+.project p { margin: .2rem 0 0; font-size: .82rem; }
+.project-input { margin: 0; }
+.project-input input { margin-top: .25rem; }
+
+label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem; color: var(--text); }
+
+.forecast { list-style: none; margin: .6rem 0 0; padding: 0; font-size: .88rem; }
+.forecast li { padding: .25rem 0; border-bottom: 1px solid #202733; }
+
+.submit-bar { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; position: sticky; bottom: 0; }
+.submit-bar p { font-size: .85rem; }
+

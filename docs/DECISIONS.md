@@ -129,3 +129,8 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
    re-served as state.
 5. Round status transitions (`OPEN → CLOSED → COMPUTED`) happen in one server-side method, called
    only by the facilitator endpoint.
+6. A trainee reads only their own company (D21). Cash, stock, the stored decision and the statement
+   are the competitive information the simulation is about, so `context`, `statements` and
+   `market-report` answer 403 for another company's id when the caller is a `PLAYER`; facilitators
+   and admins read any company in their tenant. The check lives in one place
+   (`RoundService.requireTeamReadable`) so a new read endpoint cannot quietly skip it.

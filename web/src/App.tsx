@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import PlayerConsole from "./PlayerConsole";
 import {
   api,
   ApiError,
@@ -131,6 +132,10 @@ function Login({ onDone }: { onDone: () => void }) {
 
 export default function App() {
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
+  // Who is signed in decides the screen: a trainee gets the decision form, everything else gets the
+  // facilitator console. The role comes from the token, never from the client.
+  const [identity, setIdentity] = useState<{ userId: number; role: string } | null>(null);
+  const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -171,6 +176,32 @@ export default function App() {
   useEffect(() => {
     if (selectedId !== null) void refreshBoard(selectedId);
   }, [selectedId, refreshBoard]);
+
+  useEffect(() => {
+    if (!signedIn) {
+      setIdentity(null);
+      setIdentityProblem(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .me()
+      .then((me) => {
+        if (!cancelled) setIdentity({ userId: me.userId, role: me.role });
+      })
+      .catch((error) => {
+        if (!cancelled) setIdentityProblem(errorText(error));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn]);
+
+  const signOut = () => {
+    clearToken();
+    setSignedIn(false);
+    setIdentity(null);
+  };
 
   const note = useCallback((type: string, data: any) => {
     const text =
@@ -217,13 +248,31 @@ export default function App() {
   };
 
   if (!signedIn) return <Login onDone={() => setSignedIn(true)} />;
+  if (identityProblem) {
+    return (
+      <div className="card login">
+        <p className="error">{identityProblem}</p>
+        <button onClick={signOut}>Sign in again</button>
+      </div>
+    );
+  }
+  if (!identity) {
+    return (
+      <div className="card login">
+        <p className="muted">Signing in…</p>
+      </div>
+    );
+  }
+  if (identity.role === "PLAYER") {
+    return <PlayerConsole userId={identity.userId} onSignOut={signOut} />;
+  }
 
   return (
     <div className="shell">
       <aside>
         <div className="brand">
           <strong>bizsim</strong>
-          <button className="link" onClick={() => { clearToken(); setSignedIn(false); }}>
+          <button className="link" onClick={signOut}>
             sign out
           </button>
         </div>

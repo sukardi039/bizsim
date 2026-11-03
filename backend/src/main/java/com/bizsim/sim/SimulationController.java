@@ -42,20 +42,20 @@ public class SimulationController {
     @GetMapping("/teams/{teamId}/context")
     public Map<String, Object> context(@PathVariable long runId, @PathVariable long teamId) {
         TenantContext.Principal me = TenantContext.require();
-        return rounds.context(me.tenantId(), runId, teamId);
+        return rounds.context(me.tenantId(), me.userId(), me.role(), runId, teamId);
     }
 
     @GetMapping("/teams/{teamId}/statements")
     public List<Map<String, Object>> statements(@PathVariable long runId, @PathVariable long teamId) {
         TenantContext.Principal me = TenantContext.require();
-        return rounds.statements(me.tenantId(), runId, teamId);
+        return rounds.statements(me.tenantId(), me.userId(), me.role(), runId, teamId);
     }
 
     /** The paid forecast (D18). 402 until the round's decision buys it. */
     @GetMapping("/teams/{teamId}/market-report")
     public Map<String, Object> marketReport(@PathVariable long runId, @PathVariable long teamId) {
         TenantContext.Principal me = TenantContext.require();
-        return rounds.marketReport(me.tenantId(), runId, teamId);
+        return rounds.marketReport(me.tenantId(), me.userId(), me.role(), runId, teamId);
     }
 
     @GetMapping("/scoreboard")

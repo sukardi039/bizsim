@@ -200,12 +200,11 @@ public class RoundService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> statements(long tenantId, long runId, long teamId) {
+    public List<Map<String, Object>> statements(long tenantId, long userId, String role,
+                                             long runId, long teamId) {
         runs.find(runId, tenantId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
-        if (!rounds.teamBelongsToRun(teamId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
-        }
+        requireTeamReadable(userId, role, runId, teamId);
         return rounds.statements(runId, teamId);
     }
 
@@ -214,12 +213,11 @@ public class RoundService {
      * carries the published estimate band, never the hidden expected cost.
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> context(long tenantId, long runId, long teamId) {
+    public Map<String, Object> context(long tenantId, long userId, String role,
+                                       long runId, long teamId) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
-        if (!rounds.teamBelongsToRun(teamId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
-        }
+        requireTeamReadable(userId, role, runId, teamId);
         Scenario scenario = scenarios.load(run.scenarioKey());
         RoundRepository.TeamState team = rounds.teams(runId).stream()
                 .filter(t -> t.id() == teamId).findFirst().orElseThrow();
@@ -228,6 +226,16 @@ public class RoundService {
         body.put("runId", runId);
         body.put("round", run.currentRound());
         rounds.openRound(runId).ifPresent(r -> body.put("closesAt", r.closesAt()));
+
+        // What this company already sent for the open round, if anything. Without it the trainee
+        // cannot tell a submitted month from an empty one, and reloading the form silently loses
+        // their input -- the decision is an upsert until the round closes, so the form can reopen on
+        // the values they saved and let them correct them.
+        Optional<RoundRepository.RoundRow> open = rounds.openRound(runId);
+        Optional<DecisionPayload> submitted = open.flatMap(r -> rounds.decision(r.id(), teamId));
+        body.put("submitted", submitted.isPresent());
+        submitted.ifPresent(d -> body.put("decision", d));
+
         body.put("cash", team.cash());
         body.put("brand", team.brand());
         body.put("status", team.status());
@@ -291,12 +299,11 @@ public class RoundService {
      * before paying, and it reports the ordinary economics only — never the event deck.
      */
     @Transactional(readOnly = true)
-    public Map<String, Object> marketReport(long tenantId, long runId, long teamId) {
+    public Map<String, Object> marketReport(long tenantId, long userId, String role,
+                                            long runId, long teamId) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
-        if (!rounds.teamBelongsToRun(teamId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
-        }
+        requireTeamReadable(userId, role, runId, teamId);
         RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.CONFLICT, "no round is open"));
         DecisionPayload decision = rounds.decision(round.id(), teamId).orElse(null);
@@ -312,6 +319,21 @@ public class RoundService {
         body.put("current", environment.conditions(scenario, runId, round.number()));
         body.put("forecast", environment.forecast(scenario, runId, round.number()));
         return body;
+    }
+
+    /**
+     * A trainee may read only their own company: cash, stock, decisions and statements are exactly
+     * the competitive information the simulation is about, so changing the team id in the URL must
+     * not reveal a rival's position. Facilitators and admins run the whole class and may read any
+     * company inside their tenant.
+     */
+    private void requireTeamReadable(long userId, String role, long runId, long teamId) {
+        if (!rounds.teamBelongsToRun(teamId, runId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
+        }
+        if ("PLAYER".equals(role) && !rounds.userOwnsTeam(userId, teamId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not run this company");
+        }
     }
 
     // ------------------------------------------------------------------ internals

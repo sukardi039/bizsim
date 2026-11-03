@@ -96,7 +96,13 @@ If the directory does not exist, the backend runs API-only and behaves exactly a
 Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
 then drive the session with **Open next round** and **Compute round**. The scoreboard refreshes from a
 server-sent event stream, so a second browser on the same run sees the same round land within a
-second. Player decision forms are the next sprint (S4); the console is read-and-drive only.
+second.
+
+A trainee signs in with the player account and gets the **decision form** instead of the console:
+production and prices per product, marketing per channel, production staff and machines, R&D
+investment per project, and the paid market review. The same email address always sees the same
+screen, decided by the role in the token. A trainee can read only their own company — asking for
+another company's context, statement or market report is a 403.
 
 ## Deploy
 
@@ -148,6 +154,12 @@ S1 complete: run/company/player management, round state machine.
   Scenario #1 is provisional and calibrated in `docs/SCENARIO_CALIBRATION.md` — the discount
   strategy wins share and loses profit, which is the lesson D14 asked for.
   64 tests, all against real PostgreSQL.
-
-Next: S3 STOMP push + facilitator console, S4 decision form, S5 debrief export.
+**S3 complete: live channel + facilitator console.** SSE with single-use tickets (D20); the console
+  creates a run, opens and computes rounds, and shows one scoreboard per round (D21).
+**S4 complete (3 Nov 2026): the trainee decision form.** `web/src/PlayerConsole.tsx` is what a
+  `PLAYER` sees after sign-in: production and price per product, marketing per channel, production
+  staff and machines, R&D per project, the paid market review, and a live cash-commitment line. The
+  server returns the trainee's stored decision with the form so a reload reopens their own numbers,
+  and a trainee may read only their own company (403 otherwise).
+**Next: S5 the debrief** — per-round statements and the class report on the facilitator's screen.
 
