@@ -165,6 +165,87 @@ class TemplateApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_event_deck_is_editable_and_validated() throws Exception {
+        String key = copyStandard();
+
+        Map<String, Object> event = Map.of(
+                "code", "EV-POWER", "name", "Power price shock", "description", "Energy costs jump",
+                "earliestRound", 2, "latestRound", 5, "probability", 0.45, "durationMonths", 2,
+                "demandMultiplier", 1.0, "costMultiplier", 1.25, "wageMultiplier", 1.0);
+
+        mvc.perform(put("/api/templates/" + key + "/events")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("events", List.of(event)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.events.length()").value(1))
+                .andExpect(jsonPath("$.events[0].code").value("EV-POWER"))
+                .andExpect(jsonPath("$.events[0].costMultiplier").value(1.25));
+
+        // A probability outside 0..1 is refused at the edge, not at round close.
+        Map<String, Object> impossible = Map.of(
+                "code", "EV-BAD", "name", "Impossible", "description", "x",
+                "earliestRound", 1, "latestRound", 4, "probability", 1.5, "durationMonths", 2,
+                "demandMultiplier", 1.0, "costMultiplier", 1.0, "wageMultiplier", 1.0);
+        mvc.perform(put("/api/templates/" + key + "/events")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("events", List.of(impossible)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.events_invalid"))
+                .andExpect(jsonPath("$.params.field").value("probability"));
+
+        // Duplicate codes would make the run's frozen deck ambiguous.
+        mvc.perform(put("/api/templates/" + key + "/events")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("events", List.of(event, event)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.events_invalid"));
+
+        // The auth filter must not treat this as the SSE stream: an unauthenticated call is 401.
+        mvc.perform(put("/api/templates/" + key + "/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("events", List.of()))))
+                .andExpect(status().isUnauthorized());
+
+        // The shipped template stays read-only, deck included.
+        mvc.perform(put("/api/templates/standard-v1/events")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("events", List.of(event)))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.read_only"));
+    }
+
+    @Test
+    void every_editable_setting_is_reachable() throws Exception {
+        String key = copyStandard();
+
+        // The map settings the form used to hide: salaries and starting headcount by function.
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "salaries", Map.of("PRODUCTION", 5_000_000, "SALES", 7_500_000),
+                                "startingStaff", Map.of("PRODUCTION", 32, "SALES", 4),
+                                "minRndBenefitRatio", 0.7, "cycleDemandDrift", 0.03))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settings.salaries.PRODUCTION").value(5000000))
+                .andExpect(jsonPath("$.settings.startingStaff.PRODUCTION").value(32))
+                .andExpect(jsonPath("$.settings.minRndBenefitRatio").value(0.7));
+
+        // ...and they survive a later save that does not mention them (merge, not replace).
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", 8))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settings.salaries.SALES").value(7500000))
+                .andExpect(jsonPath("$.settings.startingStaff.SALES").value(4));
+    }
+
+    @Test
     void templates_are_staff_material_and_only_a_builder_may_change_them() throws Exception {
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmePlayer))
                 .andExpect(status().isForbidden());

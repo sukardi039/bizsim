@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type TemplateChannel, type TemplateDetail, type TemplateProduct, type TemplateProject, type TemplateRound } from "./api";
+import {
+  api,
+  type TemplateChannel,
+  type TemplateDetail,
+  type TemplateEvent,
+  type TemplateProduct,
+  type TemplateProject,
+  type TemplateRound,
+} from "./api";
 import { describeError } from "./errors";
 import { useI18n } from "./i18n";
 
@@ -21,7 +29,13 @@ const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
   { field: "marketReportCost", kind: "money" },
   { field: "forecastHorizon", kind: "int" },
   { field: "forecastBand", kind: "decimal" },
+  { field: "minRndBenefitRatio", kind: "decimal" },
+  { field: "cycleDemandDrift", kind: "decimal" },
+  { field: "cycleCostDrift", kind: "decimal" },
 ];
+
+/** Per-function numbers: salaries and starting headcount. Four functions, same keys in every template. */
+const FUNCTIONS = ["PRODUCTION", "SALES", "RND", "ADMIN"] as const;
 
 /**
  * Setup → Templates → editor (S6c).
@@ -34,12 +48,17 @@ const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
 export default function TemplateEditor({ templateKey, onLeave }: { templateKey: string; onLeave: () => void }) {
   const { t, number: fmt, money } = useI18n();
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
-  const [tab, setTab] = useState<"settings" | "environment" | "products" | "channels" | "projects">("settings");
+  const [tab, setTab] = useState<
+    "settings" | "environment" | "events" | "products" | "channels" | "projects"
+  >("settings");
   const [settings, setSettings] = useState<Record<string, string>>({});
   const [rounds, setRounds] = useState<TemplateRound[]>([]);
   const [products, setProducts] = useState<TemplateProduct[]>([]);
   const [channels, setChannels] = useState<TemplateChannel[]>([]);
   const [projects, setProjects] = useState<TemplateProject[]>([]);
+  const [events, setEvents] = useState<TemplateEvent[]>([]);
+  const [salaries, setSalaries] = useState<Record<string, string>>({});
+  const [staff, setStaff] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -52,6 +71,11 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
       if (value !== undefined && value !== null) flat[field] = String(value);
     }
     setSettings(flat);
+    const pay = (next.settings.salaries ?? {}) as Record<string, number>;
+    const headcount = (next.settings.startingStaff ?? {}) as Record<string, number>;
+    setSalaries(Object.fromEntries(FUNCTIONS.map((f) => [f, String(pay[f] ?? "")])));
+    setStaff(Object.fromEntries(FUNCTIONS.map((f) => [f, String(headcount[f] ?? "")])));
+    setEvents(next.events ?? []);
     setRounds(next.environment);
     setProducts(next.products ?? []);
     setChannels(next.channels ?? []);
@@ -85,6 +109,14 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
         if (raw === undefined || raw === "") continue;
         payload[field] = kind === "int" ? Number.parseInt(raw, 10) : Number(raw);
       }
+      // The per-function maps go in as objects; a blank cell is simply not sent, so the stored value
+      // survives rather than being zeroed by a form the builder never touched.
+      const payMap: Record<string, number> = {};
+      for (const f of FUNCTIONS) if (salaries[f]) payMap[f] = Number(salaries[f]);
+      if (Object.keys(payMap).length > 0) payload.salaries = payMap;
+      const staffMap: Record<string, number> = {};
+      for (const f of FUNCTIONS) if (staff[f]) staffMap[f] = Number.parseInt(staff[f], 10);
+      if (Object.keys(staffMap).length > 0) payload.startingStaff = staffMap;
       adopt(await api.saveTemplateSettings(templateKey, payload));
       setNotice(t("editor.saved"));
     } catch (error) {
@@ -195,6 +227,9 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
           >
             {t("editor.environment")}
           </button>
+          <button className={tab === "events" ? "active" : ""} onClick={() => setTab("events")}>
+            {t("editor.events")}
+          </button>
           <button className={tab === "products" ? "active" : ""} onClick={() => setTab("products")}>
             {t("editor.products")}
           </button>
@@ -226,6 +261,38 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 </label>
               ))}
             </div>
+            <h3 className="pick-head">{t("editor.perFunction")}</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("editor.function")}</th>
+                  <th className="num">{t("field.salaries")}</th>
+                  <th className="num">{t("field.startingStaff")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {FUNCTIONS.map((f) => (
+                  <tr key={f}>
+                    <td>{t(`fn.${f}`)}</td>
+                    <td>
+                      <input
+                        value={salaries[f] ?? ""}
+                        disabled={locked}
+                        onChange={(e) => setSalaries((c) => ({ ...c, [f]: e.target.value }))}
+                      />
+                      {salaries[f] ? <small className="muted">{money(Number(salaries[f]))}</small> : null}
+                    </td>
+                    <td>
+                      <input
+                        value={staff[f] ?? ""}
+                        disabled={locked}
+                        onChange={(e) => setStaff((c) => ({ ...c, [f]: e.target.value }))}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
             <div className="buttons">
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
@@ -306,6 +373,91 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               </button>
               <button type="button" onClick={removeRound} disabled={locked || rounds.length <= 1}>
                 {t("editor.removeRound")}
+              </button>
+              <button className="primary" type="submit" disabled={locked || busy}>
+                {busy ? t("editor.saving") : t("editor.save")}
+              </button>
+            </div>
+          </form>
+        ) : tab === "events" ? (
+          <form onSubmit={(event) => saveCatalogue(event, () => api.saveTemplateEvents(templateKey, events))}>
+            <p className="muted">{t("editor.eventsHint")}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("field.code")}</th>
+                  <th>{t("field.name")}</th>
+                  <th>{t("field.description")}</th>
+                  <th className="num">{t("field.earliestRound")}</th>
+                  <th className="num">{t("field.latestRound")}</th>
+                  <th className="num">{t("field.probability")}</th>
+                  <th className="num">{t("field.durationMonths")}</th>
+                  <th className="num">{t("field.demandMultiplier")}</th>
+                  <th className="num">{t("field.costMultiplier")}</th>
+                  <th className="num">{t("field.wageMultiplier")}</th>
+                  <th>{t("field.targetProduct")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((row, index) => {
+                  const edit = (patch: Partial<TemplateEvent>) =>
+                    setEvents((c) => c.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+                  return (
+                    <tr key={index}>
+                      <td><input value={row.code} disabled={locked} onChange={(e) => edit({ code: e.target.value })} /></td>
+                      <td><input value={row.name} disabled={locked} onChange={(e) => edit({ name: e.target.value })} /></td>
+                      <td><input value={row.description} disabled={locked} onChange={(e) => edit({ description: e.target.value })} /></td>
+                      <td><input value={String(row.earliestRound)} disabled={locked} onChange={(e) => edit({ earliestRound: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.latestRound)} disabled={locked} onChange={(e) => edit({ latestRound: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.probability)} disabled={locked} onChange={(e) => edit({ probability: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.durationMonths)} disabled={locked} onChange={(e) => edit({ durationMonths: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.demandMultiplier)} disabled={locked} onChange={(e) => edit({ demandMultiplier: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.costMultiplier)} disabled={locked} onChange={(e) => edit({ costMultiplier: Number(e.target.value) })} /></td>
+                      <td><input value={String(row.wageMultiplier)} disabled={locked} onChange={(e) => edit({ wageMultiplier: Number(e.target.value) })} /></td>
+                      <td>
+                        <select
+                          value={row.targetProduct ?? ""}
+                          disabled={locked}
+                          onChange={(e) => edit({ targetProduct: e.target.value || null })}
+                        >
+                          <option value="">{t("editor.allProducts")}</option>
+                          {products.map((product) => (
+                            <option key={product.code} value={product.code}>{product.code}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="buttons">
+              <button
+                type="button"
+                disabled={locked}
+                onClick={() =>
+                  setEvents((c) => [
+                    ...c,
+                    {
+                      code: "",
+                      name: "",
+                      description: "",
+                      earliestRound: 2,
+                      latestRound: 6,
+                      probability: 0.4,
+                      durationMonths: 2,
+                      demandMultiplier: 1,
+                      costMultiplier: 1,
+                      wageMultiplier: 1,
+                      targetProduct: null,
+                    },
+                  ])
+                }
+              >
+                {t("editor.addRow")}
+              </button>
+              <button type="button" disabled={locked || events.length === 0} onClick={() => setEvents((c) => c.slice(0, -1))}>
+                {t("editor.removeRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}

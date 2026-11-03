@@ -37,13 +37,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             return true;
         }
         // The event stream authenticates with a single-use ticket in the query string instead of a
-        // header, because EventSource cannot set headers (see RunStreamController).
+        // header, because EventSource cannot set headers (see RunStreamController). Scoped to runs:
+        // an earlier `path.endsWith("/events")` also matched /api/templates/{key}/events and made
+        // that endpoint public, which the filter cannot be trusted to notice again.
         return path.equals("/api/auth/login")
                 || path.equals("/api/ping")
                 // The deploy fingerprint must answer before anyone can sign in: that is exactly when
                 // you need to know which build is live.
                 || path.equals("/api/version")
-                || path.endsWith("/events");
+                || (path.startsWith("/api/runs/") && path.endsWith("/events"));
     }
 
     @Override

@@ -179,8 +179,9 @@ S1 complete: run/company/player management, round state machine.
   definition document and every catalogue row — into a tenant-owned `DRAFT` with its own key
   (`demo-standard-v1`). The console has a **Templates** tab for it. Ruling D22: the shipped template
   is never edited, only copied.
-**S6c complete (3 Nov 2026): the template editor.** Clicking a template opens **Settings** and
-  **Environment**. Settings save merges the editable scalars into the definition document, leaving
+**S6c complete (3 Nov 2026): the template editor.** Clicking a template opens the editor; it now has
+  six tabs — **Settings** (all 22 keys, including per-function salaries and headcount),
+  **Environment**, **Events**, **Products**, **Channels**, **R&D projects**. Settings save merges the editable scalars into the definition document, leaving
   the engine's calibration alone; the environment is a table of round positions saved whole. Only a
   copy the tenant owns is editable — the shipped template answers `409 template.read_only`. See
   `docs/SETUP_WORKBENCH.md` for the phase list.

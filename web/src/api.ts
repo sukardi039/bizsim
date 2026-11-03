@@ -228,6 +228,7 @@ export interface TemplateDetail {
   products: TemplateProduct[];
   channels: TemplateChannel[];
   projects: TemplateProject[];
+  events: TemplateEvent[];
 }
 
 export interface TemplateProduct {
@@ -262,6 +263,20 @@ export interface TemplateProject {
   benefitCurve: string;
   benefitExponent: number;
   overfunding: string;
+}
+
+export interface TemplateEvent {
+  code: string;
+  name: string;
+  description: string;
+  earliestRound: number;
+  latestRound: number;
+  probability: number;
+  durationMonths: number;
+  demandMultiplier: number;
+  costMultiplier: number;
+  wageMultiplier: number;
+  targetProduct?: string | null;
 }
 
 export interface CompanyProfile {
@@ -420,6 +435,11 @@ export const api = {
     request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/channels`, {
       method: "PUT",
       body: JSON.stringify({ channels }),
+    }),
+  saveTemplateEvents: (key: string, events: TemplateEvent[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/events`, {
+      method: "PUT",
+      body: JSON.stringify({ events }),
     }),
   saveTemplateProjects: (key: string, projects: TemplateProject[]) =>
     request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/projects`, {

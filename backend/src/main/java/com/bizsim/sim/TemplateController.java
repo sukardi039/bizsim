@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Simulation templates: the economy, catalogue and settings a session is played on.
@@ -35,7 +36,11 @@ public class TemplateController {
                          List<ScenarioRepository.RoundRow> environment,
                          List<ScenarioRepository.ProductRow> products,
                          List<ScenarioRepository.ChannelRow> channels,
-                         List<ScenarioRepository.ProjectRow> projects) {
+                         List<ScenarioRepository.ProjectRow> projects,
+                         List<Scenario.EventSpec> events) {
+    }
+
+    public record EventsRequest(List<Scenario.EventSpec> events) {
     }
 
     public record EnvironmentRequest(List<ScenarioRepository.RoundRow> rounds) {
@@ -123,6 +128,21 @@ public class TemplateController {
         List<ScenarioRepository.ProductRow> products = request == null ? null : request.products();
         validateProducts(products);
         scenarios.saveProducts(key, products);
+        return detail(me, row);
+    }
+
+    /**
+     * Replaces the event deck. Unlike the catalogue this stays editable after a session exists: the
+     * deck is drawn once per run and frozen into that run (D18), so an edit cannot reach back into a
+     * class that already played.
+     */
+    @PutMapping("/{key}/events")
+    public Detail saveEvents(@PathVariable String key, @RequestBody EventsRequest request) {
+        TenantContext.Principal me = requireBuilder();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        List<Scenario.EventSpec> events = request == null ? null : request.events();
+        validateEvents(events, key);
+        scenarios.saveEvents(key, events);
         return detail(me, row);
     }
 
@@ -327,6 +347,51 @@ public class TemplateController {
         return ProblemException.badRequest("template.catalog_invalid", message, params);
     }
 
+    private static void validateEvents(List<Scenario.EventSpec> events, String key) {
+        if (events == null) {
+            return; // an empty deck is legitimate: some economies have no shocks
+        }
+        Set<String> codes = new java.util.LinkedHashSet<>();
+        for (Scenario.EventSpec event : events) {
+            if (event == null || isBlank(event.code()) || isBlank(event.name())) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "every event needs a code and a name", "field", "code");
+            }
+            if (!codes.add(event.code())) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "duplicate event code " + event.code(), "field", "code", "code", event.code());
+            }
+            if (event.earliestRound() < 1 || event.latestRound() < event.earliestRound()) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "event " + event.code() + " has an impossible round window",
+                        "field", "earliestRound", "code", event.code());
+            }
+            if (event.probability() == null || event.probability().signum() < 0
+                    || event.probability().compareTo(BigDecimal.ONE) > 0) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "event " + event.code() + " needs a probability between 0 and 1",
+                        "field", "probability", "code", event.code());
+            }
+            if (event.durationMonths() < 1 || event.durationMonths() > 12) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "event " + event.code() + " lasts 1 to 12 months",
+                        "field", "durationMonths", "code", event.code());
+            }
+            for (String field : List.of("demandMultiplier", "costMultiplier", "wageMultiplier")) {
+                BigDecimal value = switch (field) {
+                    case "demandMultiplier" -> event.demandMultiplier();
+                    case "costMultiplier" -> event.costMultiplier();
+                    default -> event.wageMultiplier();
+                };
+                if (value == null || value.signum() <= 0) {
+                    throw ProblemException.badRequest("template.events_invalid",
+                            "event " + event.code() + ": " + field + " must be above zero",
+                            "field", field, "code", event.code());
+                }
+            }
+        }
+    }
+
     private static void validateEnvironment(List<ScenarioRepository.RoundRow> rounds) {
         if (rounds == null || rounds.isEmpty()) {
             throw ProblemException.badRequest("template.environment_invalid",
@@ -363,7 +428,7 @@ public class TemplateController {
                 row.tenantId() != null && row.tenantId() == me.tenantId(),
                 scenarios.settings(row.key()), scenarios.environment(row.key()),
                 scenarios.products(row.key()), scenarios.channels(row.key()),
-                scenarios.projects(row.key()));
+                scenarios.projects(row.key()), scenarios.eventsOf(row.key()));
     }
 
     /** Building is a separate job from running (ruling 3 Nov 2026): a facilitator consumes, never edits. */

@@ -133,7 +133,12 @@ public class ScenarioRepository {
                         rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
                         rs.getString("note")), key);
 
-        List<Scenario.EventSpec> events = jdbc.query("""
+        return new Scenario(key, params, products, channels, projects, rounds, eventsOf(key));
+    }
+
+    /** The event deck a builder may edit: the same shape the engine draws from (D18). */
+    public List<Scenario.EventSpec> eventsOf(String key) {
+        return jdbc.query("""
                 select code, name, description, earliest_round, latest_round, probability,
                        duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
                        target_product
@@ -144,8 +149,27 @@ public class ScenarioRepository {
                         rs.getBigDecimal("probability"), rs.getInt("duration_months"),
                         rs.getBigDecimal("demand_multiplier"), rs.getBigDecimal("cost_multiplier"),
                         rs.getBigDecimal("wage_multiplier"), rs.getString("target_product")), key);
+    }
 
-        return new Scenario(key, params, products, channels, projects, rounds, events);
+    /** Replaces the whole deck: an event set with a gap or a duplicate code is not a set. */
+    @Transactional
+    public void saveEvents(String key, List<Scenario.EventSpec> events) {
+        jdbc.update("delete from environment_event where scenario_key = ?", key);
+        if (events == null) {
+            return;
+        }
+        for (Scenario.EventSpec event : events) {
+            jdbc.update("""
+                    insert into environment_event (scenario_key, code, name, description, earliest_round,
+                                                   latest_round, probability, duration_months,
+                                                   demand_multiplier, cost_multiplier, wage_multiplier,
+                                                   target_product)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, event.code(), event.name(), event.description(), event.earliestRound(),
+                    event.latestRound(), event.probability(), event.durationMonths(),
+                    event.demandMultiplier(), event.costMultiplier(), event.wageMultiplier(),
+                    event.targetProduct());
+        }
     }
 
     // ------------------------------------------------------------------ templates

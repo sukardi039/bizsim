@@ -132,7 +132,7 @@ class always has one person who is not in the roster.
   table and a partial edit has no meaning. Only a template the tenant owns is editable — the shipped
   one answers `409 template.read_only`. Validation returns codes (`template.settings_invalid`,
   `template.environment_invalid`) with the offending field. Console: clicking a template opens the
-  editor with **Settings** and **Environment** tabs.
+  editor with **Settings**, **Environment**, **Events**, **Products**, **Channels** and **R&D** tabs.
 - **S6d — Products, channels, R&D projects. SHIPPED.** `PUT .../products`, `/channels`, `/projects`
   replace each catalogue whole (a catalogue is a set). Validation refuses what the engine cannot run:
   at least one row, unique codes, positive price/cost/reach/size, `advantageType` limited to the four
@@ -141,6 +141,12 @@ class always has one person who is not in the roster.
   a project's `targetProduct` must exist. **A template that already has a simulation refuses catalogue
   edits** (`409 template.in_use`): its companies were created from these codes and its decisions name
   them. Settings and the environment stay editable, because each run freezes its own economy (D18).
+- **S6f — Every editable parameter, exposed. SHIPPED.** The settings form carries all 22 definition
+  keys, including the `salaries` and `startingStaff` maps (per function: production, sales, R&D,
+  admin) and `minRndBenefitRatio` / `cycleDemandDrift` / `cycleCostDrift`; a new **Events** tab edits
+  the event deck (code, name, description, round window, chance, duration, demand/cost/wage
+  multipliers, target product), saved whole and validated at the edge (`template.events_invalid`).
+  Only engine calibration stays out of the form (D26).
 - **S6e — Company profiles and start-from-prepared. SHIPPED.** V11 adds `company_profile`
   (global base + tenant copies, same pattern as templates). `GET/POST/PUT /api/companies` and
   `POST /api/companies/{id}/copy`; `POST /api/runs/prepared` takes a template, profile ids and
