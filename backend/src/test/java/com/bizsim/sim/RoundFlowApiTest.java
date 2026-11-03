@@ -248,6 +248,10 @@ class RoundFlowApiTest extends PostgresTestBase {
         }
         assertThat(jdbc.queryForObject("select count(*) from simulation where id = ?",
                 Integer.class, simulationId)).isZero();
+        // The trainee accounts created for this run go with it, so the same emails can be used again.
+        assertThat(jdbc.queryForObject(
+                "select count(*) from app_user where email in ('one@acme.test', 'two@acme.test')",
+                Integer.class)).isZero();
         mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isNotFound());
 
@@ -259,6 +263,47 @@ class RoundFlowApiTest extends PostgresTestBase {
                                 "name", "Clean slate", "scenarioKey", "standard-v1",
                                 "teams", List.of(Map.of("name", "A", "companyName", "A Inc"))))))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void deleting_a_run_keeps_a_trainee_who_is_seated_in_another_run() throws Exception {
+        // one@acme.test plays in this run AND in a second run owned by another facilitator.
+        user(tenantId, "trainer7@acme.test", "FACILITATOR");
+        String other = loginOn("acme", "trainer7@acme.test");
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + other)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Second cohort", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "Z", "companyName", "Z Inc"))))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        JsonNode otherRun = json.readTree(created.getResponse().getContentAsString());
+        long otherTeam = otherRun.get("teams").get(0).get("id").asLong();
+        long playerOneId = jdbc.queryForObject(
+                "select id from app_user where email = 'one@acme.test'", Long.class);
+        mvc.perform(post("/api/runs/" + otherRun.get("id").asLong() + "/players")
+                        .header("Authorization", "Bearer " + other)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "teamId", otherTeam, "userId", playerOneId, "roleKey", "OWNER"))))
+                .andExpect(status().isCreated());
+
+        mvc.perform(delete("/api/runs/" + runId)
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNoContent());
+
+        // The person is kept because another simulation still needs them; the one who was only here
+        // is removed. A person is not owned by a single run.
+        assertThat(login("one@acme.test")).isNotBlank();
+        assertThat(jdbc.queryForObject("select count(*) from app_user where email = 'two@acme.test'",
+                Integer.class)).isZero();
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", "acme", "email", "two@acme.test",
+                                "password", "pw-two@acme.test"))))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

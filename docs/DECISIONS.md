@@ -142,5 +142,8 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
 8. Deleting a simulation is a facilitator power, not an admin chore: its owner may delete it, an
    admin may delete any in the tenant, and nobody else may delete anything (`DELETE /api/runs/{id}`,
    204). It is the only delete in the API and it cascades — rounds, decisions, results, statements,
-   teams, seats — so a rehearsal can be cleared before a real class. The simulation row goes too once
-   it has no runs, and the D21 "one in flight" guard releases with it.
+   teams, seats — so a rehearsal can be cleared before a real class. The trainee **accounts** seated
+   in that run go too, because a leftover account turns re-creating the same email into a 409 and
+   blocks the real session; an account seated in another run, and every facilitator/admin, is kept,
+   since a person is not owned by one simulation. The simulation row goes too once it has no runs,
+   and the D21 "one in flight" guard releases with it.

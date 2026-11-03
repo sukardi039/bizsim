@@ -256,7 +256,8 @@ export default function App() {
     if (!selected) return;
     const sure = window.confirm(
       `Delete run ${selected.id} and everything played in it?\n\n` +
-        `Rounds, decisions, results and the trainee seats go with it. This cannot be undone.`,
+        `Rounds, decisions, results, the trainee accounts and their seats go with it. ` +
+        `This cannot be undone.`,
     );
     if (!sure) return;
     setProblem(null);
