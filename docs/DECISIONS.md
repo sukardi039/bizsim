@@ -153,3 +153,9 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
    `POST /api/users/{id}/deactivate`, which stops the login and keeps the results readable.
    Deactivation is reversible (`/activate`); hard deletion is reserved for an account that never
    played. Only `PLAYER` accounts are removable this way, and nobody deletes themselves.
+10. Editing a template is a **merge, not a replacement**. `PUT /api/templates/{key}/settings` writes
+    only the fields the editor shows (`rounds`, `roundMinutes`, `startingCash`, salaries, cycles…)
+    into the definition document and ignores everything else, because that document also carries
+    engine calibration — elasticities, baseline competitor — that no form should be able to erase.
+    The environment timeline is the opposite: `scenario_round` rows are replaced whole, since a
+    partial edit of a sequence has no meaning. Every save bumps `scenario.version`.

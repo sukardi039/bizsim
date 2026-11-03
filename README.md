@@ -178,5 +178,10 @@ S1 complete: run/company/player management, round state machine.
   `standard-v1` plus the tenant's own copies; `POST /api/templates/{key}/copy` clones a template —
   definition document and every catalogue row — into a tenant-owned `DRAFT` with its own key
   (`demo-standard-v1`). The console has a **Templates** tab for it. Ruling D22: the shipped template
-  is never edited, only copied. Editing the copy is S6c — see `docs/SETUP_WORKBENCH.md`.
+  is never edited, only copied.
+**S6c complete (3 Nov 2026): the template editor.** Clicking a template opens **Settings** and
+  **Environment**. Settings save merges the editable scalars into the definition document, leaving
+  the engine's calibration alone; the environment is a table of round positions saved whole. Only a
+  copy the tenant owns is editable — the shipped template answers `409 template.read_only`. Next is
+  S6d (products, channels, R&D projects); see `docs/SETUP_WORKBENCH.md`.
 

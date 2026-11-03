@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type TemplateRow } from "./api";
 import { useI18n } from "./i18n";
+import TemplateEditor from "./TemplateEditor";
 import { describeError } from "./errors";
 
 function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
@@ -20,6 +21,8 @@ export default function TemplatesPanel() {
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  /** Which template is open in the editor; null shows the list. */
+  const [editing, setEditing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -50,6 +53,10 @@ export default function TemplatesPanel() {
     }
   };
 
+  if (editing) {
+    return <TemplateEditor templateKey={editing} onLeave={() => { setEditing(null); void load(); }} />;
+  }
+
   return (
     <section className="card">
       <h2>{t("templates.title")}</h2>
@@ -76,7 +83,9 @@ export default function TemplatesPanel() {
           {templates.map((template) => (
             <tr key={template.key}>
               <td>
-                {template.name}
+                <button className="link" onClick={() => setEditing(template.key)}>
+                  {template.name}
+                </button>
                 <small className="muted" style={{ display: "block" }}>{template.key}</small>
               </td>
               <td>{template.tenantId == null ? t("templates.global") : t("templates.yours")}</td>

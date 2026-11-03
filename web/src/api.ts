@@ -186,6 +186,27 @@ export interface MarketForecast {
   outlook: string;
 }
 
+export interface TemplateRound {
+  round: number;
+  demandIndex: number;
+  costIndex: number;
+  wageIndex: number;
+  trendStrength: number;
+  trendLabel: string;
+  note: string;
+}
+
+export interface TemplateDetail {
+  key: string;
+  name: string;
+  tenantId?: number | null;
+  status: string;
+  basedOn?: string | null;
+  editable: boolean;
+  settings: Record<string, unknown>;
+  environment: TemplateRound[];
+}
+
 export interface UserRow {
   id: number;
   email: string;
@@ -295,6 +316,18 @@ export const api = {
     request<TemplateRow>(`/templates/${encodeURIComponent(key)}/copy`, {
       method: "POST",
       body: JSON.stringify({ name: name ?? "" }),
+    }),
+  templateDetail: (key: string) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}`),
+  saveTemplateSettings: (key: string, settings: Record<string, unknown>) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/settings`, {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    }),
+  saveTemplateEnvironment: (key: string, rounds: TemplateRound[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/environment`, {
+      method: "PUT",
+      body: JSON.stringify({ rounds }),
     }),
   users: () => request<UserRow[]>("/users"),
   deleteUser: (id: number) => request<unknown>(`/users/${id}`, { method: "DELETE" }),

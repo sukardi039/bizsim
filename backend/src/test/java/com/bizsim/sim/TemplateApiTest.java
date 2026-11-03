@@ -14,11 +14,13 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -152,6 +154,81 @@ class TemplateApiTest extends PostgresTestBase {
                 .andExpect(status().isForbidden());
         mvc.perform(get("/api/templates"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void a_copy_can_be_edited_and_the_shipped_template_cannot() throws Exception {
+        String key = copyStandard();
+
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "rounds", 6, "startingCash", 1_500_000_000L, "cycles", 2))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.editable").value(true))
+                .andExpect(jsonPath("$.settings.rounds").value(6))
+                .andExpect(jsonPath("$.settings.startingCash").value(1_500_000_000L));
+
+        // The merge keeps calibration the editor never shows: a form save must not drop the engine's
+        // elasticity block or its baseline competitor.
+        assertThat(jdbc.queryForObject(
+                "select definition->>'baselineCompetitor' from scenario where key = ?", String.class, key))
+                .isNotNull();
+        assertThat(jdbc.queryForObject(
+                "select definition->'elasticity'->>'price' from scenario where key = ?", String.class, key))
+                .isNotNull();
+
+        mvc.perform(put("/api/templates/" + key + "/environment")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", List.of(
+                                Map.of("round", 1, "demandIndex", 1.0, "costIndex", 1.0, "wageIndex", 1.0,
+                                        "trendStrength", 0.0, "trendLabel", "Start", "note", ""),
+                                Map.of("round", 2, "demandIndex", 1.1, "costIndex", 1.05, "wageIndex", 1.02,
+                                        "trendStrength", 0.3, "trendLabel", "Boom", "note", "peak"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.environment.length()").value(2))
+                .andExpect(jsonPath("$.environment[1].demandIndex").value(1.1))
+                .andExpect(jsonPath("$.environment[1].trendLabel").value("Boom"));
+
+        // A rule the facilitator can fix comes back as a code.
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", 99))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.settings_invalid"))
+                .andExpect(jsonPath("$.params.field").value("rounds"));
+
+        mvc.perform(put("/api/templates/" + key + "/environment")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", List.of(
+                                Map.of("round", 2, "demandIndex", 1.0, "costIndex", 1.0, "wageIndex", 1.0))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.environment_invalid"));
+
+        // The shipped template is read-only, whoever asks.
+        mvc.perform(put("/api/templates/standard-v1/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("rounds", 4))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.read_only"));
+
+        // Another tenant cannot even see it.
+        mvc.perform(get("/api/templates/" + key)
+                        .header("Authorization", "Bearer " + otherFacilitator))
+                .andExpect(status().isNotFound());
+    }
+
+    private String copyStandard() throws Exception {
+        MvcResult copied = mvc.perform(post("/api/templates/standard-v1/copy")
+                        .header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return json.readTree(copied.getResponse().getContentAsString()).get("key").asText();
     }
 
     // ------------------------------------------------------------------ helpers

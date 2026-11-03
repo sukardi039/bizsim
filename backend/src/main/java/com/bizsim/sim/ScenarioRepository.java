@@ -2,6 +2,7 @@ package com.bizsim.sim;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.bizsim.web.ProblemException;
@@ -242,6 +243,88 @@ public class ScenarioRepository {
                 """, key, sourceKey);
 
         return key;
+    }
+
+    // ------------------------------------------------------------------ template editing (S6c)
+
+    /** One position of the environment timeline, as the editor sees it. */
+    public record RoundRow(int round, BigDecimal demandIndex, BigDecimal costIndex, BigDecimal wageIndex,
+                           BigDecimal trendStrength, String trendLabel, String note) {
+    }
+
+    /** The definition keys a facilitator may change. Everything else is engine calibration. */
+    private static final List<String> EDITABLE_SETTINGS = List.of(
+            "rounds", "roundMinutes", "startingCash", "startingBrand", "fixedCostPerMonth", "brandDecay",
+            "holdingCostPerUnit", "referenceQuality", "referenceSpend", "machineCostPerWorker",
+            "hiringCostMonths", "severanceMonths", "minRndBenefitRatio", "marketReportCost",
+            "forecastHorizon", "forecastBand", "cycles", "cycleLength", "cycleDemandDrift",
+            "cycleCostDrift", "salaries", "startingStaff");
+
+    /** The editable part of the definition document, as stored. */
+    public Map<String, Object> settings(String key) {
+        String definition = jdbc.queryForObject(
+                "select definition::text from scenario where key = ?", String.class, key);
+        try {
+            JsonNode node = json.readTree(definition);
+            Map<String, Object> settings = new LinkedHashMap<>();
+            for (String field : EDITABLE_SETTINGS) {
+                JsonNode value = node.get(field);
+                if (value != null) {
+                    settings.put(field, json.convertValue(value, Object.class));
+                }
+            }
+            return settings;
+        } catch (Exception e) {
+            throw new IllegalStateException("scenario " + key + " has unreadable definition", e);
+        }
+    }
+
+    public List<RoundRow> environment(String key) {
+        return jdbc.query("""
+                select round_number, demand_index, cost_index, wage_index, trend_strength, trend_label, note
+                from scenario_round where scenario_key = ? order by round_number
+                """, (rs, i) -> new RoundRow(rs.getInt(1), rs.getBigDecimal(2), rs.getBigDecimal(3),
+                rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7)), key);
+    }
+
+    /**
+     * Merges the submitted settings into the definition document.
+     *
+     * <p>A merge, not a replacement: the document also holds calibration the editor never shows
+     * (elasticities, baseline competitor), and writing the whole document from a form would silently
+     * drop those. Unknown keys are ignored, so a stale client cannot invent engine calibration.
+     */
+    @Transactional
+    public void saveSettings(String key, Map<String, Object> submitted) {
+        String definition = jdbc.queryForObject(
+                "select definition::text from scenario where key = ?", String.class, key);
+        try {
+            ObjectNode node = (ObjectNode) json.readTree(definition);
+            for (String field : EDITABLE_SETTINGS) {
+                if (submitted.containsKey(field)) {
+                    node.set(field, json.valueToTree(submitted.get(field)));
+                }
+            }
+            jdbc.update("update scenario set definition = ?::jsonb, version = version + 1 where key = ?",
+                    json.writeValueAsString(node), key);
+        } catch (Exception e) {
+            throw new IllegalStateException("cannot merge settings for " + key, e);
+        }
+    }
+
+    /** Replaces the whole environment timeline: the positions are a table, not a partial edit. */
+    @Transactional
+    public void saveEnvironment(String key, List<RoundRow> rows) {
+        jdbc.update("delete from scenario_round where scenario_key = ?", key);
+        for (RoundRow row : rows) {
+            jdbc.update("""
+                    insert into scenario_round (scenario_key, round_number, demand_index, cost_index,
+                                                wage_index, trend_strength, trend_label, note)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, row.round(), row.demandIndex(), row.costIndex(), row.wageIndex(),
+                    row.trendStrength(), row.trendLabel(), row.note());
+        }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }
 
     private static BigDecimal dec(JsonNode node) {

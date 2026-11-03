@@ -125,9 +125,14 @@ class always has one person who is not in the roster.
 - ~~**S6a — Template library, read-only.**~~ `GET /api/templates` + a Setup page listing
   `standard-v1` (name, rounds, cycles, products, channels, projects, rounds table). Proves the
   document can be surfaced before anything can be edited. No schema change.
-- **S6c — Edit settings, then environment.** `PUT /api/templates/{id}/settings` and
-  `/environment`, with the same validation the engine relies on (`rounds ≥ 1`, indices > 0, at least
-  one product). Save-from-UI, reload, and a run created from the edited template shows the new numbers.
+- **S6c — Edit settings and environment. SHIPPED.** `GET /api/templates/{key}` returns the editable
+  settings plus the environment timeline; `PUT .../settings` **merges** the submitted scalars into the
+  definition document (elasticity and baseline calibration are never dropped, unknown keys ignored)
+  and bumps `version`; `PUT .../environment` replaces the timeline whole, because positions are a
+  table and a partial edit has no meaning. Only a template the tenant owns is editable — the shipped
+  one answers `409 template.read_only`. Validation returns codes (`template.settings_invalid`,
+  `template.environment_invalid`) with the offending field. Console: clicking a template opens the
+  editor with **Settings** and **Environment** tabs.
 - **S6d — Products, channels, R&D projects.** The remaining editor tabs.
 - **S6e — People and roster, then start-from-roster.** Roster accounts (`INVITED`), company profiles,
   and a *Start session* action that creates the run and seats the roster. Retires the hardcoded
