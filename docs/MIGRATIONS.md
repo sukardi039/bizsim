@@ -6,8 +6,15 @@ silently reshape a table that holds a class's finished rounds. Everything below 
 failure modes boring.
 
 Schema lives in `backend/src/main/resources/db/migration`, is applied on every startup, and is
-recorded in `flyway_schema_history`. There are four migrations today: V1 baseline, V2 scenario
-placeholder, V3 simulation model, V4 R&D curves.
+recorded in `flyway_schema_history`. There are seven migrations today: V1 baseline, V2 scenario
+placeholder, V3 simulation model, V4 R&D curves, V5 environment, V6 cycles and trend, V7 finish
+completed runs.
+
+A migration may carry **data** as well as schema (V2, V6 and V7 all do). When it repairs rows the
+application wrote, the file must say which broken behaviour it is undoing, what it deliberately
+leaves alone, and carry a test that fails if the guard is removed — `LegacyRunFinishMigrationTest`
+closes the sessions that played to the end and proves a run whose last round is still open is left
+untouched.
 
 ---
 
@@ -122,6 +129,9 @@ Run by CI on every pull request (`mvn -B verify`), not by review discipline:
   `create index concurrently` is enough to lose atomicity (`MigrationNamingTest`).
 - **An empty database gets the whole schema** on startup, including the shipped scenario
   (`SchemaCreationTest`).
+- **A data repair closes only what it should** — `LegacyRunFinishMigrationTest` (V7) proves a
+  session that played to its end becomes `FINISHED` with the timestamp of its last results, while a
+  run whose last round is still open stays `OPEN`; remove the guard and the test fails.
 
 ---
 
