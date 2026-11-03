@@ -1,6 +1,7 @@
 package com.bizsim.sim;
 
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,7 +53,7 @@ public class TemplateController {
     private static TenantContext.Principal requireFacilitator() {
         TenantContext.Principal me = TenantContext.require();
         if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "facilitator only");
+            throw ProblemException.forbidden("auth.facilitator_only", "facilitator only");
         }
         return me;
     }

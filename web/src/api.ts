@@ -6,15 +6,46 @@ const ORIGIN = (import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "");
 const BASE = ORIGIN + "/api";
 const STORAGE = "bizsim.session";
 
+export interface ApiProblemBody {
+  code: string;
+  params?: Record<string, string | number>;
+  message: string;
+}
+
 export class ApiError extends Error {
   constructor(readonly status: number, readonly body: any) {
     super(body?.error ?? `HTTP ${status}`);
   }
 
-  /** The server reports validation problems as a list; the form shows them verbatim. */
+  /** The translatable reason (D23): the interface owns the wording, not the server. */
+  get code(): string | undefined {
+    return typeof this.body?.code === "string" ? this.body.code : undefined;
+  }
+
+  get params(): Record<string, string> {
+    const raw = this.body?.params;
+    if (!raw || typeof raw !== "object") return {};
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      params[key] = String(value);
+    }
+    return params;
+  }
+
+  /** Every rule a submission broke, as codes with parameters. */
+  get problems(): ApiProblemBody[] {
+    const list = this.body?.problems;
+    if (!Array.isArray(list)) return [];
+    return list.filter(
+      (entry): entry is ApiProblemBody =>
+        !!entry && typeof entry === "object" && typeof (entry as ApiProblemBody).code === "string",
+    );
+  }
+
+  /** The server's English messages — a fallback for codes this client does not know yet. */
   get details(): string[] {
-    if (Array.isArray(this.body?.details)) return this.body.details;
-    if (Array.isArray(this.body?.problems)) return this.body.problems;
+    if (this.problems.length > 0) return this.problems.map((problem) => problem.message);
+    if (Array.isArray(this.body?.details)) return this.body.details.filter((s: unknown) => typeof s === "string");
     return [];
   }
 }

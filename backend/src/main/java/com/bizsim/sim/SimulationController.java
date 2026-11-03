@@ -1,6 +1,7 @@
 package com.bizsim.sim;
 
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,7 +33,7 @@ public class SimulationController {
                                       @RequestBody DecisionPayload payload) {
         TenantContext.Principal me = TenantContext.require();
         if (!"PLAYER".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "player role required");
+            throw ProblemException.forbidden("auth.player_only", "player role required");
         }
         rounds.submit(me.tenantId(), me.userId(), runId, teamId, payload);
         return Map.of("submitted", true);
@@ -76,7 +77,7 @@ public class SimulationController {
     private static TenantContext.Principal requireFacilitator() {
         TenantContext.Principal me = TenantContext.require();
         if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "facilitator or admin role required");
+            throw ProblemException.forbidden("auth.facilitator_only", "facilitator or admin role required");
         }
         return me;
     }

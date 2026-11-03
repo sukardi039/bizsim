@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n";
+import { describeError } from "./errors";
 import {
   api,
   ApiError,
@@ -12,12 +13,8 @@ import {
 
 /* ------------------------------------------------------------------ helpers */
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError) {
-    const details = error.details;
-    return details.length ? details.join(" · ") : error.message;
-  }
-  return error instanceof Error ? error.message : "unexpected error";
+function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  return describeError(error, t);
 }
 
 /** The shortfall body carries a per-line breakdown; that is the useful part to show. */
@@ -140,7 +137,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         setReport(null);
       }
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   }, [userId]);
 
@@ -199,7 +196,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       await load();
     } catch (error) {
       setShortfall(shortfallLines(error));
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(false);
     }
@@ -212,7 +209,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       setReport({ forecast: bought.forecast });
       setProblem(null);
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   };
 
@@ -307,12 +304,15 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {shortfall && (
           <div className="shortfall">
             <p className="error">
-              Not enough cash: the plan commits {money(shortfall.required)} against {money(shortfall.cash)} available.
+              {t("shortfall.title", {
+                required: money(shortfall.required),
+                available: money(shortfall.cash),
+              })}
             </p>
             <ul>
               {shortfall.lines.map(([line, amount]) => (
                 <li key={line}>
-                  <span className="muted">{line}</span> {money(amount)}
+                  <span className="muted">{t(`line.${line}`)}</span> {money(amount)}
                 </li>
               ))}
             </ul>

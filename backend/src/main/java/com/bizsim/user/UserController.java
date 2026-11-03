@@ -1,6 +1,7 @@
 package com.bizsim.user;
 
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.web.ProblemException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -66,21 +67,21 @@ public class UserController {
 
         String role = request.role() == null || request.role().isBlank() ? "PLAYER" : request.role();
         if (!"PLAYER".equals(role) && !"FACILITATOR".equals(role)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "role must be PLAYER or FACILITATOR");
+            throw ProblemException.badRequest("user.role_invalid", "role must be PLAYER or FACILITATOR");
         }
         // D21: a second facilitator is how two cohorts run at once, but that is an admin's call --
         // a facilitator adding another facilitator could quietly take over the next class's account.
         if ("FACILITATOR".equals(role) && !"ADMIN".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+            throw ProblemException.forbidden("user.facilitator_needs_admin",
                     "only an admin may create a facilitator account");
         }
         if (request.password().length() < MIN_LENGTH) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "the initial password must be at least " + MIN_LENGTH + " characters");
+            throw ProblemException.badRequest("user.password_too_short",
+                    "the initial password must be at least " + MIN_LENGTH + " characters",
+                    "min", MIN_LENGTH);
         }
         if (users.findByEmailInTenant(me.tenantId(), request.email()).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw ProblemException.conflict("user.duplicate_email",
                     "an account with that email already exists in this tenant");
         }
 
@@ -101,16 +102,15 @@ public class UserController {
     public void delete(@PathVariable long id) {
         TenantContext.Principal me = requireFacilitator();
         if (me.userId() == id) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "you cannot delete your own account");
+            throw ProblemException.badRequest("user.self_delete", "you cannot delete your own account");
         }
         if (users.hasHistory(me.tenantId(), id)) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw ProblemException.conflict("user.has_played",
                     "this trainee has already played; deactivate the account instead of deleting it");
         }
         if (!users.delete(me.tenantId(), id)) {
             // Either unknown, another tenant's, or not a trainee: one answer, no enumeration.
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+            throw ProblemException.notFound("user.not_found",
                     "no such trainee in this tenant (only PLAYER accounts can be deleted)");
         }
     }
@@ -131,15 +131,14 @@ public class UserController {
     private void setActive(long id, boolean active) {
         TenantContext.Principal me = requireFacilitator();
         if (!users.setActive(me.tenantId(), id, active)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "no such trainee in this tenant");
+            throw ProblemException.notFound("user.not_found", "no such trainee in this tenant");
         }
     }
 
     private static TenantContext.Principal requireFacilitator() {
         TenantContext.Principal me = TenantContext.require();
         if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "facilitator only");
+            throw ProblemException.forbidden("auth.facilitator_only", "facilitator only");
         }
         return me;
     }

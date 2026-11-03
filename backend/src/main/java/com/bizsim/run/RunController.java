@@ -1,6 +1,7 @@
 package com.bizsim.run;
 
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -87,8 +88,7 @@ public class RunController {
     private static TenantContext.Principal requireFacilitator() {
         TenantContext.Principal me = TenantContext.require();
         if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                    "facilitator or admin role required");
+            throw ProblemException.forbidden("auth.facilitator_only", "facilitator or admin role required");
         }
         return me;
     }

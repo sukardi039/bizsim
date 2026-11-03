@@ -1,7 +1,9 @@
 package com.bizsim.sim;
 
 import com.bizsim.run.RunRepository;
+import com.bizsim.web.ApiProblem;
 import com.bizsim.web.CashShortfallException;
+import com.bizsim.web.ProblemException;
 import com.bizsim.web.ValidationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -55,39 +57,43 @@ public class RoundService {
     @Transactional
     public void submit(long tenantId, long userId, long runId, long teamId, DecisionPayload payload) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         if (!"OPEN".equals(run.status())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "run is " + run.status());
+            throw ProblemException.conflict("run.not_open", "run is " + run.status(), "status", run.status());
         }
         RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.CONFLICT, "no round is open"));
+                () -> ProblemException.conflict("round.not_open", "no round is open"));
         if (round.closesAt() != null && Instant.now().isAfter(round.closesAt())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "round " + round.number() + " closed at " + round.closesAt());
+            throw ProblemException.conflict("round.closed",
+                    "round " + round.number() + " closed at " + round.closesAt(),
+                    "round", round.number());
         }
         if (!rounds.teamBelongsToRun(teamId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
+            throw ProblemException.notFound("team.not_found", "no such company in this run");
         }
         if (!rounds.userOwnsTeam(userId, teamId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not run this company");
+            throw ProblemException.forbidden("team.not_yours", "you do not run this company");
         }
 
         Scenario scenario = scenarios.load(run.scenarioKey());
         ScoringEngine.TeamInput input = input(scenario, runId, round.id(), teamId, payload);
 
-        List<String> errors = validator.validate(scenario, payload, input.rnd());
-        if (!errors.isEmpty()) {
-            throw new ValidationException(errors);
+        List<ApiProblem> problems = validator.validate(scenario, payload, input.rnd());
+        if (!problems.isEmpty()) {
+            throw new ValidationException(problems);
         }
 
         ScoringEngine.Commitment commitment = engine.preview(scenario,
                 environment.forRound(scenario, runId, round.number()), input);
         if (commitment.plannedWorkers().compareTo(commitment.capacityAvailable()) > 0) {
-            throw new ValidationException(List.of("production: the plan needs "
-                    + commitment.plannedWorkers().stripTrailingZeros().toPlainString()
-                    + " workers, this company has "
-                    + commitment.capacityAvailable().stripTrailingZeros().toPlainString()
-                    + " (hire production staff or buy capacity)"));
+            throw new ValidationException(List.of(ApiProblem.of("production.workforce_short",
+                    "production: the plan needs "
+                            + commitment.plannedWorkers().stripTrailingZeros().toPlainString()
+                            + " workers, this company has "
+                            + commitment.capacityAvailable().stripTrailingZeros().toPlainString()
+                            + " (hire production staff or buy capacity)",
+                    "needed", commitment.plannedWorkers().stripTrailingZeros().toPlainString(),
+                    "available", commitment.capacityAvailable().stripTrailingZeros().toPlainString())));
         }
         if (commitment.discretionary().compareTo(input.cash()) > 0) {
             Map<String, BigDecimal> lines = new LinkedHashMap<>();
@@ -110,7 +116,7 @@ public class RoundService {
     @Transactional
     public Optional<ScoringEngine.RoundResult> closeAndCompute(long tenantId, long runId) {
         RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
 
         Optional<RoundRepository.RoundRow> open = rounds.openRound(runId);
         if (open.isEmpty()) {
@@ -194,7 +200,7 @@ public class RoundService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> scoreboard(long tenantId, long runId, Integer round) {
         runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         // One row per company, for one round: the latest computed round unless a round is asked for.
         return rounds.scoreboard(runId, round);
     }
@@ -203,7 +209,7 @@ public class RoundService {
     public List<Map<String, Object>> statements(long tenantId, long userId, String role,
                                              long runId, long teamId) {
         runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         requireTeamReadable(userId, role, runId, teamId);
         return rounds.statements(runId, teamId);
     }
@@ -216,7 +222,7 @@ public class RoundService {
     public Map<String, Object> context(long tenantId, long userId, String role,
                                        long runId, long teamId) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         requireTeamReadable(userId, role, runId, teamId);
         Scenario scenario = scenarios.load(run.scenarioKey());
         RoundRepository.TeamState team = rounds.teams(runId).stream()
@@ -302,14 +308,15 @@ public class RoundService {
     public Map<String, Object> marketReport(long tenantId, long userId, String role,
                                             long runId, long teamId) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         requireTeamReadable(userId, role, runId, teamId);
         RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.CONFLICT, "no round is open"));
+                () -> ProblemException.conflict("round.not_open", "no round is open"));
         DecisionPayload decision = rounds.decision(round.id(), teamId).orElse(null);
         if (decision == null || !decision.marketReportRequested()) {
-            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED,
-                    "the market review has not been purchased for this round");
+            throw new ProblemException(HttpStatus.PAYMENT_REQUIRED,
+                    ApiProblem.of("report.not_purchased",
+                            "the market review has not been purchased for this round"));
         }
 
         Scenario scenario = scenarios.load(run.scenarioKey());
@@ -329,10 +336,10 @@ public class RoundService {
      */
     private void requireTeamReadable(long userId, String role, long runId, long teamId) {
         if (!rounds.teamBelongsToRun(teamId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company in this run");
+            throw ProblemException.notFound("team.not_found", "no such company in this run");
         }
         if ("PLAYER".equals(role) && !rounds.userOwnsTeam(userId, teamId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "you do not run this company");
+            throw ProblemException.forbidden("team.not_yours", "you do not run this company");
         }
     }
 
@@ -356,7 +363,7 @@ public class RoundService {
     private ScoringEngine.TeamInput input(Scenario scenario, long runId, long roundId, long teamId, DecisionPayload payload) {
         RoundRepository.TeamState team = rounds.teams(runId).stream()
                 .filter(t -> t.id() == teamId).findFirst().orElseThrow(
-                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such company"));
+                        () -> ProblemException.notFound("team.not_found", "no such company"));
         return new ScoringEngine.TeamInput(team.id(), team.status(), nz(team.cash()), nz(team.brand()),
                 nz(team.machineWorkers()), rounds.staff(runId).getOrDefault(teamId, Map.of()),
                 rounds.products(runId).getOrDefault(teamId, Map.of()),
@@ -395,7 +402,7 @@ public class RoundService {
     private String scenarioKey(long runId) {
         return jdbc.query("select scenario_key from run where id = ?",
                 (rs, i) -> rs.getString(1), runId).stream().findFirst().orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
     }
 
     private static BigDecimal estimateLow(Scenario.ProjectSpec project) {

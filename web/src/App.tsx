@@ -4,9 +4,9 @@ import Trainees from "./Trainees";
 import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
 import { useI18n, LOCALES, type Locale } from "./i18n";
+import { describeError } from "./errors";
 import {
   api,
-  ApiError,
   clearToken,
   eventStreamUrl,
   getToken,
@@ -20,12 +20,8 @@ import {
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError) {
-    const details = error.details;
-    return details.length ? details.join(" · ") : error.message;
-  }
-  return error instanceof Error ? error.message : "unexpected error";
+function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  return describeError(error, t);
 }
 
 interface FeedItem {
@@ -66,7 +62,8 @@ function useRunStream(runId: number | null, onEvent: (type: string, data: any) =
         };
       } catch (error) {
         if (!stopped) retry = window.setTimeout(connect, 2000);
-        console.warn("stream ticket failed", errorText(error));
+        // A console diagnostic, not interface text: no translation needed here.
+        console.warn("stream ticket failed", error);
       }
     };
 
@@ -98,7 +95,7 @@ function Login({ onDone }: { onDone: () => void }) {
       setToken(token);
       onDone();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(false);
     }
@@ -162,7 +159,7 @@ export default function App() {
     try {
       setRuns(await api.runs());
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   }, []);
 
@@ -200,7 +197,7 @@ export default function App() {
         adopt(me.locale);
       })
       .catch((error) => {
-        if (!cancelled) setIdentityProblem(errorText(error));
+        if (!cancelled) setIdentityProblem(errorText(error, t));
       });
     return () => {
       cancelled = true;
@@ -240,7 +237,7 @@ export default function App() {
       setSelectedId(run.id);
       await refreshRuns();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   };
 
@@ -253,7 +250,7 @@ export default function App() {
       await refreshRuns();
       await refreshBoard(selected.id);
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   };
 
@@ -274,7 +271,7 @@ export default function App() {
       setFeed([]);
       await refreshRuns();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   };
 

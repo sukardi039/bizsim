@@ -2,6 +2,8 @@ package com.bizsim.sim;
 
 import com.bizsim.run.RunRepository;
 import com.bizsim.tenant.TenantContext;
+import com.bizsim.web.ApiProblem;
+import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,7 +41,7 @@ public class RunStreamController {
     public Map<String, Object> ticket(@PathVariable long runId) {
         TenantContext.Principal me = TenantContext.require();
         runs.find(runId, me.tenantId()).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
 
         StreamTicketService.Ticket ticket = tickets.issue(runId, me.tenantId(), me.userId());
         Map<String, Object> body = new LinkedHashMap<>();
@@ -52,8 +54,9 @@ public class RunStreamController {
     public SseEmitter events(@PathVariable long runId, @RequestParam String ticket) {
         tickets.consume(ticket)
                 .filter(consumed -> consumed.runId() == runId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
-                        "invalid, expired or already used stream ticket"));
+                .orElseThrow(() -> new ProblemException(HttpStatus.UNAUTHORIZED,
+                        ApiProblem.of("stream.ticket_invalid",
+                                "invalid, expired or already used stream ticket")));
         return events.subscribe(runId);
     }
 }

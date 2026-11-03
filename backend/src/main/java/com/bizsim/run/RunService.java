@@ -7,6 +7,7 @@ import com.bizsim.sim.Scenario;
 import com.bizsim.sim.ScenarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.bizsim.web.ProblemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -56,19 +57,19 @@ public class RunService {
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles) {
         if (!runs.scenarioExists(scenarioKey)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown scenario " + scenarioKey);
+            throw ProblemException.badRequest("template.unknown", "unknown scenario " + scenarioKey, "template", scenarioKey);
         }
         if (teams == null || teams.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "at least one team is required");
+            throw ProblemException.badRequest("run.teams_required", "at least one team is required");
         }
         if (teams.size() > 10) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "at most 10 teams per run (decision 5)");
+            throw ProblemException.badRequest("run.too_many_teams",
+                    "at most 10 teams per run (decision 5)", "max", 10);
         }
         // D21: one facilitator, one simulation at a time. A second concurrent simulation needs a
         // second facilitator account, so this is a refusal rather than a filter on the screen.
         if (runs.activeRunsOfFacilitator(tenantId, facilitatorId) > 0) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
+            throw ProblemException.conflict("run.already_in_progress",
                     "you already have a simulation in progress; finish it, or sign in as another "
                             + "facilitator for a second one");
         }
@@ -81,7 +82,7 @@ public class RunService {
         int defaultRounds = Math.max(1, cycles) * Math.max(1, scenario.params().cycleLength());
         int roundCount = requestedRounds == null ? defaultRounds : requestedRounds;
         if (cycles < 1 || roundCount < 1 || roundCount > 48) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw ProblemException.badRequest("run.rounds_out_of_range",
                     "rounds must be 1-48 and cycles at least 1");
         }
 
@@ -102,10 +103,10 @@ public class RunService {
     @Transactional
     public RunView addTeam(long tenantId, long runId, TeamSpec spec) {
         RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
         if (!"OPEN".equals(run.status())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "teams cannot be added to a " + run.status() + " run");
+            throw ProblemException.conflict("run.not_open",
+                    "teams cannot be added to a " + run.status() + " run", "status", run.status());
         }
         Scenario scenario = scenarios.load(run.scenarioKey());
         long teamId = runs.insertTeam(runId, blankToNull(spec.name(), "team name"), spec.companyName(),
@@ -119,9 +120,9 @@ public class RunService {
                                              String roleKey) {
         requireRun(tenantId, runId);
         runs.findTeam(teamId, runId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such team in this run"));
+                () -> ProblemException.notFound("team.not_found", "no such team in this run"));
         if (!runs.userBelongsToTenant(userId, tenantId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such user in this tenant");
+            throw ProblemException.notFound("user.not_found", "no such user in this tenant");
         }
         runs.insertPlayer(runId, teamId, userId, blankToNull(roleKey, "roleKey"));
         return runs.players(runId).stream()
@@ -133,18 +134,19 @@ public class RunService {
     @Transactional
     public RoundState openNextRound(long tenantId, long runId) {
         RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
 
         if (!"OPEN".equals(run.status())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "run is " + run.status() + ", rounds cannot advance");
+            throw ProblemException.conflict("run.not_open",
+                    "run is " + run.status() + ", rounds cannot advance", "status", run.status());
         }
 
         int maxRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
         int next = run.currentRound() + 1;
         if (next > maxRounds) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "scenario " + run.scenarioKey() + " has only " + maxRounds + " rounds");
+            throw ProblemException.conflict("template.rounds_exceeded",
+                    "scenario " + run.scenarioKey() + " has only " + maxRounds + " rounds",
+                    "rounds", maxRounds);
         }
 
         // Advancing closes whatever is open and computes it. Closing an already-computed round is a
@@ -175,14 +177,14 @@ public class RunService {
         requireRun(tenantId, runId);
         if (!"ADMIN".equals(role)) {
             long owner = runs.facilitatorOf(tenantId, runId).orElseThrow(
-                    () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                    () -> ProblemException.notFound("run.not_found", "no such run"));
             if (owner != userId) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                throw ProblemException.forbidden("run.not_yours",
                         "this simulation belongs to another facilitator");
             }
         }
         if (!runs.deleteRun(tenantId, runId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run");
+            throw ProblemException.notFound("run.not_found", "no such run");
         }
     }
 
@@ -206,7 +208,7 @@ public class RunService {
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {
         return runs.find(runId, tenantId).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
+                () -> ProblemException.notFound("run.not_found", "no such run"));
     }
 
     public int maxRounds(String scenarioKey) {
@@ -214,15 +216,15 @@ public class RunService {
                 "select (definition->>'rounds')::int from scenario where key = ?",
                 (rs, i) -> (Integer) rs.getObject(1), scenarioKey).stream().findFirst().orElse(null);
         if (rounds == null || rounds < 1) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "scenario " + scenarioKey + " has no valid round count");
+            throw ProblemException.badRequest("template.invalid_rounds",
+                    "scenario " + scenarioKey + " has no valid round count", "template", scenarioKey);
         }
         return rounds;
     }
 
     private static String blankToNull(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required");
+            throw ProblemException.badRequest("request.field_required", field + " is required", "field", field);
         }
         return value.trim();
     }

@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type UserRow } from "./api";
+import { api, type UserRow } from "./api";
 import { useI18n } from "./i18n";
+import { describeError } from "./errors";
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError) {
-    const details = error.details;
-    return details.length ? details.join(" · ") : error.message;
-  }
-  return error instanceof Error ? error.message : "unexpected error";
+function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  return describeError(error, t);
 }
 
 /**
@@ -31,7 +28,7 @@ export default function PeoplePanel() {
     try {
       setUsers(await api.users());
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   }, []);
 
@@ -52,7 +49,7 @@ export default function PeoplePanel() {
       setSecret("");
       await load();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(null);
     }
@@ -67,7 +64,7 @@ export default function PeoplePanel() {
       setNotice(`${user.email} is now ${user.active ? "deactivated" : "active"}.`);
       await load();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(null);
     }
@@ -83,7 +80,7 @@ export default function PeoplePanel() {
       setNotice(`${user.email} was deleted.`);
       await load();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(null);
     }

@@ -55,7 +55,7 @@ public class MeController {
         TenantContext.Principal p = TenantContext.require();
         String locale = request == null || request.locale() == null ? "" : request.locale().trim();
         if (!SUPPORTED.contains(locale)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+            throw ProblemException.badRequest("locale.unsupported",
                     "unsupported locale; expected one of " + SUPPORTED);
         }
         users.setLocale(p.tenantId(), p.userId(), locale);

@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type Run, type Team, type UserRow } from "./api";
+import { api, type Run, type Team, type UserRow } from "./api";
 import { useI18n } from "./i18n";
+import { describeError } from "./errors";
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError) {
-    const details = error.details;
-    return details.length ? details.join(" · ") : error.message;
-  }
-  return error instanceof Error ? error.message : "unexpected error";
+function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  return describeError(error, t);
 }
 
 /**
@@ -44,7 +41,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
       setPick("");
       onChanged();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(false);
     }
@@ -64,7 +61,7 @@ function SeatRow({ run, team, seated, available, onChanged }: {
       setSecret("");
       onChanged();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(false);
     }

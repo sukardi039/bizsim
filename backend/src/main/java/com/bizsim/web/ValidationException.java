@@ -2,17 +2,26 @@ package com.bizsim.web;
 
 import java.util.List;
 
-/** A decision that is wrong in shape or references. All problems are reported together. */
+/**
+ * Every rule a submission broke, as codes (see {@link ApiProblem}), never just the first one.
+ *
+ * <p>{@link #errors()} keeps the English messages for logs and for clients that predate the code
+ * contract; {@link #problems()} is what the interface actually renders.
+ */
 public class ValidationException extends RuntimeException {
 
-    private final List<String> errors;
+    private final List<ApiProblem> problems;
 
-    public ValidationException(List<String> errors) {
+    public ValidationException(List<ApiProblem> problems) {
         super("invalid decision");
-        this.errors = List.copyOf(errors);
+        this.problems = List.copyOf(problems);
+    }
+
+    public List<ApiProblem> problems() {
+        return problems;
     }
 
     public List<String> errors() {
-        return errors;
+        return problems.stream().map(ApiProblem::message).toList();
     }
 }

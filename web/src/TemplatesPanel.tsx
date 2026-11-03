@@ -1,13 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type TemplateRow } from "./api";
+import { api, type TemplateRow } from "./api";
 import { useI18n } from "./i18n";
+import { describeError } from "./errors";
 
-function errorText(error: unknown): string {
-  if (error instanceof ApiError) {
-    const details = error.details;
-    return details.length ? details.join(" · ") : error.message;
-  }
-  return error instanceof Error ? error.message : "unexpected error";
+function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
+  return describeError(error, t);
 }
 
 /**
@@ -28,7 +25,7 @@ export default function TemplatesPanel() {
     try {
       setTemplates(await api.templates());
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     }
   }, []);
 
@@ -47,7 +44,7 @@ export default function TemplatesPanel() {
       setNotice(`Copied to "${copy.name}" (${copy.key}). It is a draft of your own; editing comes next.`);
       await load();
     } catch (error) {
-      setProblem(errorText(error));
+      setProblem(errorText(error, t));
     } finally {
       setBusy(null);
     }

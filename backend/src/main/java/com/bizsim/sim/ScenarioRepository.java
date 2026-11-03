@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.bizsim.web.ProblemException;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,7 +37,7 @@ public class ScenarioRepository {
         String definition = jdbc.query(
                 "select definition::text from scenario where key = ?",
                 (rs, i) -> rs.getString(1), key).stream().findFirst().orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "unknown scenario " + key));
+                () -> ProblemException.badRequest("template.unknown", "unknown scenario " + key, "template", key));
 
         JsonNode d;
         try {
@@ -183,7 +184,7 @@ public class ScenarioRepository {
     @Transactional
     public String copy(String sourceKey, long tenantId, String tenantCode, String requestedName) {
         TemplateRow source = findVisible(tenantId, sourceKey).orElseThrow(
-                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such template"));
+                () -> ProblemException.notFound("template.not_found", "no such template"));
 
         String base = (tenantCode + "-" + sourceKey).toLowerCase().replaceAll("[^a-z0-9-]", "-");
         if (base.length() > 50) {

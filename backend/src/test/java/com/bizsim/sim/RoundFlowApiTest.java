@@ -697,6 +697,36 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     @Test
+    void failures_carry_codes_so_the_interface_owns_the_wording() throws Exception {
+        openRound();
+
+        // A rule the trainee can fix: the code names the rule and the product, never a sentence.
+        Map<String, Object> badPrice = new java.util.LinkedHashMap<>(payload(10, 0, 0, 0L, 30, 0));
+        badPrice.put("price", List.of(Map.of("product", "P1", "unitPrice", 0)));
+        submit(playerOneToken, teamOne, badPrice)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("decision.invalid"))
+                .andExpect(jsonPath("$.problems[0].code").value("price.not_positive"))
+                .andExpect(jsonPath("$.problems[0].params.product").value("P1"))
+                // the English text still travels, as a fallback for logs and older clients
+                .andExpect(jsonPath("$.details[0]").isString());
+
+        // Money: the shortfall lines are codes too, so each can be labelled in the reader's language.
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 5_000_000_000L, 30, 0))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("decision.cash_shortfall"))
+                .andExpect(jsonPath("$.lines.marketing").exists());
+
+        // Addressing and role failures carry codes as well.
+        mvc.perform(get("/api/runs/999999").header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("run.not_found"));
+        mvc.perform(delete("/api/runs/" + runId).header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("auth.facilitator_only"));
+    }
+
+    @Test
     void a_facilitator_sees_only_their_own_simulations() throws Exception {
         user(tenantId, "trainer3@acme.test", "FACILITATOR");
         String third = loginOn("acme", "trainer3@acme.test");
