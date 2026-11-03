@@ -31,6 +31,7 @@ const en: Dict = {
   "nav.sessions": "Sessions",
   "nav.templates": "Templates",
   "nav.people": "People",
+  "nav.companies": "Companies",
   "app.signOut": "sign out",
 
   "login.title": "bizsim",
@@ -255,12 +256,43 @@ const en: Dict = {
   "field.durationMonths": "Months",
   "field.benefitCurve": "Curve",
   "field.overfunding": "Over-funding",
+
+  "start.title": "Start a session",
+  "start.hint":
+    "Everything comes from what you prepared: a template, the companies, and the trainees. Tick the companies you want in this cohort — their product lines come from their profiles.",
+  "start.name": "Session name",
+  "start.defaultName": "Session",
+  "start.template": "Template",
+  "start.companies": "Companies",
+  "start.trainees": "Trainees",
+  "start.optional": "(one per company, optional)",
+  "start.noCompanies": "No company profiles yet — create one in Templates → Companies.",
+  "start.noTrainees": "No active trainees yet — add them in People.",
+  "start.fullLine": "full product line",
+  "start.start": "Start session",
+  "start.starting": "Starting…",
+  "start.tooManyTrainees": "There are more trainees ticked than companies to seat them in.",
+
+  "companies.title": "Companies",
+  "companies.hint":
+    "A company profile is reusable: its name and which products of a template it carries. The shipped profile is read-only — copy it and adapt the copy.",
+  "companies.name": "Company",
+  "companies.legalName": "Legal name",
+  "companies.products": "Product line",
+  "companies.allProducts": "all products",
+  "companies.sameAsName": "same as the company name",
+  "companies.add": "Add a company",
+  "companies.create": "Create profile",
+  "companies.created": "Profile created.",
+  "companies.copied": "Copied to \"{name}\".",
+  "companies.saved": "Profile saved.",
 };
 
 const zh: Dict = {
   "nav.sessions": "模拟",
   "nav.templates": "模板",
   "nav.people": "人员",
+  "nav.companies": "公司",
   "app.signOut": "退出登录",
 
   "login.title": "bizsim",
@@ -479,6 +511,35 @@ const zh: Dict = {
   "field.durationMonths": "月数",
   "field.benefitCurve": "收益曲线",
   "field.overfunding": "超额处理",
+
+  "start.title": "开始模拟",
+  "start.hint":
+    "全部来自已准备的内容：模板、公司与学员。勾选本次参与的公司，其产品线来自各自的档案。",
+  "start.name": "模拟名称",
+  "start.defaultName": "模拟",
+  "start.template": "模板",
+  "start.companies": "公司",
+  "start.trainees": "学员",
+  "start.optional": "（每家公司一位，可选）",
+  "start.noCompanies": "尚无公司档案——请在“模板 → 公司”中创建。",
+  "start.noTrainees": "尚无启用的学员——请在“人员”中添加。",
+  "start.fullLine": "全部产品线",
+  "start.start": "开始模拟",
+  "start.starting": "正在开始…",
+  "start.tooManyTrainees": "勾选的学员多于可分配的公司数量。",
+
+  "companies.title": "公司档案",
+  "companies.hint": "公司档案可重复使用：包含公司名称以及使用模板中的哪些产品。内置档案为只读，请复制后再修改。",
+  "companies.name": "公司",
+  "companies.legalName": "法定名称",
+  "companies.products": "产品线",
+  "companies.allProducts": "全部产品",
+  "companies.sameAsName": "与公司名称相同",
+  "companies.add": "新增公司",
+  "companies.create": "创建档案",
+  "companies.created": "档案已创建。",
+  "companies.copied": "已复制为“{name}”。",
+  "companies.saved": "档案已保存。",
 };
 
 const catalogs: Record<Locale, Dict> = { en, zh };

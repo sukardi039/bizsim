@@ -1,6 +1,6 @@
 # Setup workbench — the pre-session build
 
-Status: **S6a and S6b shipped (3 Nov 2026); S6c–S6e designed.** This file is the agreed scope for the
+Status: **S6a–S6e shipped (3 Nov 2026).** This file is the agreed scope for the
 next phase, so the slices can be cut without re-litigating the shape.
 
 Glossary, because it caused a question: a **session** is one simulation run (one `run` row, one class
@@ -141,9 +141,13 @@ class always has one person who is not in the roster.
   a project's `targetProduct` must exist. **A template that already has a simulation refuses catalogue
   edits** (`409 template.in_use`): its companies were created from these codes and its decisions name
   them. Settings and the environment stay editable, because each run freezes its own economy (D18).
-- **S6e — People and roster, then start-from-roster.** Roster accounts (`INVITED`), company profiles,
-  and a *Start session* action that creates the run and seats the roster. Retires the hardcoded
-  `"standard-v1"` in the console.
+- **S6e — Company profiles and start-from-prepared. SHIPPED.** V11 adds `company_profile`
+  (global base + tenant copies, same pattern as templates). `GET/POST/PUT /api/companies` and
+  `POST /api/companies/{id}/copy`; `POST /api/runs/prepared` takes a template, profile ids and
+  trainee ids, validates every piece **before writing anything**, creates the run with a company per
+  profile, narrows each company to its profile's product line, and seats the trainees in order.
+  The console gained a **Companies** tab and a **Start a session** card that replaces the empty
+  state, so a session is no longer assembled by typing company names.
 
 S6a and S6b are shipped; S6c is next (the settings and environment editor), then S6d, then S6e.
 

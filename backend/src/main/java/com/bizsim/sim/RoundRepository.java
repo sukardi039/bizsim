@@ -133,6 +133,22 @@ public class RoundRepository {
         return result;
     }
 
+    /**
+     * Narrows a freshly created company to the product line its profile carries. Called only by
+     * {@code RunService.startPrepared}, before the run is handed to anyone: once a decision names a
+     * product, removing it would strand the company.
+     */
+    public void restrictProducts(long teamId, List<String> keep) {
+        List<String> existing = jdbc.queryForList(
+                "select product_code from company_product where team_id = ?", String.class, teamId);
+        for (String code : existing) {
+            if (!keep.contains(code)) {
+                jdbc.update("delete from company_product where team_id = ? and product_code = ?",
+                        teamId, code);
+            }
+        }
+    }
+
     /** Seeds a new company: product line, workforce, and an untouched project slate. */
     public void initialiseCompany(long teamId, Scenario scenario) {
         for (Scenario.ProductSpec p : scenario.products()) {

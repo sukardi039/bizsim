@@ -3,6 +3,8 @@ import PlayerConsole from "./PlayerConsole";
 import Trainees from "./Trainees";
 import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
+import StartSession from "./StartSession";
+import CompaniesPanel from "./CompaniesPanel";
 import { useI18n, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
@@ -140,7 +142,7 @@ export default function App() {
   const [identity, setIdentity] = useState<{ userId: number; role: string } | null>(null);
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   /** Sessions drive a class; Templates is the setup workbench. Same shell, two views. */
-  const [view, setView] = useState<"runs" | "templates" | "people">("runs");
+  const [view, setView] = useState<"runs" | "templates" | "companies" | "people">("runs");
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -326,6 +328,9 @@ export default function App() {
           <button className={view === "templates" ? "active" : ""} onClick={() => setView("templates")}>
             {t("nav.templates")}
           </button>
+          <button className={view === "companies" ? "active" : ""} onClick={() => setView("companies")}>
+            {t("nav.companies")}
+          </button>
           <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
             {t("nav.people")}
           </button>
@@ -381,12 +386,19 @@ export default function App() {
       <main>
         {problem && <p className="error">{problem}</p>}
 
-        {view === "people" ? (
+        {view === "companies" ? (
+          <CompaniesPanel />
+        ) : view === "people" ? (
           <PeoplePanel />
         ) : view === "templates" ? (
           <TemplatesPanel />
         ) : !selected ? (
-          <p className="muted">{t("run.select")}</p>
+          <StartSession
+            onStarted={(run) => {
+              setSelectedId(run.id);
+              void refreshRuns();
+            }}
+          />
         ) : (
           <>
             <header className="run-head">

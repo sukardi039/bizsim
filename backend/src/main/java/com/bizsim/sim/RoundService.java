@@ -189,6 +189,11 @@ public class RoundService {
         events.publishAfterCommit(runId, "round.opened", Map.of("round", number));
     }
 
+    /** Narrows a freshly created company to the product line its profile carries (S6e). */
+    public void restrictProducts(long teamId, List<String> keep) {
+        rounds.restrictProducts(teamId, keep);
+    }
+
     /** Seeds a new company with its product line, workforce and untouched R&D slate. */
     @Transactional
     public void initialiseCompany(long teamId, Scenario scenario) {

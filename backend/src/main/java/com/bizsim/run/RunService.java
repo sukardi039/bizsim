@@ -7,6 +7,7 @@ import com.bizsim.sim.Scenario;
 import com.bizsim.sim.ScenarioRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
+import com.bizsim.user.UserRepository;
 import com.bizsim.web.ProblemException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,14 +44,19 @@ public class RunService {
     private final ScenarioRepository scenarios;
     private final EnvironmentService environment;
     private final JdbcTemplate jdbc;
+    private final CompanyProfileRepository profiles;
+    private final UserRepository users;
 
     public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
-                      EnvironmentService environment, JdbcTemplate jdbc) {
+                      EnvironmentService environment, JdbcTemplate jdbc,
+                      CompanyProfileRepository profiles, UserRepository users) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
         this.environment = environment;
         this.jdbc = jdbc;
+        this.profiles = profiles;
+        this.users = users;
     }
 
     @Transactional
@@ -98,6 +104,79 @@ public class RunService {
             rounds.initialiseCompany(teamId, scenario);
         }
         return view(tenantId, runId);
+    }
+
+    /**
+     * Starts a session from what was prepared: a template, company profiles, and the trainees to seat.
+     *
+     * <p>This is the workbench's pay-off (S6e): the facilitator no longer types company names into a
+     * blank run. It creates the run exactly like {@link #createRun}, then narrows each company to the
+     * product line its profile carries and seats the trainees in order.
+     *
+     * <p>Everything is validated before anything is written: an unknown template, a profile from
+     * another tenant, a product code the template does not have, or an inactive trainee is a refusal,
+     * not a half-built session.
+     */
+    @Transactional
+    public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
+                                 List<Long> profileIds, List<Long> traineeIds,
+                                 Integer requestedRounds, Integer requestedCycles) {
+        scenarios.findVisible(tenantId, templateKey).orElseThrow(
+                () -> ProblemException.notFound("template.not_found", "no such template"));
+        if (profileIds == null || profileIds.isEmpty()) {
+            throw ProblemException.badRequest("run.teams_required", "at least one company is required");
+        }
+        if (traineeIds != null && traineeIds.size() > profileIds.size()) {
+            throw ProblemException.badRequest("run.too_many_trainees",
+                    "there are more trainees than companies to seat them in",
+                    "trainees", traineeIds.size(), "companies", profileIds.size());
+        }
+
+        Scenario scenario = scenarios.load(templateKey);
+        List<CompanyProfileRepository.ProfileRow> chosen = new ArrayList<>();
+        for (Long profileId : profileIds) {
+            CompanyProfileRepository.ProfileRow profile = profiles.findForTenant(tenantId, profileId)
+                    .orElseThrow(() -> ProblemException.notFound("company_profile.not_found",
+                            "no such company profile in this tenant"));
+            for (String code : profile.products()) {
+                if (!scenario.productsByCode().containsKey(code)) {
+                    throw ProblemException.badRequest("run.unknown_product",
+                            "company " + profile.name() + " carries " + code
+                                    + ", which template " + templateKey + " does not have",
+                            "product", code, "company", profile.name());
+                }
+            }
+            chosen.add(profile);
+        }
+
+        List<Long> seats = traineeIds == null ? List.of() : traineeIds;
+        for (Long traineeId : seats) {
+            users.findInTenant(tenantId, traineeId)
+                    .filter(user -> "PLAYER".equals(user.role()) && user.active())
+                    .orElseThrow(() -> ProblemException.badRequest("user.not_found",
+                            "no active trainee with id " + traineeId + " in this tenant"));
+        }
+
+        List<TeamSpec> teams = new ArrayList<>();
+        for (CompanyProfileRepository.ProfileRow profile : chosen) {
+            teams.add(new TeamSpec(profile.name(),
+                    profile.companyName() == null || profile.companyName().isBlank()
+                            ? profile.name() : profile.companyName()));
+        }
+
+        RunView view = createRun(tenantId, facilitatorId, name, templateKey, teams,
+                requestedRounds, requestedCycles);
+
+        for (int i = 0; i < chosen.size(); i++) {
+            List<String> productLine = chosen.get(i).products();
+            if (!productLine.isEmpty()) {
+                rounds.restrictProducts(view.teams().get(i).id(), productLine);
+            }
+        }
+        for (int i = 0; i < seats.size(); i++) {
+            addPlayer(tenantId, view.id(), view.teams().get(i).id(), seats.get(i), "OWNER");
+        }
+        return view(tenantId, view.id());
     }
 
     @Transactional

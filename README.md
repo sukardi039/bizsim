@@ -188,5 +188,11 @@ S1 complete: run/company/player management, round state machine.
   next to Settings and Environment, saved whole. Validation refuses what the engine cannot run
   (unknown advantage type, missing target product, non-positive price); a template that already has a
   simulation refuses catalogue edits (`409 template.in_use`) because its companies and decisions name
-  those codes. Next is S6e: company profiles, the roster and *Start session*.
+  those codes.
+**S6e complete (3 Nov 2026): the workbench closes the loop.** A **Companies** tab holds reusable
+  company profiles (name + which products of a template it carries; the shipped one is read-only,
+  copy it to adapt). A run is now started from what you prepared: **Start a session** → template,
+  tick companies, tick trainees → the run is created with those companies carrying their own product
+  lines and the trainees already seated. Validation happens before anything is written, so a mismatch
+  is a refusal rather than a half-built session.
 

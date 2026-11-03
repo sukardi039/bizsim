@@ -29,6 +29,11 @@ public class RunController {
     public record AddPlayerRequest(long teamId, long userId, String roleKey) {
     }
 
+    /** Everything was prepared in the workbench: a template, company profiles, and the trainees. */
+    public record StartPreparedRequest(String name, String templateKey, List<Long> companyProfileIds,
+                                       List<Long> traineeIds, Integer rounds, Integer cycles) {
+    }
+
     private final RunService runs;
 
     public RunController(RunService runs) {
@@ -42,6 +47,20 @@ public class RunController {
         return runs.createRun(me.tenantId(), me.userId(),
                 request.name() == null || request.name().isBlank() ? "Untitled" : request.name(),
                 request.scenarioKey(), request.teams(), request.rounds(), request.cycles());
+    }
+
+    /**
+     * Starts a session from the prepared set: template + company profiles + seated trainees, in one
+     * call. Nothing is written until every piece checks out.
+     */
+    @PostMapping("/prepared")
+    @ResponseStatus(HttpStatus.CREATED)
+    public RunService.RunView startPrepared(@RequestBody StartPreparedRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        return runs.startPrepared(me.tenantId(), me.userId(),
+                request.name() == null || request.name().isBlank() ? "Session" : request.name(),
+                request.templateKey(), request.companyProfileIds(), request.traineeIds(),
+                request.rounds(), request.cycles());
     }
 
     @GetMapping

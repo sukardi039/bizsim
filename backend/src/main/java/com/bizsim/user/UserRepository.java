@@ -83,6 +83,12 @@ public class UserRepository {
         return changed > 0;
     }
 
+    /** One account of one tenant, for the roster checks at session start. */
+    public java.util.Optional<AppUser> findInTenant(long tenantId, long id) {
+        return jdbc.query("select * from app_user where id = ? and tenant_id = ?",
+                MAPPER, id, tenantId).stream().findFirst();
+    }
+
     /**
      * The language this person sees: their own choice, else the tenant default, else English. One
      * query so the resolution order lives in one place.

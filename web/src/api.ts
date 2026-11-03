@@ -244,6 +244,16 @@ export interface TemplateProject {
   overfunding: string;
 }
 
+export interface CompanyProfile {
+  id: number;
+  name: string;
+  companyName: string;
+  products: string[];
+  notes?: string | null;
+  tenantId?: number | null;
+  basedOn?: number | null;
+}
+
 export interface UserRow {
   id: number;
   email: string;
@@ -382,6 +392,24 @@ export const api = {
       body: JSON.stringify({ projects }),
     }),
   users: () => request<UserRow[]>("/users"),
+  companies: () => request<CompanyProfile[]>("/companies"),
+  copyCompany: (id: number) =>
+    request<CompanyProfile>(`/companies/${id}/copy`, { method: "POST" }),
+  saveCompany: (id: number, body: { name: string; companyName: string; products: string[]; notes?: string }) =>
+    request<CompanyProfile>(`/companies/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  createCompany: (body: { name: string; companyName: string; products: string[]; notes?: string }) =>
+    request<CompanyProfile>("/companies", { method: "POST", body: JSON.stringify(body) }),
+  /** Starts a session from the prepared set: template + company profiles + trainees. */
+  startPrepared: (body: {
+    name: string;
+    templateKey: string;
+    companyProfileIds: number[];
+    traineeIds: number[];
+  }) =>
+    request<Run>("/runs/prepared", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   deleteUser: (id: number) => request<unknown>(`/users/${id}`, { method: "DELETE" }),
   setUserActive: (id: number, active: boolean) =>
     request<unknown>(`/users/${id}/${active ? "activate" : "deactivate"}`, { method: "POST" }),

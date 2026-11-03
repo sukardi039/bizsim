@@ -165,3 +165,11 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
     Settings and the environment stay editable because a run freezes its own economy (D18) — the
     catalogue is the one thing a run borrows by reference rather than by value. The remedy is the one
     this product already uses everywhere: copy the template.
+12. A company is a **profile**, and a session is assembled from profiles. `company_profile` holds the
+    reusable definition — display name plus which of the template's products the company carries
+    (empty = the full line) — with one shipped global row that any tenant may copy, exactly like a
+    template. Starting a session (`POST /api/runs/prepared`) validates the template, the profiles and
+    the trainees *before* writing anything, then creates one company per profile and seats the
+    trainees in order; a profile's product line becomes the company's `company_product` rows.
+    Deliberately **no roster-status column**: "not yet in a session" is derivable from having no
+    seat, and a second stored flag would eventually disagree with the seats it describes.
