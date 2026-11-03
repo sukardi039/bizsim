@@ -1,7 +1,11 @@
 # Setup workbench — the pre-session build
 
-Status: **design, not built.** This file is the agreed scope for the next phase, so the slices can be
-cut without re-litigating the shape.
+Status: **S6a and S6b shipped (3 Nov 2026); S6c–S6e designed.** This file is the agreed scope for the
+next phase, so the slices can be cut without re-litigating the shape.
+
+Glossary, because it caused a question: a **session** is one simulation run (one `run` row, one class
+day). A **training package** is several sessions delivered together (a term, a workshop series). The
+product only models the session; a package is a human notion for now.
 
 ---
 
@@ -71,26 +75,28 @@ The workbench is where a facilitator prepares; the console stays the place where
 
 ---
 
-## 5. Data model changes (proposed)
+## 5. Data model changes
 
-1. **`scenario` becomes a tenant-owned template**
-   - `tenant_id bigint` (nullable for the shipped `standard-v1`, which stays global and read-only),
-   - `status varchar` — `DRAFT` | `PUBLISHED`,
-   - `based_on varchar` — the template it was cloned from, for provenance,
-   - key becomes `(tenant_id, key)` unique instead of a global primary key.
-2. **`company_profile`** (new, tenant-owned): `id`, `tenant_id`, `name`, `product_line` (which products
-   from the template the company carries), `notes`. A run's `team` rows are created *from* profiles,
-   so the same company setup can be reused for the next cohort.
-3. **Roster** — trainee accounts that exist before a session:
-   - `app_user` gains `status` (`INVITED` | `ACTIVE` | `DISABLED`) so a prepared account is visibly
-     "not yet in a session";
-   - `player` (the seat) stays per-run, as today: **the person is tenant-level, the seat is
-     session-level.** This is what R1 already enforces when deleting a run.
-4. **`run` gains `template_version`** so a session records exactly which template it was played on,
-   even if the template is edited later (the same reasoning as D18's frozen economy).
+**Shipped (V9, 3 Nov 2026):**
 
-No migration is written until the phases below are agreed — three of these change primary keys and
-deserve their own migration with its own test.
+1. **`scenario` is tenant-extensible.** `tenant_id` (null = the shipped global template),
+   `status` (`DRAFT` | `PUBLISHED`), `based_on` (provenance). `key` stays the **primary key** rather
+   than becoming `(tenant_id, key)`: every catalogue table references `scenario (key)`, and widening
+   the key would rewrite five foreign keys for no gain. A tenant copy gets its own unique key,
+   namespaced by tenant code (`demo-standard-v1`, then `demo-standard-v1-2`).
+2. **A copy is complete** — the definition document plus `product`, `channel`, `rnd_project`,
+   `scenario_round`, `environment_event`. A copy that missed a catalogue table would load with no
+   products and only fail at the first round, in a classroom.
+
+**Still to design — not written, and not needed before S6e:**
+
+3. **`company_profile`** (global base + tenant copies, same pattern as templates): `name`,
+   `product_line`, `starting position`, `notes`. A run's `team` rows would be created from profiles.
+4. **Roster** — trainee accounts that exist before a session: `app_user.status`
+   (`INVITED` | `ACTIVE` | `DISABLED`). The `player` (seat) stays per-run: **the person is
+   tenant-level, the seat is session-level** — which is what deleting a run already enforces.
+5. **`run.template_version`** so a session records which template it was played on even after the
+   template is edited (same reasoning as D18's frozen economy).
 
 ---
 
@@ -111,12 +117,14 @@ class always has one person who is not in the roster.
 
 ## 7. Phases (each independently shippable and testable)
 
-- **S6a — Template library, read-only.** `GET /api/templates` + a Setup page listing
+- **S6a — Template library, read-only. SHIPPED.** `GET /api/templates`, Setup → Templates page listing
+  `standard-v1` (owner, status, products, rounds, provenance).
+- **S6b — Duplicate a template. SHIPPED.** `POST /api/templates/{key}/copy` → tenant-owned `DRAFT`
+  with a tenant-namespaced key; V9 adds `tenant_id`/`status`/`based_on`; `TemplateApiTest` proves the
+  copy is complete and the global template is untouched.
+- ~~**S6a — Template library, read-only.**~~ `GET /api/templates` + a Setup page listing
   `standard-v1` (name, rounds, cycles, products, channels, projects, rounds table). Proves the
   document can be surfaced before anything can be edited. No schema change.
-- **S6b — Duplicate a template.** `POST /api/templates/{key}/copy` → a tenant-owned `DRAFT` copy.
-  First schema change (`tenant_id`, `status`, `based_on`), with a migration and a test that the
-  global template is never mutated.
 - **S6c — Edit settings, then environment.** `PUT /api/templates/{id}/settings` and
   `/environment`, with the same validation the engine relies on (`rounds ≥ 1`, indices > 0, at least
   one product). Save-from-UI, reload, and a run created from the edited template shows the new numbers.
@@ -125,20 +133,19 @@ class always has one person who is not in the roster.
   and a *Start session* action that creates the run and seats the roster. Retires the hardcoded
   `"standard-v1"` in the console.
 
-S6a and S6b are the ones that unblock everything else and carry the least risk; S6c–S6e are the bulk.
+S6a and S6b are shipped; S6c is next (the settings and environment editor), then S6d, then S6e.
 
 ---
 
 ## 8. Open questions for the product owner
 
-1. **Template ownership.** Should every tenant be able to create templates (S6b as described), or is
-   a template always global and only *adjusted* per run? The first needs `tenant_id` on `scenario`.
-2. **Company profiles.** Is a company a *reusable* profile (same product mix next term) or always
-   defined per session? Reusable costs one table but removes retyping every cohort.
-3. **Trainee identity across sessions.** Same trainee in three sessions this term: one person-level
-   account re-seated each time, or a fresh account per session (today's behaviour, and what R1
-   assumes)? This decides whether `app_user` needs a status and whether deleting a run may ever
-   remove someone who is also in another session — today it keeps them.
+1. **Template ownership — answered 3 Nov 2026.** `standard-v1` stays global; a tenant copies it and
+   modifies its own copy if needed. Shipped as S6b.
+2. **Company profiles — answered 3 Nov 2026.** One global, reusable profile that can be extended; it
+   is reusable across simulations, not defined per session. Designed in §5 (item 3), not yet built.
+3. **Trainee identity — answered 3 Nov 2026.** Personal: one account per person, re-seated per
+   session. Deleting a session removes the seat and any account that exists only for it, and keeps a
+   person who is seated in another session (already enforced and tested).
 4. **Credential delivery.** Printed list, CSV export, or paste-into-WhatsApp from the roster screen?
    There is no email delivery in this product and adding it is its own decision.
 

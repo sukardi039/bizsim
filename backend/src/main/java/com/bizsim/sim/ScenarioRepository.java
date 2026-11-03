@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Loads a scenario from the database: the definition JSON plus the product/channel/project catalogue.
@@ -142,6 +144,103 @@ public class ScenarioRepository {
                         rs.getBigDecimal("wage_multiplier"), rs.getString("target_product")), key);
 
         return new Scenario(key, params, products, channels, projects, rounds, events);
+    }
+
+    // ------------------------------------------------------------------ templates
+
+    /** A template the caller can see: the shipped global one, or one their own tenant copied. */
+    public record TemplateRow(String key, String name, Long tenantId, String status, String basedOn,
+                              int version, int products, int rounds) {
+    }
+
+    public List<TemplateRow> listVisible(long tenantId) {
+        return jdbc.query("""
+                select s.key, s.name, s.tenant_id, s.status, s.based_on, s.version,
+                       (select count(*) from product p where p.scenario_key = s.key) as products,
+                       (select count(*) from scenario_round r where r.scenario_key = s.key) as rounds
+                from scenario s
+                where s.tenant_id is null or s.tenant_id = ?
+                order by s.tenant_id nulls first, s.name
+                """, (rs, i) -> new TemplateRow(
+                rs.getString("key"), rs.getString("name"),
+                (Long) rs.getObject("tenant_id"), rs.getString("status"), rs.getString("based_on"),
+                rs.getInt("version"), rs.getInt("products"), rs.getInt("rounds")), tenantId);
+    }
+
+    public Optional<ScenarioRepository.TemplateRow> findVisible(long tenantId, String key) {
+        return listVisible(tenantId).stream().filter(t -> t.key().equals(key)).findFirst();
+    }
+
+    /**
+     * Copies a visible template into a tenant-owned DRAFT. The copy is a full scenario: the
+     * definition JSON plus every catalogue row that carries {@code scenario_key}, so the tenant can
+     * edit it without touching the global template and without needing a second lookup path.
+     *
+     * <p>The clone is deliberately a copy of the whole document, not a diff against the base — a
+     * template that only overrides some fields would have to be merged at load time, and the merge
+     * would become the thing classes depend on.
+     */
+    @Transactional
+    public String copy(String sourceKey, long tenantId, String tenantCode, String requestedName) {
+        TemplateRow source = findVisible(tenantId, sourceKey).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such template"));
+
+        String base = (tenantCode + "-" + sourceKey).toLowerCase().replaceAll("[^a-z0-9-]", "-");
+        if (base.length() > 50) {
+            base = base.substring(0, 50);
+        }
+        String key = base;
+        for (int n = 2; jdbc.queryForObject("select count(*) from scenario where key = ?",
+                Integer.class, key) > 0; n++) {
+            key = base + "-" + n;
+        }
+
+        String name = requestedName == null || requestedName.isBlank()
+                ? source.name() + " (copy)" : requestedName.trim();
+        jdbc.update("""
+                insert into scenario (key, name, definition, version, tenant_id, status, based_on)
+                select ?, ?, definition, version, ?, 'DRAFT', key from scenario where key = ?
+                """, key, name, tenantId, sourceKey);
+
+        jdbc.update("""
+                insert into product (scenario_key, code, name, base_price, base_unit_cost, base_quality,
+                                     base_demand, units_per_worker, income_elasticity, trend_affinity)
+                select ?, code, name, base_price, base_unit_cost, base_quality, base_demand,
+                       units_per_worker, income_elasticity, trend_affinity
+                from product where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into channel (scenario_key, code, name, reach_weight, brand_alpha)
+                select ?, code, name, reach_weight, brand_alpha from channel where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into rnd_project (scenario_key, code, name, target_product, advantage_type,
+                                         advantage_value, hidden_cost, hint_band, duration_months,
+                                         partial_benefit, benefit_curve, benefit_exponent, overfunding)
+                select ?, code, name, target_product, advantage_type, advantage_value, hidden_cost,
+                       hint_band, duration_months, partial_benefit, benefit_curve, benefit_exponent,
+                       overfunding
+                from rnd_project where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into scenario_round (scenario_key, round_number, demand_index, cost_index,
+                                            wage_index, note, trend_strength, trend_label)
+                select ?, round_number, demand_index, cost_index, wage_index, note, trend_strength,
+                       trend_label
+                from scenario_round where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into environment_event (scenario_key, code, name, description, earliest_round,
+                                               latest_round, probability, duration_months,
+                                               demand_multiplier, cost_multiplier, wage_multiplier,
+                                               target_product)
+                select ?, code, name, description, earliest_round, latest_round, probability,
+                       duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
+                       target_product
+                from environment_event where scenario_key = ?
+                """, key, sourceKey);
+
+        return key;
     }
 
     private static BigDecimal dec(JsonNode node) {

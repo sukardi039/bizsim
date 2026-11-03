@@ -155,6 +155,18 @@ export interface MarketForecast {
   outlook: string;
 }
 
+export interface TemplateRow {
+  key: string;
+  name: string;
+  /** Absent for the shipped global template: the API omits nulls. */
+  tenantId?: number | null;
+  status: string;
+  basedOn?: string | null;
+  version: number;
+  products: number;
+  rounds: number;
+}
+
 export interface DecisionFormContext {
   runId: number;
   round: number;
@@ -225,6 +237,12 @@ export const api = {
     request<RunPlayer>(`/runs/${runId}/players`, {
       method: "POST",
       body: JSON.stringify({ teamId, userId, roleKey }),
+    }),
+  templates: () => request<TemplateRow[]>("/templates"),
+  copyTemplate: (key: string, name?: string) =>
+    request<TemplateRow>(`/templates/${encodeURIComponent(key)}/copy`, {
+      method: "POST",
+      body: JSON.stringify({ name: name ?? "" }),
     }),
   submitDecision: (runId: number, teamId: number, decision: DecisionInput) =>
     request<{ submitted: boolean }>(`/runs/${runId}/teams/${teamId}/decisions`, {

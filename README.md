@@ -168,4 +168,9 @@ S1 complete: run/company/player management, round state machine.
   server returns the trainee's stored decision with the form so a reload reopens their own numbers,
   and a trainee may read only their own company (403 otherwise).
 **Next: S5 the debrief** — per-round statements and the class report on the facilitator's screen.
+**S6a/S6b complete (3 Nov 2026): setup → templates.** `GET /api/templates` lists the global
+  `standard-v1` plus the tenant's own copies; `POST /api/templates/{key}/copy` clones a template —
+  definition document and every catalogue row — into a tenant-owned `DRAFT` with its own key
+  (`demo-standard-v1`). The console has a **Templates** tab for it. Ruling D22: the shipped template
+  is never edited, only copied. Editing the copy is S6c — see `docs/SETUP_WORKBENCH.md`.
 

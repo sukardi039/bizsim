@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlayerConsole from "./PlayerConsole";
 import Trainees from "./Trainees";
+import TemplatesPanel from "./TemplatesPanel";
 import {
   api,
   ApiError,
@@ -137,6 +138,8 @@ export default function App() {
   // facilitator console. The role comes from the token, never from the client.
   const [identity, setIdentity] = useState<{ userId: number; role: string } | null>(null);
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
+  /** Sessions drive a class; Templates is the setup workbench. Same shell, two views. */
+  const [view, setView] = useState<"runs" | "templates">("runs");
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -303,6 +306,15 @@ export default function App() {
           </button>
         </div>
 
+        <div className="nav">
+          <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
+            Sessions
+          </button>
+          <button className={view === "templates" ? "active" : ""} onClick={() => setView("templates")}>
+            Templates
+          </button>
+        </div>
+
         <form className="card" onSubmit={create}>
           <h2>New run</h2>
           <label>
@@ -353,7 +365,9 @@ export default function App() {
       <main>
         {problem && <p className="error">{problem}</p>}
 
-        {!selected ? (
+        {view === "templates" ? (
+          <TemplatesPanel />
+        ) : !selected ? (
           <p className="muted">Select a run, or create one.</p>
         ) : (
           <>
