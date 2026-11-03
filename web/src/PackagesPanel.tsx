@@ -114,13 +114,19 @@ export default function PackagesPanel() {
     }
   };
 
+  /** A session holds one company per profile and at most ten of them (decision 5). */
+  const MAX_COMPANIES = 10;
+
   const toggle = (id: number) =>
-    setDraft((current) => ({
-      ...current,
-      companyIds: current.companyIds.includes(id)
-        ? current.companyIds.filter((value) => value !== id)
-        : [...current.companyIds, id],
-    }));
+    setDraft((current) => {
+      if (current.companyIds.includes(id)) {
+        return { ...current, companyIds: current.companyIds.filter((value) => value !== id) };
+      }
+      if (current.companyIds.length >= MAX_COMPANIES) {
+        return current; // the count line says why; do not silently drop the click
+      }
+      return { ...current, companyIds: [...current.companyIds, id] };
+    });
 
   const companyName = (id: number) =>
     companies.find((company) => company.id === id)?.name ?? `#${id}`;
@@ -223,7 +229,15 @@ export default function PackagesPanel() {
             </label>
           </div>
 
-          <h3 className="pick-head">{t("start.companies")}</h3>
+          <h3 className="pick-head">
+            {t("start.companies")}{" "}
+            <small className="muted">
+              {t("packages.companyCount", {
+                count: draft.companyIds.length,
+                max: MAX_COMPANIES,
+              })}
+            </small>
+          </h3>
           {companies.length === 0 && <p className="muted">{t("start.noCompanies")}</p>}
           <ul className="picks">
             {companies.map((company) => (
@@ -232,6 +246,10 @@ export default function PackagesPanel() {
                   <input
                     type="checkbox"
                     checked={draft.companyIds.includes(company.id)}
+                    disabled={
+                      !draft.companyIds.includes(company.id) &&
+                      draft.companyIds.length >= MAX_COMPANIES
+                    }
                     onChange={() => toggle(company.id)}
                   />
                   {company.name}

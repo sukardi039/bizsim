@@ -319,6 +319,7 @@ const en: Dict = {
   "start.classListHint":
     "Prepared with the package: one person per company. To change it, publish a new package, or adjust the seats after the session starts.",
   "start.mapping": "Who sits where",
+  "packages.companyCount": "{count} of {max} companies — one company per profile, one profile per company",
   "packages.classList": "Class list",
   "packages.classListHint":
     "One person per company, chosen now so the facilitator does not have to assemble the class on the day. Leave a seat open for a walk-in.",
@@ -672,6 +673,7 @@ const zh: Dict = {
   "start.classList": "班级名单",
   "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包，或在模拟开始后调整座位。",
   "start.mapping": "座位安排",
+  "packages.companyCount": "{count} / {max} 家公司 —— 每个档案一家公司",
   "packages.classList": "班级名单",
   "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。可留空位给临时加入者。",
   "packages.seatOpen": "— 空位 —",
