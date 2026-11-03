@@ -55,10 +55,15 @@ class TemplateApiTest extends PostgresTestBase {
 
     @BeforeEach
     void seed() throws Exception {
-        // Only tenant-owned templates and the fixtures of this class; the shipped template stays.
+        // Play data first: a test that creates a run leaves a simulation pointing at its template, and
+        // `delete from scenario` then fails on simulation_scenario_key_fkey.
+        for (String table : List.of("round_statement", "round_result", "decision", "round", "player",
+                "company_product", "company_staff", "company_rnd", "team", "run", "simulation",
+                "app_user", "tenant")) {
+            jdbc.update("delete from " + table);
+        }
+        // Only tenant-owned templates; the shipped template stays.
         jdbc.update("delete from scenario where tenant_id is not null");
-        jdbc.update("delete from app_user");
-        jdbc.update("delete from tenant");
 
         acme = tenant("acme", "Acme");
         other = tenant("other", "Other");
@@ -221,6 +226,99 @@ class TemplateApiTest extends PostgresTestBase {
         mvc.perform(get("/api/templates/" + key)
                         .header("Authorization", "Bearer " + otherFacilitator))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void the_catalogue_is_editable_until_the_template_has_a_session() throws Exception {
+        String key = copyStandard();
+
+        mvc.perform(put("/api/templates/" + key + "/products")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("products", List.of(
+                                product("P1", "Basic", 1_000_000, 590_000, 50, 1000, 40, 1.0, -0.5),
+                                product("P2", "Standard", 2_500_000, 1_430_000, 60, 600, 20, 1.0, 0.3))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.products.length()").value(2))
+                .andExpect(jsonPath("$.products[0].code").value("P1"))
+                .andExpect(jsonPath("$.products[0].basePrice").value(1_000_000));
+
+        mvc.perform(put("/api/templates/" + key + "/channels")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("channels", List.of(
+                                Map.of("code", "DIGITAL", "name", "Digital", "reachWeight", 1.0,
+                                        "brandAlpha", 1.6))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.channels.length()").value(1));
+
+        mvc.perform(put("/api/templates/" + key + "/projects")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("projects", List.of(project("P1"))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.projects.length()").value(1))
+                .andExpect(jsonPath("$.projects[0].targetProduct").value("P1"));
+
+        // The rules the engine depends on are refused here, not at round close in a classroom.
+        mvc.perform(put("/api/templates/" + key + "/products")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("products", List.of()))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.catalog_invalid"))
+                .andExpect(jsonPath("$.params.field").value("products"));
+
+        mvc.perform(put("/api/templates/" + key + "/projects")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("projects", List.of(project("P9"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.catalog_invalid"))
+                .andExpect(jsonPath("$.params.field").value("targetProduct"));
+
+        // Once a session exists, the catalogue is frozen: its companies and decisions name these codes.
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Live cohort", "scenarioKey", key,
+                                "teams", List.of(Map.of("name", "A", "companyName", "A Inc"))))))
+                .andExpect(status().isCreated());
+
+        mvc.perform(put("/api/templates/" + key + "/products")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("products", List.of(
+                                product("P1", "Basic", 1_000_000, 590_000, 50, 1000, 40, 1.0, -0.5))))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.in_use"));
+    }
+
+    private static Map<String, Object> product(String code, String name, long price, long cost,
+                                               int quality, int demand, int perWorker,
+                                               double incomeElasticity, double trendAffinity) {
+        return Map.of("code", code, "name", name, "basePrice", price, "baseUnitCost", cost,
+                "baseQuality", quality, "baseDemand", demand, "unitsPerWorker", perWorker,
+                "incomeElasticity", incomeElasticity, "trendAffinity", trendAffinity);
+    }
+
+    private static Map<String, Object> project(String targetProduct) {
+        // Map.of caps at ten pairs; this row carries twelve.
+        Map<String, Object> project = new java.util.LinkedHashMap<>();
+        project.put("code", "RND-1");
+        project.put("name", "Process efficiency");
+        project.put("targetProduct", targetProduct);
+        project.put("advantageType", "UNIT_COST_DOWN");
+        project.put("advantageValue", 0.15);
+        project.put("hiddenCost", 300_000_000);
+        project.put("hintBand", 0.2);
+        project.put("durationMonths", 3);
+        project.put("partialBenefit", true);
+        project.put("benefitCurve", "LINEAR");
+        project.put("benefitExponent", 1.0);
+        project.put("overfunding", "LOST");
+        return project;
     }
 
     private String copyStandard() throws Exception {

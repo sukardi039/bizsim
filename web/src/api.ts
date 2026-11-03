@@ -205,6 +205,43 @@ export interface TemplateDetail {
   editable: boolean;
   settings: Record<string, unknown>;
   environment: TemplateRound[];
+  products: TemplateProduct[];
+  channels: TemplateChannel[];
+  projects: TemplateProject[];
+}
+
+export interface TemplateProduct {
+  code: string;
+  name: string;
+  basePrice: number;
+  baseUnitCost: number;
+  baseQuality: number;
+  baseDemand: number;
+  unitsPerWorker: number;
+  incomeElasticity: number;
+  trendAffinity: number;
+}
+
+export interface TemplateChannel {
+  code: string;
+  name: string;
+  reachWeight: number;
+  brandAlpha: number;
+}
+
+export interface TemplateProject {
+  code: string;
+  name: string;
+  targetProduct: string | null;
+  advantageType: string;
+  advantageValue: number;
+  hiddenCost: number;
+  hintBand: number;
+  durationMonths: number;
+  partialBenefit: boolean;
+  benefitCurve: string;
+  benefitExponent: number;
+  overfunding: string;
 }
 
 export interface UserRow {
@@ -328,6 +365,21 @@ export const api = {
     request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/environment`, {
       method: "PUT",
       body: JSON.stringify({ rounds }),
+    }),
+  saveTemplateProducts: (key: string, products: TemplateProduct[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/products`, {
+      method: "PUT",
+      body: JSON.stringify({ products }),
+    }),
+  saveTemplateChannels: (key: string, channels: TemplateChannel[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/channels`, {
+      method: "PUT",
+      body: JSON.stringify({ channels }),
+    }),
+  saveTemplateProjects: (key: string, projects: TemplateProject[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/projects`, {
+      method: "PUT",
+      body: JSON.stringify({ projects }),
     }),
   users: () => request<UserRow[]>("/users"),
   deleteUser: (id: number) => request<unknown>(`/users/${id}`, { method: "DELETE" }),

@@ -133,7 +133,14 @@ class always has one person who is not in the roster.
   one answers `409 template.read_only`. Validation returns codes (`template.settings_invalid`,
   `template.environment_invalid`) with the offending field. Console: clicking a template opens the
   editor with **Settings** and **Environment** tabs.
-- **S6d — Products, channels, R&D projects.** The remaining editor tabs.
+- **S6d — Products, channels, R&D projects. SHIPPED.** `PUT .../products`, `/channels`, `/projects`
+  replace each catalogue whole (a catalogue is a set). Validation refuses what the engine cannot run:
+  at least one row, unique codes, positive price/cost/reach/size, `advantageType` limited to the four
+  branches in `ScoringEngine` (`UNIT_COST_DOWN`, `CAPACITY_UP`, `QUALITY_UP`, `ATTRACTIVENESS_UP`),
+  `benefitCurve` to `LINEAR|POWER|CHANCE`, `overfunding` to `REFUND|LOST`, `durationMonths >= 1`, and
+  a project's `targetProduct` must exist. **A template that already has a simulation refuses catalogue
+  edits** (`409 template.in_use`): its companies were created from these codes and its decisions name
+  them. Settings and the environment stay editable, because each run freezes its own economy (D18).
 - **S6e — People and roster, then start-from-roster.** Roster accounts (`INVITED`), company profiles,
   and a *Start session* action that creates the run and seats the roster. Retires the hardcoded
   `"standard-v1"` in the console.

@@ -32,11 +32,33 @@ public class TemplateController {
 
     public record Detail(String key, String name, Long tenantId, String status, String basedOn,
                          boolean editable, Map<String, Object> settings,
-                         List<ScenarioRepository.RoundRow> environment) {
+                         List<ScenarioRepository.RoundRow> environment,
+                         List<ScenarioRepository.ProductRow> products,
+                         List<ScenarioRepository.ChannelRow> channels,
+                         List<ScenarioRepository.ProjectRow> projects) {
     }
 
     public record EnvironmentRequest(List<ScenarioRepository.RoundRow> rounds) {
     }
+
+    public record ProductsRequest(List<ScenarioRepository.ProductRow> products) {
+    }
+
+    public record ChannelsRequest(List<ScenarioRepository.ChannelRow> channels) {
+    }
+
+    public record ProjectsRequest(List<ScenarioRepository.ProjectRow> projects) {
+    }
+
+    /**
+     * The values the engine understands. These are the four branches in
+     * {@code ScoringEngine} — anything else throws at round close, so the editor refuses it here
+     * instead of letting a class discover it mid-session.
+     */
+    private static final List<String> ADVANTAGE_TYPES = List.of(
+            "UNIT_COST_DOWN", "CAPACITY_UP", "QUALITY_UP", "ATTRACTIVENESS_UP");
+    private static final List<String> BENEFIT_CURVES = List.of("LINEAR", "POWER", "CHANCE");
+    private static final List<String> OVERFUNDING = List.of("REFUND", "LOST");
 
     private static final int MAX_ROUNDS = 48;
 
@@ -92,7 +114,54 @@ public class TemplateController {
         return detail(me, row);
     }
 
+    /** Replaces the product catalogue. Refused once the template has sessions: they name these codes. */
+    @PutMapping("/{key}/products")
+    public Detail saveProducts(@PathVariable String key, @RequestBody ProductsRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        requireUnused(me, key);
+        List<ScenarioRepository.ProductRow> products = request == null ? null : request.products();
+        validateProducts(products);
+        scenarios.saveProducts(key, products);
+        return detail(me, row);
+    }
+
+    @PutMapping("/{key}/channels")
+    public Detail saveChannels(@PathVariable String key, @RequestBody ChannelsRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        requireUnused(me, key);
+        List<ScenarioRepository.ChannelRow> channels = request == null ? null : request.channels();
+        validateChannels(channels);
+        scenarios.saveChannels(key, channels);
+        return detail(me, row);
+    }
+
+    @PutMapping("/{key}/projects")
+    public Detail saveProjects(@PathVariable String key, @RequestBody ProjectsRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        requireUnused(me, key);
+        List<ScenarioRepository.ProjectRow> projects = request == null ? null : request.projects();
+        validateProjects(projects, scenarios.products(key));
+        scenarios.saveProjects(key, projects);
+        return detail(me, row);
+    }
+
     // ------------------------------------------------------------------ rules
+
+    /**
+     * A template with sessions must not have its catalogue rewritten: a run's companies were created
+     * from these codes and every stored decision names them. Settings and the environment stay
+     * editable, because a run freezes its own economy (D18) and copies its own numbers.
+     */
+    private void requireUnused(TenantContext.Principal me, String key) {
+        if (scenarios.hasRuns(me.tenantId(), key)) {
+            throw ProblemException.conflict("template.in_use",
+                    "this template already has simulations; copy it to change its catalogue",
+                    "template", key);
+        }
+    }
 
     /**
      * The editor may only touch a copy the tenant owns. The shipped template is a reference everyone
@@ -158,6 +227,106 @@ public class TemplateController {
         }
     }
 
+    private static void validateProducts(List<ScenarioRepository.ProductRow> products) {
+        if (products == null || products.isEmpty()) {
+            throw catalogInvalid("a template needs at least one product", "field", "products");
+        }
+        if (products.size() > 10) {
+            throw catalogInvalid("a template cannot exceed 10 products", "field", "products", "max", 10);
+        }
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        for (ScenarioRepository.ProductRow product : products) {
+            if (product == null || isBlank(product.code())) {
+                throw catalogInvalid("every product needs a code", "field", "code");
+            }
+            if (!codes.add(product.code())) {
+                throw catalogInvalid("product codes must be unique: " + product.code(),
+                        "field", "code", "code", product.code());
+            }
+            if (isBlank(product.name())) {
+                throw catalogInvalid("product " + product.code() + " needs a name",
+                        "field", "name", "code", product.code());
+            }
+            requirePositive(product.basePrice(), "basePrice", product.code());
+            requirePositive(product.baseUnitCost(), "baseUnitCost", product.code());
+            requirePositive(product.unitsPerWorker(), "unitsPerWorker", product.code());
+        }
+    }
+
+    private static void validateChannels(List<ScenarioRepository.ChannelRow> channels) {
+        if (channels == null || channels.isEmpty()) {
+            throw catalogInvalid("a template needs at least one channel", "field", "channels");
+        }
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        for (ScenarioRepository.ChannelRow channel : channels) {
+            if (channel == null || isBlank(channel.code())) {
+                throw catalogInvalid("every channel needs a code", "field", "code");
+            }
+            if (!codes.add(channel.code())) {
+                throw catalogInvalid("channel codes must be unique: " + channel.code(),
+                        "field", "code", "code", channel.code());
+            }
+            requirePositive(channel.reachWeight(), "reachWeight", channel.code());
+        }
+    }
+
+    private static void validateProjects(List<ScenarioRepository.ProjectRow> projects,
+                                         List<ScenarioRepository.ProductRow> products) {
+        if (projects == null || projects.isEmpty()) {
+            throw catalogInvalid("a template needs at least one research project", "field", "projects");
+        }
+        java.util.Set<String> codes = new java.util.HashSet<>();
+        java.util.Set<String> productCodes = new java.util.HashSet<>();
+        for (ScenarioRepository.ProductRow product : products) {
+            productCodes.add(product.code());
+        }
+        for (ScenarioRepository.ProjectRow project : projects) {
+            if (project == null || isBlank(project.code())) {
+                throw catalogInvalid("every project needs a code", "field", "code");
+            }
+            if (!codes.add(project.code())) {
+                throw catalogInvalid("project codes must be unique: " + project.code(),
+                        "field", "code", "code", project.code());
+            }
+            if (!ADVANTAGE_TYPES.contains(project.advantageType())) {
+                throw catalogInvalid(project.code() + ": advantageType must be one of " + ADVANTAGE_TYPES,
+                        "field", "advantageType", "code", project.code());
+            }
+            if (!BENEFIT_CURVES.contains(project.benefitCurve())) {
+                throw catalogInvalid(project.code() + ": benefitCurve must be one of " + BENEFIT_CURVES,
+                        "field", "benefitCurve", "code", project.code());
+            }
+            if (!OVERFUNDING.contains(project.overfunding())) {
+                throw catalogInvalid(project.code() + ": overfunding must be one of " + OVERFUNDING,
+                        "field", "overfunding", "code", project.code());
+            }
+            if (project.durationMonths() < 1) {
+                throw catalogInvalid(project.code() + ": durationMonths must be at least 1",
+                        "field", "durationMonths", "code", project.code());
+            }
+            if (!isBlank(project.targetProduct()) && !productCodes.contains(project.targetProduct())) {
+                throw catalogInvalid(project.code() + ": unknown target product " + project.targetProduct(),
+                        "field", "targetProduct", "code", project.code());
+            }
+            requirePositive(project.advantageValue(), "advantageValue", project.code());
+        }
+    }
+
+    private static void requirePositive(java.math.BigDecimal value, String field, String code) {
+        if (value == null || value.signum() <= 0) {
+            throw catalogInvalid(code + ": " + field + " must be above zero",
+                    "field", field, "code", code);
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static ProblemException catalogInvalid(String message, Object... params) {
+        return ProblemException.badRequest("template.catalog_invalid", message, params);
+    }
+
     private static void validateEnvironment(List<ScenarioRepository.RoundRow> rounds) {
         if (rounds == null || rounds.isEmpty()) {
             throw ProblemException.badRequest("template.environment_invalid",
@@ -192,7 +361,9 @@ public class TemplateController {
     private Detail detail(TenantContext.Principal me, ScenarioRepository.TemplateRow row) {
         return new Detail(row.key(), row.name(), row.tenantId(), row.status(), row.basedOn(),
                 row.tenantId() != null && row.tenantId() == me.tenantId(),
-                scenarios.settings(row.key()), scenarios.environment(row.key()));
+                scenarios.settings(row.key()), scenarios.environment(row.key()),
+                scenarios.products(row.key()), scenarios.channels(row.key()),
+                scenarios.projects(row.key()));
     }
 
     private static TenantContext.Principal requireFacilitator() {

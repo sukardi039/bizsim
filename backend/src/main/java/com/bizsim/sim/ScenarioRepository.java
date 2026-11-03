@@ -327,6 +327,114 @@ public class ScenarioRepository {
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }
 
+    // ------------------------------------------------------------------ catalogue (S6d)
+
+    public record ProductRow(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
+                             BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
+                             BigDecimal incomeElasticity, BigDecimal trendAffinity) {
+    }
+
+    public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
+    }
+
+    public record ProjectRow(String code, String name, String targetProduct, String advantageType,
+                             BigDecimal advantageValue, BigDecimal hiddenCost, BigDecimal hintBand,
+                             int durationMonths, boolean partialBenefit, String benefitCurve,
+                             BigDecimal benefitExponent, String overfunding) {
+    }
+
+    public List<ProductRow> products(String key) {
+        return jdbc.query("""
+                select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
+                       income_elasticity, trend_affinity
+                from product where scenario_key = ? order by code
+                """, (rs, i) -> new ProductRow(rs.getString("code"), rs.getString("name"),
+                rs.getBigDecimal("base_price"), rs.getBigDecimal("base_unit_cost"),
+                rs.getBigDecimal("base_quality"), rs.getBigDecimal("base_demand"),
+                rs.getBigDecimal("units_per_worker"), rs.getBigDecimal("income_elasticity"),
+                rs.getBigDecimal("trend_affinity")), key);
+    }
+
+    public List<ChannelRow> channels(String key) {
+        return jdbc.query("""
+                select code, name, reach_weight, brand_alpha from channel
+                where scenario_key = ? order by code
+                """, (rs, i) -> new ChannelRow(rs.getString("code"), rs.getString("name"),
+                rs.getBigDecimal("reach_weight"), rs.getBigDecimal("brand_alpha")), key);
+    }
+
+    public List<ProjectRow> projects(String key) {
+        return jdbc.query("""
+                select code, name, target_product, advantage_type, advantage_value, hidden_cost,
+                       hint_band, duration_months, partial_benefit, benefit_curve, benefit_exponent,
+                       overfunding
+                from rnd_project where scenario_key = ? order by code
+                """, (rs, i) -> new ProjectRow(rs.getString("code"), rs.getString("name"),
+                rs.getString("target_product"), rs.getString("advantage_type"),
+                rs.getBigDecimal("advantage_value"), rs.getBigDecimal("hidden_cost"),
+                rs.getBigDecimal("hint_band"), rs.getInt("duration_months"),
+                rs.getBoolean("partial_benefit"), rs.getString("benefit_curve"),
+                rs.getBigDecimal("benefit_exponent"), rs.getString("overfunding")), key);
+    }
+
+    /**
+     * Replaces the product catalogue. Like the environment, a catalogue is a set: a partial edit
+     * leaves companies holding products the template no longer has.
+     *
+     * <p>This is the one edit that can strand a live class — a run's companies were created from
+     * these codes and their decisions name them — so the service refuses when the template has runs
+     * (see {@link #hasRuns}).
+     */
+    @Transactional
+    public void saveProducts(String key, List<ProductRow> rows) {
+        jdbc.update("delete from product where scenario_key = ?", key);
+        for (ProductRow row : rows) {
+            jdbc.update("""
+                    insert into product (scenario_key, code, name, base_price, base_unit_cost, base_quality,
+                                         base_demand, units_per_worker, income_elasticity, trend_affinity)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, row.code(), row.name(), row.basePrice(), row.baseUnitCost(),
+                    row.baseQuality(), row.baseDemand(), row.unitsPerWorker(), row.incomeElasticity(),
+                    row.trendAffinity());
+        }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    @Transactional
+    public void saveChannels(String key, List<ChannelRow> rows) {
+        jdbc.update("delete from channel where scenario_key = ?", key);
+        for (ChannelRow row : rows) {
+            jdbc.update("""
+                    insert into channel (scenario_key, code, name, reach_weight, brand_alpha)
+                    values (?, ?, ?, ?, ?)
+                    """, key, row.code(), row.name(), row.reachWeight(), row.brandAlpha());
+        }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    @Transactional
+    public void saveProjects(String key, List<ProjectRow> rows) {
+        jdbc.update("delete from rnd_project where scenario_key = ?", key);
+        for (ProjectRow row : rows) {
+            jdbc.update("""
+                    insert into rnd_project (scenario_key, code, name, target_product, advantage_type,
+                                             advantage_value, hidden_cost, hint_band, duration_months,
+                                             partial_benefit, benefit_curve, benefit_exponent, overfunding)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, row.code(), row.name(), row.targetProduct(), row.advantageType(),
+                    row.advantageValue(), row.hiddenCost(), row.hintBand(), row.durationMonths(),
+                    row.partialBenefit(), row.benefitCurve(), row.benefitExponent(), row.overfunding());
+        }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    /** True once a session has been played on this template: catalogue edits would strand it. */
+    public boolean hasRuns(long tenantId, String key) {
+        return jdbc.queryForObject(
+                "select count(*) from run where tenant_id = ? and scenario_key = ?",
+                Integer.class, tenantId, key) > 0;
+    }
+
     private static BigDecimal dec(JsonNode node) {
         if (node == null || node.isMissingNode() || node.isNull()) {
             return BigDecimal.ZERO;

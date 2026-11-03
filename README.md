@@ -182,6 +182,11 @@ S1 complete: run/company/player management, round state machine.
 **S6c complete (3 Nov 2026): the template editor.** Clicking a template opens **Settings** and
   **Environment**. Settings save merges the editable scalars into the definition document, leaving
   the engine's calibration alone; the environment is a table of round positions saved whole. Only a
-  copy the tenant owns is editable — the shipped template answers `409 template.read_only`. Next is
-  S6d (products, channels, R&D projects); see `docs/SETUP_WORKBENCH.md`.
+  copy the tenant owns is editable — the shipped template answers `409 template.read_only`. See
+  `docs/SETUP_WORKBENCH.md` for the phase list.
+**S6d complete (3 Nov 2026): the catalogue.** Products, Channels and R&D projects are editable tabs
+  next to Settings and Environment, saved whole. Validation refuses what the engine cannot run
+  (unknown advantage type, missing target product, non-positive price); a template that already has a
+  simulation refuses catalogue edits (`409 template.in_use`) because its companies and decisions name
+  those codes. Next is S6e: company profiles, the roster and *Start session*.
 

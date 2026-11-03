@@ -159,3 +159,9 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
     engine calibration — elasticities, baseline competitor — that no form should be able to erase.
     The environment timeline is the opposite: `scenario_round` rows are replaced whole, since a
     partial edit of a sequence has no meaning. Every save bumps `scenario.version`.
+11. The **catalogue** (products, channels, R&D projects) is frozen once a template has a simulation
+    (`409 template.in_use`). A run's companies are created from those product codes and every stored
+    decision names them, so rewriting the catalogue under a live class would strand its next round.
+    Settings and the environment stay editable because a run freezes its own economy (D18) — the
+    catalogue is the one thing a run borrows by reference rather than by value. The remedy is the one
+    this product already uses everywhere: copy the template.
