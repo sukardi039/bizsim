@@ -42,6 +42,7 @@ class RunApiTest extends PostgresTestBase {
     private String facilitatorToken;
     private String playerToken;
     private String adminToken;
+    private String builderToken;
 
     @BeforeEach
     void seed() throws Exception {
@@ -62,23 +63,35 @@ class RunApiTest extends PostgresTestBase {
         user(acmeTenant, "player@acme.test", "PLAYER");
         user(globexTenant, "trainer@globex.test", "FACILITATOR");
         user(acmeTenant, "admin@acme.test", "ADMIN");
+        user(acmeTenant, "builder@acme.test", "BUILDER");
 
         facilitatorToken = login("acme", "trainer@acme.test");
         playerToken = login("acme", "player@acme.test");
         adminToken = login("acme", "admin@acme.test");
+        builderToken = login("acme", "builder@acme.test");
     }
 
     @Test
-    void an_admin_bootstraps_a_run_for_a_facilitator_and_nobody_else_may() throws Exception {
+    void a_builder_bootstraps_a_run_for_a_facilitator_and_nobody_else_may() throws Exception {
         // The facilitator cannot create a run without a package any more (ruling 3 Nov 2026).
-        mvc.perform(post("/api/runs")
+        mvc.perform(post("/api/runs").param("facilitatorId", String.valueOf(acmeFacilitator))
                         .header("Authorization", "Bearer " + facilitatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Mine", "scenarioKey", "standard-v1",
                                 "teams", List.of(Map.of("name", "A", "companyName", "A"))))))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("auth.admin_only"));
+                .andExpect(jsonPath("$.code").value("auth.builder_only"));
+
+        // A builder may -- building is preparing -- but must name who will run it.
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Orphan", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "A", "companyName", "A"))))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("run.facilitator_required"));
 
         // An admin may, and the run belongs to the facilitator who will drive it.
         MvcResult created = mvc.perform(post("/api/runs")

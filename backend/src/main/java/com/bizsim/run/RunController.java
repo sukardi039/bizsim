@@ -45,29 +45,32 @@ public class RunController {
     }
 
     /**
-     * Bootstraps a run without a package — an administrator's tool, not a facilitator's (ruling
-     * 3 Nov 2026). Facilitators start sessions from a published package; this path exists for support,
-     * data repair and tests, and `facilitatorId` lets an admin hand the run to the person who will
-     * drive it, so D21 ownership stays with the facilitator rather than the admin.
+     * Bootstraps a run without a package — a **builder's** tool (ruling 3 Nov 2026), because building
+     * is preparing. Facilitators start sessions from a published package; this path exists for
+     * support, data repair and tests.
+     *
+     * <p>`facilitatorId` is required, not optional: the run must belong to the person who will drive
+     * it (D21), and a builder never drives. Preparing a run for nobody would create a session no one
+     * can operate.
      */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public RunService.RunView create(@RequestBody CreateRunRequest request,
                                      @RequestParam(required = false) Long facilitatorId) {
         TenantContext.Principal me = TenantContext.require();
-        if (!"ADMIN".equals(me.role())) {
-            throw ProblemException.forbidden("auth.admin_only",
-                    "only an administrator may create a run without a package");
+        if (!"BUILDER".equals(me.role()) && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("auth.builder_only",
+                    "only a builder prepares a run; facilitators start sessions from a package");
         }
-        long owner = me.userId();
-        if (facilitatorId != null) {
-            users.findInTenant(me.tenantId(), facilitatorId)
-                    .filter(user -> "FACILITATOR".equals(user.role()) || "ADMIN".equals(user.role()))
-                    .orElseThrow(() -> ProblemException.badRequest("user.not_found",
-                            "no facilitator with id " + facilitatorId + " in this tenant"));
-            owner = facilitatorId;
+        if (facilitatorId == null) {
+            throw ProblemException.badRequest("run.facilitator_required",
+                    "name the facilitator who will run this session", "field", "facilitatorId");
         }
-        return runs.createRun(me.tenantId(), owner,
+        users.findInTenant(me.tenantId(), facilitatorId)
+                .filter(user -> "FACILITATOR".equals(user.role()) || "ADMIN".equals(user.role()))
+                .orElseThrow(() -> ProblemException.badRequest("user.not_found",
+                        "no facilitator with id " + facilitatorId + " in this tenant"));
+        return runs.createRun(me.tenantId(), facilitatorId,
                 request.name() == null || request.name().isBlank() ? "Untitled" : request.name(),
                 request.scenarioKey(), request.teams(), request.rounds(), request.cycles());
     }

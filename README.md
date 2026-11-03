@@ -197,7 +197,8 @@ recorded on every run it produced (`run.package_id`). Publishing **freezes** the
 private immutable copy, so editing a draft afterwards cannot change a class that was already
 prepared — and re-publishing makes a new package rather than rewriting an old one. Starting a
 session is the only execution path exposed to facilitators; `POST /api/runs` (a run without a
-package) is admin-only, with `?facilitatorId=` to assign the run to its driver. The console shows each role only its own
+package) is a builder's tool and requires `?facilitatorId=` — the run belongs to the facilitator who
+will drive it, because a builder never does. The console shows each role only its own
 workspace, and the API refuses the other direction rather than relying on a hidden button.
 
 **S6e complete (3 Nov 2026): the workbench closes the loop.** A **Companies** tab holds reusable
