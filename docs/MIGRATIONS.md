@@ -6,15 +6,21 @@ silently reshape a table that holds a class's finished rounds. Everything below 
 failure modes boring.
 
 Schema lives in `backend/src/main/resources/db/migration`, is applied on every startup, and is
-recorded in `flyway_schema_history`. There are seven migrations today: V1 baseline, V2 scenario
+recorded in `flyway_schema_history`. There are eight migrations today: V1 baseline, V2 scenario
 placeholder, V3 simulation model, V4 R&D curves, V5 environment, V6 cycles and trend, V7 finish
-completed runs.
+completed runs, V8 reset pilot simulations.
 
-A migration may carry **data** as well as schema (V2, V6 and V7 all do). When it repairs rows the
+A migration may carry **data** as well as schema (V2, V6, V7 and V8 all do). When it repairs rows the
 application wrote, the file must say which broken behaviour it is undoing, what it deliberately
 leaves alone, and carry a test that fails if the guard is removed — `LegacyRunFinishMigrationTest`
 closes the sessions that played to the end and proves a run whose last round is still open is left
 untouched.
+
+V8 is the one deliberate exception to "repair, do not delete": the pilot simulations played before the
+scoreboard and finish fixes were cleared outright, because patched rows still read as mixed rounds.
+It deletes `simulation` and cascades to every play table, and **keeps** tenants, user accounts and the
+scenario — deleting accounts would lock the facilitator out. `PilotResetMigrationTest` asserts both
+halves. It is a one-off: simulations created after the release are never touched.
 
 ---
 
@@ -132,6 +138,9 @@ Run by CI on every pull request (`mvn -B verify`), not by review discipline:
 - **A data repair closes only what it should** — `LegacyRunFinishMigrationTest` (V7) proves a
   session that played to its end becomes `FINISHED` with the timestamp of its last results, while a
   run whose last round is still open stays `OPEN`; remove the guard and the test fails.
+- **A reset removes play data and keeps identity** — `PilotResetMigrationTest` (V8) proves every
+  play table empties and `tenant`, `app_user`, `scenario` and `product` survive, then starts a fresh
+  simulation for the same facilitator.
 
 ---
 
