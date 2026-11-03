@@ -93,9 +93,11 @@ public class RunController {
     public List<RunService.RunView> list() {
         TenantContext.Principal me = TenantContext.require();
         // Sessions are execution data: a builder prepares packages and does not watch classes run.
-        if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
+        if ("BUILDER".equals(me.role())) {
             throw ProblemException.forbidden("auth.facilitator_only", "sessions are for facilitators");
         }
+        // A trainee is shown only the runs they are seated in (RunRepository.findVisible); without
+        // this branch the player console received 403 and sat on "No simulation yet" forever.
         return runs.runs(me.tenantId(), me.userId(), me.role());
     }
 

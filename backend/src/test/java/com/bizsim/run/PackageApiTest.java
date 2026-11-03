@@ -186,6 +186,14 @@ class PackageApiTest extends PostgresTestBase {
         Long seatedTeam = jdbc.queryForObject(
                 "select team_id from player where run_id = ? and user_id = ?", Long.class, runId, ada);
         assertThat(seatedTeam).isEqualTo(firstTeam);
+
+        // The seated trainee must be able to see their own session: the console asks GET /runs and
+        // without this a player sat on "No simulation yet" forever behind a 403.
+        String adaToken = login("acme", "ada@acme.test");
+        mvc.perform(get("/api/runs").header("Authorization", "Bearer " + adaToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value((int) runId));
     }
 
     @Test
