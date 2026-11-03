@@ -37,6 +37,9 @@ const en: Dict = {
   "nav.runs": "Runs",
   "nav.noRuns": "no runs yet",
   "app.signOut": "sign out",
+  "app.signedInAs": "the role you are signed in as",
+  "people.adminOnly":
+    "You are not an admin: you can add trainees, but staff accounts (facilitator, builder, admin) and role changes are an administrator's job.",
 
   "login.title": "bizsim",
   "login.subtitle": "Facilitator console",
@@ -382,6 +385,8 @@ const zh: Dict = {
   "nav.runs": "模拟列表",
   "nav.noRuns": "暂无模拟",
   "app.signOut": "退出登录",
+  "app.signedInAs": "当前登录的角色",
+  "people.adminOnly": "您不是管理员：可以添加学员，但员工账号（教师、构建者、管理员）与角色变更需由管理员操作。",
 
   "login.title": "bizsim",
   "login.subtitle": "教师控制台",

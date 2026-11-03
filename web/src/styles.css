@@ -89,6 +89,15 @@ select.lang { width: auto; padding: .2rem .4rem; font-size: .8rem; }
 .nav { display: flex; gap: .4rem; margin-bottom: 1rem; }
 .settings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .7rem; margin-bottom: 1rem; }
 .settings-grid small { display: block; margin-top: .15rem; }
+.role-badge {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 .45rem;
+  font-size: .72rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .75;
+}
 .pick-head { margin: .2rem 0 .4rem; font-size: .9rem; }
 .picks { list-style: none; margin: 0; padding: 0; }
 .picks li { padding: .2rem 0; }

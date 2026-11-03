@@ -24,6 +24,7 @@ import java.util.List;
  *   BIZSIM_BOOTSTRAP_EMAIL        the owner's email
  *   BIZSIM_BOOTSTRAP_ADMIN_SECRET initial credential, at least 8 characters
  *   BIZSIM_BOOTSTRAP_ROLE         optional, ADMIN by default (ADMIN, FACILITATOR or BUILDER)
+ *   BIZSIM_BOOTSTRAP_PROMOTE      optional, "true" to set the role on an account that already exists
  * </pre>
  *
  * <p>Remove the three variables once you have signed in; they are a bootstrap, not configuration.
@@ -45,17 +46,27 @@ public class AdminBootstrap implements ApplicationRunner {
      * create the builder and facilitator accounts the two-party model needs (D24).
      */
     private final String role;
+    /**
+     * Recovery lever. Without it, a deployment whose only account is a facilitator can never reach
+     * the setup screens: only an admin can mint an admin, and the bootstrap never rewrites an
+     * existing account. Setting this to true promotes the named account's role and touches nothing
+     * else — in particular it never resets the password, so an accidental re-run cannot lock anyone
+     * out or undo a password change.
+     */
+    private final boolean promote;
 
     public AdminBootstrap(JdbcTemplate jdbc,
                           @Value("${BIZSIM_BOOTSTRAP_TENANT:}") String tenantCode,
                           @Value("${BIZSIM_BOOTSTRAP_EMAIL:}") String email,
                           @Value("${BIZSIM_BOOTSTRAP_ADMIN_SECRET:}") String secret,
-                          @Value("${BIZSIM_BOOTSTRAP_ROLE:ADMIN}") String role) {
+                          @Value("${BIZSIM_BOOTSTRAP_ROLE:ADMIN}") String role,
+                          @Value("${BIZSIM_BOOTSTRAP_PROMOTE:false}") boolean promote) {
         this.jdbc = jdbc;
         this.tenantCode = tenantCode;
         this.email = email;
         this.secret = secret;
         this.role = List.of("ADMIN", "FACILITATOR", "BUILDER").contains(role) ? role : "ADMIN";
+        this.promote = promote;
     }
 
     @Override
@@ -84,7 +95,16 @@ public class AdminBootstrap implements ApplicationRunner {
                 "select count(*) from app_user where tenant_id = ? and email = ?",
                 Integer.class, tenantId, email);
         if (users != null && users > 0) {
-            log.info("bootstrap admin: '{}' already exists, left untouched", email);
+            if (!promote) {
+                log.info("bootstrap admin: '{}' already exists, left untouched "
+                        + "(set BIZSIM_BOOTSTRAP_PROMOTE=true to change its role)", email);
+                return;
+            }
+            // Role only: password, history and seats are untouched.
+            jdbc.update("update app_user set role = ? where tenant_id = ? and email = ?",
+                    role, tenantId, email);
+            log.info("bootstrap admin: promoted '{}' to {} in tenant '{}' (password unchanged)",
+                    email, role, tenantCode);
             return;
         }
 

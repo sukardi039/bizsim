@@ -304,6 +304,10 @@ export default function App() {
         <div className="brand">
           <strong>bizsim</strong>
           <span className="brand-right">
+            {/* Which role is signed in: the sections you can see follow from this, so say it out loud. */}
+            <span className="role-badge" title={t("app.signedInAs")}>
+              {identity.role.toLowerCase()}
+            </span>
             <select
               className="lang"
               value={locale}

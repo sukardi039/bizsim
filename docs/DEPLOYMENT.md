@@ -55,10 +55,26 @@ containers read, so no credential is ever written into a tracked file.
  "migrations":14,"latest":"14","latestDescription":"frozen package templates", ...}
 ```
 
+If `builtAt` is fresh but the console still looks like the previous release, that is the *web*
+container, not the API: `index.html` is now served with `Cache-Control: no-store`, because a cached
+copy keeps naming the previous bundle. Hard-refresh once after this deploy; it should not recur.
+
 `builtAt` is baked into the jar at build time and is the field to trust: **the migration count only
 moves when the schema moves**, so a release that ships only UI or permission changes leaves `latest`
 unchanged. If `builtAt` is older than your last deploy, the old image is still running — redeploy and
 watch that timestamp change.
+
+**Stuck without an admin?** `BIZSIM_BOOTSTRAP_PROMOTE=true` sets the role of an account that
+**already exists** — role only, never the password, so it cannot lock anyone out. Use it when a
+deployment's only accounts are facilitators or trainees and nobody can create staff:
+
+```
+BIZSIM_BOOTSTRAP_TENANT=demo
+BIZSIM_BOOTSTRAP_EMAIL=admin@demo.test
+BIZSIM_BOOTSTRAP_PROMOTE=true      # ADMIN by default; add BIZSIM_BOOTSTRAP_ROLE to choose another
+```
+
+Restart once, sign in, then remove the variables.
 
 **Keep the first account an `ADMIN`.** Only an admin may create a `BUILDER` or a `FACILITATOR`
 (D24), and the whole setup workbench — templates, events, companies, packages — is behind `BUILDER`.
