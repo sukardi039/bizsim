@@ -9,6 +9,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
  * Creates one facilitator account on first boot, driven by environment variables.
  *
@@ -19,8 +21,9 @@ import org.springframework.stereotype.Component;
  *
  * <pre>
  *   BIZSIM_BOOTSTRAP_TENANT       tenant code, e.g. demo
- *   BIZSIM_BOOTSTRAP_EMAIL        the facilitator's email
+ *   BIZSIM_BOOTSTRAP_EMAIL        the owner's email
  *   BIZSIM_BOOTSTRAP_ADMIN_SECRET initial credential, at least 8 characters
+ *   BIZSIM_BOOTSTRAP_ROLE         optional, ADMIN by default (ADMIN, FACILITATOR or BUILDER)
  * </pre>
  *
  * <p>Remove the three variables once you have signed in; they are a bootstrap, not configuration.
@@ -37,15 +40,22 @@ public class AdminBootstrap implements ApplicationRunner {
     private final String tenantCode;
     private final String email;
     private final String secret;
+    /**
+     * The first account is an ADMIN by default: it is the owner's account, and only an admin can
+     * create the builder and facilitator accounts the two-party model needs (D24).
+     */
+    private final String role;
 
     public AdminBootstrap(JdbcTemplate jdbc,
                           @Value("${BIZSIM_BOOTSTRAP_TENANT:}") String tenantCode,
                           @Value("${BIZSIM_BOOTSTRAP_EMAIL:}") String email,
-                          @Value("${BIZSIM_BOOTSTRAP_ADMIN_SECRET:}") String secret) {
+                          @Value("${BIZSIM_BOOTSTRAP_ADMIN_SECRET:}") String secret,
+                          @Value("${BIZSIM_BOOTSTRAP_ROLE:ADMIN}") String role) {
         this.jdbc = jdbc;
         this.tenantCode = tenantCode;
         this.email = email;
         this.secret = secret;
+        this.role = List.of("ADMIN", "FACILITATOR", "BUILDER").contains(role) ? role : "ADMIN";
     }
 
     @Override
@@ -80,10 +90,11 @@ public class AdminBootstrap implements ApplicationRunner {
 
         jdbc.update("""
                 insert into app_user (tenant_id, email, password_hash, display_name, role)
-                values (?, ?, ?, ?, 'FACILITATOR')
-                """, tenantId, email, encoder.encode(secret), email);
+                values (?, ?, ?, ?, ?)
+                """, tenantId, email, encoder.encode(secret), email, role);
 
-        log.info("bootstrap admin: created facilitator '{}' in tenant '{}'. "
-                + "Remove the BIZSIM_BOOTSTRAP_* variables once you have signed in.", email, tenantCode);
+        log.info("bootstrap admin: created {} '{}' in tenant '{}'. "
+                + "Remove the BIZSIM_BOOTSTRAP_* variables once you have signed in.",
+                role, email, tenantCode);
     }
 }

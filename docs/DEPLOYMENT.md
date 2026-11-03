@@ -42,8 +42,14 @@ containers read, so no credential is ever written into a tracked file.
 | `BIZSIM_DB_URL` | set by compose to `jdbc:postgresql://db:5432/bizsim` | no need to set it by hand |
 | `SPRING_PROFILES_ACTIVE` | leave unset | `seed` is a development convenience, not a deployment switch |
 | `BIZSIM_BOOTSTRAP_TENANT` | your tenant code, e.g. `demo` | creates the tenant if missing |
-| `BIZSIM_BOOTSTRAP_EMAIL` | the facilitator's email | creates that account if missing |
-| `BIZSIM_BOOTSTRAP_ADMIN_SECRET` | a credential of 8+ characters | initial login; remove all three after signing in |
+| `BIZSIM_BOOTSTRAP_EMAIL` | the owner's email | creates that account if missing |
+| `BIZSIM_BOOTSTRAP_ADMIN_SECRET` | a credential of 8+ characters | initial login; remove all of these after signing in |
+| `BIZSIM_BOOTSTRAP_ROLE` | `ADMIN` (default), `FACILITATOR` or `BUILDER` | the first account's role |
+
+**Keep the first account an `ADMIN`.** Only an admin may create a `BUILDER` or a `FACILITATOR`
+(D24), and the whole setup workbench — templates, events, companies, packages — is behind `BUILDER`.
+If the first account is a facilitator, nobody can reach the setup screens until you either promote it
+or bootstrap a second account with a new email address.
 
 ### Frontend → backend
 

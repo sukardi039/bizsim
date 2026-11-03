@@ -17,17 +17,17 @@ class AdminBootstrapTest extends PostgresTestBase {
     private JdbcTemplate jdbc;
 
     @Test
-    void creates_the_tenant_and_a_facilitator_once() {
+    void creates_the_tenant_and_an_admin_once() {
         String code = "boot" + System.nanoTime();
         String email = "boss@boot.test";
 
-        new AdminBootstrap(jdbc, code, email, "first-credential").run(null);
+        new AdminBootstrap(jdbc, code, email, "first-credential", "ADMIN").run(null);
 
         Long tenantId = jdbc.queryForObject(
                 "select id from tenant where code = ?", Long.class, code);
         assertThat(tenantId).isNotNull();
         assertThat(jdbc.queryForObject(
-                "select count(*) from app_user where tenant_id = ? and role = 'FACILITATOR'",
+                "select count(*) from app_user where tenant_id = ? and role = 'ADMIN'",
                 Integer.class, tenantId)).isEqualTo(1);
 
         String firstHash = jdbc.queryForObject(
@@ -35,7 +35,7 @@ class AdminBootstrapTest extends PostgresTestBase {
                 String.class, tenantId, email);
 
         // A second boot with a different credential must not reset the stored one.
-        new AdminBootstrap(jdbc, code, email, "second-credential").run(null);
+        new AdminBootstrap(jdbc, code, email, "second-credential", "ADMIN").run(null);
 
         String secondHash = jdbc.queryForObject(
                 "select password_hash from app_user where tenant_id = ? and email = ?",
@@ -50,8 +50,8 @@ class AdminBootstrapTest extends PostgresTestBase {
     void does_nothing_when_the_variables_are_absent() {
         long before = jdbc.queryForObject("select count(*) from tenant", Long.class);
 
-        new AdminBootstrap(jdbc, "", "", "").run(null);
-        new AdminBootstrap(jdbc, "tenant-only", "", "").run(null);
+        new AdminBootstrap(jdbc, "", "", "", "ADMIN").run(null);
+        new AdminBootstrap(jdbc, "tenant-only", "", "", "ADMIN").run(null);
 
         assertThat(jdbc.queryForObject("select count(*) from tenant", Long.class)).isEqualTo(before);
         assertThat(jdbc.queryForObject(
@@ -62,7 +62,7 @@ class AdminBootstrapTest extends PostgresTestBase {
     void refuses_a_credential_that_is_too_short() {
         String code = "short" + System.nanoTime();
 
-        new AdminBootstrap(jdbc, code, "boss@short.test", "tiny").run(null);
+        new AdminBootstrap(jdbc, code, "boss@short.test", "tiny", "ADMIN").run(null);
 
         assertThat(jdbc.queryForObject(
                 "select count(*) from tenant where code = ?", Long.class, code)).isZero();

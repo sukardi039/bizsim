@@ -20,17 +20,23 @@ export default function PeoplePanel() {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [secret, setSecret] = useState("");
+  // Staff roles are an admin's call (only an admin may mint a facilitator or a builder), so the
+  // selector appears for admins only; everyone else can still add trainees.
+  const [role, setRole] = useState("PLAYER");
+  const [canMintStaff, setCanMintStaff] = useState(false);
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      setUsers(await api.users());
+      const [list, me] = await Promise.all([api.users(), api.me()]);
+      setUsers(list);
+      setCanMintStaff(me.role === "ADMIN");
     } catch (error) {
       setProblem(errorText(error, t));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     void load();
@@ -42,11 +48,24 @@ export default function PeoplePanel() {
     setProblem(null);
     setNotice(null);
     try {
-      const created = await api.createUser(email.trim(), displayName.trim() || email.trim(), secret);
-      setNotice(`${created.email} can now sign in. Seat them on a company in the Sessions view.`);
+      const created = await api.createUser(
+        email.trim(),
+        displayName.trim() || email.trim(),
+        secret,
+        role,
+      );
+      // Say what this account can actually do: a builder is not seated anywhere.
+      setNotice(
+        created.role === "BUILDER"
+          ? t("people.createdBuilder", { email: created.email })
+          : created.role === "FACILITATOR"
+            ? t("people.createdFacilitator", { email: created.email })
+            : t("people.createdPlayer", { email: created.email }),
+      );
       setEmail("");
       setDisplayName("");
       setSecret("");
+      setRole("PLAYER");
       await load();
     } catch (error) {
       setProblem(errorText(error, t));
@@ -161,6 +180,17 @@ export default function PeoplePanel() {
               required
             />
           </label>
+          {/* Staff roles are an admin's call, so only an admin sees the selector (server-enforced). */}
+          {canMintStaff && (
+            <label>
+              {t("people.role")}
+              <select value={role} onChange={(e) => setRole(e.target.value)}>
+                <option value="PLAYER">{t("people.player")}</option>
+                <option value="FACILITATOR">{t("people.facilitator")}</option>
+                <option value="BUILDER">{t("people.builder")}</option>
+              </select>
+            </label>
+          )}
           <button type="submit" disabled={busy === "new" || !email.trim() || secret.length < 8}>
             {busy === "new" ? t("people.creating") : t("people.create")}
           </button>
