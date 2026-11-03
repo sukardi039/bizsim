@@ -240,6 +240,10 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 - **Add a trainee** — name, email, initial password (8+), and the **Role** selector:
   **Trainee** / **Facilitator** / **Builder** / **Admin**. Only an admin sees the role selector; the
   server refuses staff roles for anyone else.
+- **Set password** — a per-row button (admins only). Use it when someone cannot sign in: a
+  mistyped credential at creation, a forgotten password, or a password handed to the wrong person.
+  The new password needs 8+ characters and is stored hashed; hand it over and they can change it
+  again after signing in.
 - **Change a role** — the role cell in the list is a dropdown for admins. Pick the new role and it
   saves immediately; the account keeps its password and its history. Two guards: you cannot change
   your **own** role (ask another admin), and the **last active admin** cannot be demoted — create a
@@ -285,6 +289,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 | What you see | Cause / fix |
 |---|---|
 | `Unauthorized` / `invalid or expired token` | sign out and in again; the token lasts 8 hours |
+| **sign-in says the password is wrong** | the tenant code and email are now matched ignoring case, so check instead: (1) the account is **active** — a deactivated account gives the same answer, (2) the password actually has 8+ characters, (3) no stray spaces pasted in. Admin fix: **People → Set password** |
 | `This action is for facilitators` | you are signed in as a builder; use a facilitator account for sessions |
 | `only a builder prepares…` | the account is a facilitator; templates/companies/packages need a builder or admin |
 | `No published packages yet` | a builder has not published one; see §5 |

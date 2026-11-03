@@ -34,11 +34,16 @@ public class UserRepository {
     }
 
     /** Login lookup: tenant is identified by its public code, so the same email can exist twice. */
+    /**
+     * Login lookup. Case-insensitive on both the tenant code and the email, because "Admin@School.test"
+     * and "admin@school.test" are the same person and a 401 for the difference looks exactly like a
+     * wrong password. Callers trim their input; this ignores case.
+     */
     public Optional<AppUser> findByTenantCodeAndEmail(String tenantCode, String email) {
         List<AppUser> rows = jdbc.query("""
                 select u.* from app_user u
                 join tenant t on t.id = u.tenant_id
-                where t.code = ? and u.email = ? and u.active
+                where lower(t.code) = lower(?) and lower(u.email) = lower(?) and u.active
                 """, MAPPER, tenantCode, email);
         return rows.stream().findFirst();
     }
@@ -80,6 +85,12 @@ public class UserRepository {
     public boolean setRole(long tenantId, long id, String role) {
         return jdbc.update("update app_user set role = ? where id = ? and tenant_id = ?",
                 role, id, tenantId) > 0;
+    }
+
+    /** Replaces the stored credential. The caller has already hashed it. */
+    public boolean setPassword(long tenantId, long id, String passwordHash) {
+        return jdbc.update("update app_user set password_hash = ? where id = ? and tenant_id = ?",
+                passwordHash, id, tenantId) > 0;
     }
 
     /** How many admins the tenant still has: the last one must not be demoted out of existence. */
@@ -127,8 +138,9 @@ public class UserRepository {
                 MAPPER, tenantId);
     }
 
+    /** Same case-insensitive rule as login: "Ada@x" and "ada@x" are one account. */
     public Optional<AppUser> findByEmailInTenant(long tenantId, String email) {
-        return jdbc.query("select * from app_user where tenant_id = ? and email = ?",
+        return jdbc.query("select * from app_user where tenant_id = ? and lower(email) = lower(?)",
                 MAPPER, tenantId, email).stream().findFirst();
     }
 

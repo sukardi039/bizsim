@@ -18,6 +18,7 @@ import java.util.Map;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -196,6 +197,70 @@ class UserRoleApiTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of("role", "ADMIN"))))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void a_forgotten_or_mistyped_password_can_be_reset() throws Exception {
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "forgetful@acme.test", "displayName", "Forgetful",
+                                "password", "firstpassword", "role", "PLAYER"))))
+                .andExpect(status().isCreated());
+        Long id = jdbc.queryForObject(
+                "select id from app_user where email = 'forgetful@acme.test'", Long.class);
+
+        // Too short is refused rather than silently accepted.
+        mvc.perform(put("/api/users/" + id + "/password")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("password", "short"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("user.password_too_short"));
+
+        mvc.perform(put("/api/users/" + id + "/password")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("password", "secondpassword"))))
+                .andExpect(status().isNoContent());
+
+        // The old one no longer works; the new one does.
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", "acme", "email", "forgetful@acme.test",
+                                "password", "firstpassword"))))
+                .andExpect(status().isUnauthorized());
+        loginWith("forgetful@acme.test", "secondpassword");
+
+        // A person can change their own password, but must know the current one.
+        String own = loginWith("forgetful@acme.test", "secondpassword");
+        mvc.perform(post("/api/me/password")
+                        .header("Authorization", "Bearer " + own)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "currentPassword", "wrong-one", "newPassword", "thirdpassword"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("user.current_password_wrong"));
+        mvc.perform(post("/api/me/password")
+                        .header("Authorization", "Bearer " + own)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "currentPassword", "secondpassword", "newPassword", "thirdpassword"))))
+                .andExpect(status().isNoContent());
+        loginWith("forgetful@acme.test", "thirdpassword");
+    }
+
+    @Test
+    void signing_in_ignores_the_case_of_the_email_and_tenant_code() throws Exception {
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "tenantCode", "ACME", "email", "Owner@ACME.test",
+                                "password", "pw-owner@acme.test"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.token").isString());
     }
 
     @Test

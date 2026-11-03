@@ -480,6 +480,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+  resetUserPassword: (id: number, password: string) =>
+    request<unknown>(`/users/${id}/password`, {
+      method: "PUT",
+      body: JSON.stringify({ password }),
+    }),
+  changeMyPassword: (currentPassword: string, newPassword: string) =>
+    request<unknown>("/me/password", {
+      method: "POST",
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
   setUserRole: (id: number, role: string) =>
     request<{ id: number; email: string; displayName: string; role: string; active: boolean }>(
       `/users/${id}/role`,

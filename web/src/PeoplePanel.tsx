@@ -91,6 +91,27 @@ export default function PeoplePanel() {
     }
   };
 
+  /** Set a new password for an account. The one thing that cannot be done without a reset. */
+  const resetPassword = async (user: UserRow) => {
+    const next = window.prompt(t("people.passwordPrompt", { email: user.email }));
+    if (next === null) return;
+    if (next.length < 8) {
+      setProblem(t("people.passwordTooShort"));
+      return;
+    }
+    setBusy(user.id);
+    setProblem(null);
+    setNotice(null);
+    try {
+      await api.resetUserPassword(user.id, next);
+      setNotice(t("people.passwordChanged", { email: user.email }));
+    } catch (error) {
+      setProblem(errorText(error, t));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const toggle = async (user: UserRow) => {
     setBusy(user.id);
     setProblem(null);
@@ -168,6 +189,11 @@ export default function PeoplePanel() {
                   </span>
                 </td>
                 <td className="num">
+                  {canMintStaff && (
+                    <button onClick={() => resetPassword(user)} disabled={busy === user.id}>
+                      {t("people.setPassword")}
+                    </button>
+                  )}
                   {user.role === "PLAYER" && (
                     <span className="buttons">
                       <button onClick={() => toggle(user)} disabled={busy === user.id}>
