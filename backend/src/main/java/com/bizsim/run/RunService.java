@@ -65,6 +65,14 @@ public class RunService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "at most 10 teams per run (decision 5)");
         }
+        // D21: one facilitator, one simulation at a time. A second concurrent simulation needs a
+        // second facilitator account, so this is a refusal rather than a filter on the screen.
+        if (runs.activeRunsOfFacilitator(tenantId, facilitatorId) > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "you already have a simulation in progress; finish it, or sign in as another "
+                            + "facilitator for a second one");
+        }
+
         Scenario scenario = scenarios.load(scenarioKey);
 
         // D19: cycles are chosen when the simulation is set up, and rounds can be stretched if the
@@ -158,9 +166,9 @@ public class RunService {
 
     /** Runs of the caller's tenant, newest first. Feeds the console sidebar. */
     @Transactional(readOnly = true)
-    public List<RunView> runs(long tenantId) {
+    public List<RunView> runs(long tenantId, long userId, String role) {
         List<RunView> views = new ArrayList<>();
-        for (RunRepository.RunRow run : runs.findAll(tenantId)) {
+        for (RunRepository.RunRow run : runs.findVisible(tenantId, userId, role)) {
             views.add(view(tenantId, run.id()));
         }
         return views;

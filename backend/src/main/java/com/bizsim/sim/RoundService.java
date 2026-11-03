@@ -182,10 +182,11 @@ public class RoundService {
     // ------------------------------------------------------------------ reading
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> scoreboard(long tenantId, long runId) {
+    public List<Map<String, Object>> scoreboard(long tenantId, long runId, Integer round) {
         runs.find(runId, tenantId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "no such run"));
-        return rounds.scoreboard(runId);
+        // One row per company, for one round: the latest computed round unless a round is asked for.
+        return rounds.scoreboard(runId, round);
     }
 
     @Transactional(readOnly = true)

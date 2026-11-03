@@ -119,7 +119,8 @@ export const api = {
     }),
   nextRound: (runId: number) => request<{ number: number }>(`/runs/${runId}/rounds/next`, { method: "POST" }),
   closeRound: (runId: number) => request<unknown>(`/runs/${runId}/rounds/close`, { method: "POST" }),
-  scoreboard: (runId: number) => request<ScoreRow[]>(`/runs/${runId}/scoreboard`),
+  scoreboard: (runId: number, round?: number) =>
+    request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>
     request<DecisionFormContext>(`/runs/${runId}/teams/${teamId}/context`),
   streamTicket: (runId: number) =>

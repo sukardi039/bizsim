@@ -37,6 +37,7 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
+    private long tenantId;
     private long runId;
     private long teamOne;
     private long teamTwo;
@@ -53,6 +54,7 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         long tenant = jdbc.queryForObject(
                 "insert into tenant (code, name) values ('acme', 'Acme') returning id", Long.class);
+        tenantId = tenant;
         user(tenant, "trainer@acme.test", "FACILITATOR");
         user(tenant, "one@acme.test", "PLAYER");
         user(tenant, "two@acme.test", "PLAYER");
@@ -269,8 +271,21 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     @Test
     void cycles_are_configurable_and_rounds_can_exceed_the_default() throws Exception {
-        MvcResult created = mvc.perform(post("/api/runs")
+        // D21: this facilitator already has a simulation in progress in this fixture.
+        mvc.perform(post("/api/runs")
                         .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Second at once", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "B", "companyName", "B Inc"))))))
+                .andExpect(status().isConflict());
+
+        // A second simulation therefore needs a second facilitator — which is the point of the rule.
+        user(tenantId, "trainer2@acme.test", "FACILITATOR");
+        String secondFacilitator = loginOn("acme", "trainer2@acme.test");
+
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + secondFacilitator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Three cycles", "scenarioKey", "standard-v1", "cycles", 3,
@@ -338,6 +353,56 @@ class RoundFlowApiTest extends PostgresTestBase {
                 "rnd", List.of(Map.of("project", "RND-P1-COST", "invest", rnd)),
                 "capacityPurchase", 0));
         return body;
+    }
+
+    @Test
+    void a_facilitator_sees_only_their_own_simulations() throws Exception {
+        user(tenantId, "trainer3@acme.test", "FACILITATOR");
+        String third = loginOn("acme", "trainer3@acme.test");
+
+        mvc.perform(post("/api/runs")
+                        .header("Authorization", "Bearer " + third)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Theirs", "scenarioKey", "standard-v1",
+                                "teams", List.of(Map.of("name", "Z", "companyName", "Z Inc"))))))
+                .andExpect(status().isCreated());
+
+        // The original facilitator still sees exactly their own simulation.
+        mvc.perform(get("/api/runs").header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value((int) runId));
+    }
+
+    @Test
+    void the_scoreboard_is_one_row_per_company_for_a_single_round() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        openRound();
+        submit(playerOneToken, teamOne, payload(500, 120, 20, 0L, 30, 0)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        // Two rounds computed, but the board is not a history: one row per company, latest round.
+        MvcResult latest = mvc.perform(get("/api/runs/" + runId + "/scoreboard")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].round").value(2))
+                .andExpect(jsonPath("$[1].round").value(2))
+                .andReturn();
+        assertThat(latest.getResponse().getContentAsString()).doesNotContain("\"round\":1");
+
+        // A named round is still available, for the debrief.
+        mvc.perform(get("/api/runs/" + runId + "/scoreboard").param("round", "1")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].round").value(1));
     }
 
     private void openRound() throws Exception {

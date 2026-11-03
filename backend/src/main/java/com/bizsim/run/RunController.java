@@ -45,7 +45,7 @@ public class RunController {
     @GetMapping
     public List<RunService.RunView> list() {
         TenantContext.Principal me = TenantContext.require();
-        return runs.runs(me.tenantId());
+        return runs.runs(me.tenantId(), me.userId(), me.role());
     }
 
     @GetMapping("/{id}")

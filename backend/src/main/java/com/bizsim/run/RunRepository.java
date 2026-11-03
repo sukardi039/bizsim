@@ -54,11 +54,40 @@ public class RunRepository {
                 """, Long.class, tenantId, name, scenarioKey, facilitatorId);
     }
 
-    /** Every run of one tenant, newest first. The tenant id comes from the token, never the caller. */
-    public List<RunRow> findAll(long tenantId) {
+    /**
+     * The runs a caller may see (D21). A facilitator sees only the simulations they own, because one
+     * facilitator runs one simulation at a time; an admin sees the whole tenant; a player sees the
+     * runs their companies belong to.
+     */
+    public List<RunRow> findVisible(long tenantId, long userId, String role) {
+        if ("ADMIN".equals(role)) {
+            return jdbc.query("select * from run where tenant_id = ? order by id desc", RUN, tenantId);
+        }
+        if ("PLAYER".equals(role)) {
+            return jdbc.query("""
+                    select distinct r.* from run r
+                    join team t on t.run_id = r.id
+                    join player p on p.team_id = t.id
+                    where r.tenant_id = ? and p.user_id = ?
+                    order by r.id desc
+                    """, RUN, tenantId, userId);
+        }
         return jdbc.query("""
-                select * from run where tenant_id = ? order by id desc
-                """, RUN, tenantId);
+                select r.* from run r
+                join simulation s on s.id = r.simulation_id
+                where r.tenant_id = ? and s.facilitator_id = ?
+                order by r.id desc
+                """, RUN, tenantId, userId);
+    }
+
+    /** A facilitator may have only one simulation in flight; the count is the guard for D21. */
+    public int activeRunsOfFacilitator(long tenantId, long facilitatorId) {
+        Integer count = jdbc.queryForObject("""
+                select count(*) from run r
+                join simulation s on s.id = r.simulation_id
+                where r.tenant_id = ? and s.facilitator_id = ? and r.status <> 'FINISHED'
+                """, Integer.class, tenantId, facilitatorId);
+        return count == null ? 0 : count;
     }
 
     public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles) {

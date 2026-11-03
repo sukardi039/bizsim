@@ -242,7 +242,7 @@ public class RoundRepository {
 
     // ------------------------------------------------------------------ reading results
 
-    public List<Map<String, Object>> scoreboard(long runId) {
+    public List<Map<String, Object>> scoreboard(long runId, Integer round) {
         // Columns are extracted from the jsonb on purpose: returning a raw jsonb to Jackson yields a
         // PGobject, and the scoreboard contract should be stable fields, not whatever is in the blob.
         return jdbc.queryForList("""
@@ -263,8 +263,10 @@ public class RoundRepository {
                 join round r on r.id = rr.round_id
                 join team t on t.id = rr.team_id
                 where r.run_id = ?
-                order by r.number, rr.total_score desc, t.id
-                """, runId);
+                  and r.number = coalesce(?, (select max(number) from round
+                                              where run_id = ? and status = 'COMPUTED'))
+                order by rr.total_score desc, t.id
+                """, runId, round, runId);
     }
 
     public List<Map<String, Object>> statements(long runId, long teamId) {

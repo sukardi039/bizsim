@@ -137,6 +137,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = runs.find((run) => run.id === selectedId) ?? null;
   const [board, setBoard] = useState<ScoreRow[]>([]);
+  const [boardRound, setBoardRound] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -154,9 +155,12 @@ export default function App() {
 
   const refreshBoard = useCallback(async (runId: number) => {
     try {
-      setBoard(await api.scoreboard(runId));
+      const rows = await api.scoreboard(runId);
+      setBoard(rows);
+      setBoardRound(rows.length > 0 ? rows[0].round : null);
     } catch {
       setBoard([]); // no round computed yet
+      setBoardRound(null);
     }
   }, []);
 
@@ -298,13 +302,14 @@ export default function App() {
             </header>
 
             <section className="card">
-              <h2>Scoreboard</h2>
+              <h2>Scoreboard{boardRound !== null ? ` · round ${boardRound}` : ""}</h2>
               {board.length === 0 ? (
                 <p className="muted">No round computed yet.</p>
               ) : (
                 <table>
                   <thead>
                     <tr>
+                      <th className="num">#</th>
                       <th>Company</th>
                       <th className="num">Profit</th>
                       <th className="num">Cash</th>
@@ -313,10 +318,9 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...board]
-                      .sort((a, b) => b.profit - a.profit)
-                      .map((row) => (
+                    {board.map((row, index) => (
                         <tr key={row.team_id}>
+                          <td className="num">{index + 1}</td>
                           <td>{row.company_name}</td>
                           <td className={row.profit < 0 ? "num negative" : "num positive"}>{money(row.profit)}</td>
                           <td className="num">{money(row.cash)}</td>
