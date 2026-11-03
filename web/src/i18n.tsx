@@ -315,6 +315,8 @@ const en: Dict = {
   "start.start": "Start session",
   "start.starting": "Starting…",
   "start.tooManyTrainees": "There are more trainees ticked than companies to seat them in.",
+  "start.mapping": "Who sits where",
+  "start.emptySeat": "seat empty — fill it after the session starts",
 
   "packages.tidy": "Tidy up",
   "packages.tidyHint":
@@ -660,6 +662,8 @@ const zh: Dict = {
   "start.start": "开始模拟",
   "start.starting": "正在开始…",
   "start.tooManyTrainees": "勾选的学员多于可分配的公司数量。",
+  "start.mapping": "座位安排",
+  "start.emptySeat": "座位空缺——可在模拟开始后补上",
 
   "packages.tidy": "清理",
   "packages.tidyHint":

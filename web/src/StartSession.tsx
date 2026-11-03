@@ -144,6 +144,26 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
           ))}
         </ul>
 
+        {/* Tick order seats people in company order, which is easy to get wrong. Show the mapping. */}
+        {chosen && (
+          <>
+            <h3 className="pick-head">{t("start.mapping")}</h3>
+            <ul className="picks">
+              {chosen.companyProfileIds.map((id, index) => {
+                const seated = trainees.find((trainee) => trainee.id === traineeIds[index]);
+                return (
+                  <li key={id}>
+                    <strong>
+                      {companies.find((company) => company.id === id)?.name ?? `#${id}`}
+                    </strong>{" "}
+                    → {seated ? seated.displayName : <span className="muted">{t("start.emptySeat")}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+
         {chosen && traineeIds.length > chosen.companyProfileIds.length && (
           <p className="error">{t("start.tooManyTrainees")}</p>
         )}
