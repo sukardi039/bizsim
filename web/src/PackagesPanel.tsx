@@ -128,6 +128,16 @@ export default function PackagesPanel() {
       return { ...current, companyIds: [...current.companyIds, id] };
     });
 
+  /**
+   * Why the Publish button is disabled. A disabled button with no explanation is a dead end: the
+   * form looks complete and nothing happens.
+   */
+  const blockers = [
+    !draft.name.trim() ? t("packages.blockedName") : null,
+    draft.companyIds.length === 0 ? t("packages.blockedCompanies") : null,
+    !draft.templateKey ? t("packages.blockedTemplate") : null,
+  ].filter((entry): entry is string => entry !== null);
+
   const companyName = (id: number) =>
     companies.find((company) => company.id === id)?.name ?? `#${id}`;
 
@@ -303,11 +313,16 @@ export default function PackagesPanel() {
             </>
           )}
 
+          {blockers.length > 0 && (
+            <p className="muted">
+              {t("packages.blockedTitle")} {blockers.join(" · ")}
+            </p>
+          )}
           <div className="buttons">
             <button
               className="primary"
               type="submit"
-              disabled={busy === "new" || !draft.name.trim() || draft.companyIds.length === 0}
+              disabled={busy === "new" || blockers.length > 0}
             >
               {busy === "new" ? t("packages.publishing") : t("packages.publishAction")}
             </button>

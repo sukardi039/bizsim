@@ -319,6 +319,10 @@ const en: Dict = {
   "start.classListHint":
     "Prepared with the package: one person per company. To change it, publish a new package, or adjust the seats after the session starts.",
   "start.mapping": "Who sits where",
+  "packages.blockedTitle": "To publish, add:",
+  "packages.blockedName": "a package name",
+  "packages.blockedCompanies": "at least one company (tick a profile above)",
+  "packages.blockedTemplate": "a template",
   "packages.companyCount": "{count} of {max} companies — one company per profile, one profile per company",
   "packages.classList": "Class list",
   "packages.classListHint":
@@ -673,6 +677,10 @@ const zh: Dict = {
   "start.classList": "班级名单",
   "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包，或在模拟开始后调整座位。",
   "start.mapping": "座位安排",
+  "packages.blockedTitle": "发布前还需：",
+  "packages.blockedName": "填写模拟包名称",
+  "packages.blockedCompanies": "至少勾选一家公司档案",
+  "packages.blockedTemplate": "选择模板",
   "packages.companyCount": "{count} / {max} 家公司 —— 每个档案一家公司",
   "packages.classList": "班级名单",
   "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。可留空位给临时加入者。",
