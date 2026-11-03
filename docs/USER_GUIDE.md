@@ -293,7 +293,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 | **no Role dropdown when adding someone** | you are signed in as a facilitator, or the deployed build predates the selector — an admin sees it; otherwise redeploy (§10, `api/version`) |
 | **created an account with the wrong role** | **People** → the role cell is a dropdown for admins → pick the right role; no need to delete and recreate |
 | `this package has been retired` | publish a new package |
-| Blank screen after a deploy | check `https://<domain>/api/version` — `latest` must match the newest migration; if not, redeploy |
+| Blank screen, or a feature you were told exists is missing | check `https://<domain>/api/version`: `builtAt` is the build time of the running image. If it predates the change, redeploy. `latest` only tracks database migrations, so a UI-only release does not move it |
 
 ---
 

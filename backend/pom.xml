@@ -105,6 +105,17 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <executions>
+          <!-- Bakes build time into the jar, so /api/version can say when THIS image was built.
+               The migration count only moves when the schema moves; without a build stamp a deploy
+               that ships no migration is indistinguishable from the previous one. -->
+          <execution>
+            <id>build-info</id>
+            <goals>
+              <goal>build-info</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <!-- Same Flyway version Spring Boot runs at startup, used for the manual operations a deploy
            sometimes needs: info, validate, repair, baseline. Normal development never calls it.

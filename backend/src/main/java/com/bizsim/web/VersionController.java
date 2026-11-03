@@ -1,6 +1,8 @@
 package com.bizsim.web;
 
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.info.BuildProperties;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -22,24 +24,30 @@ import java.util.Map;
 @RequestMapping("/api")
 public class VersionController {
 
-    public record VersionView(String version, long migrations, String latest, String latestDescription,
-                              String latestAppliedAt, String serverTime) {
+    public record VersionView(String version, String builtAt, long migrations, String latest,
+                              String latestDescription, String latestAppliedAt, String serverTime) {
     }
 
     private final JdbcTemplate jdbc;
     private final String version;
+    private final ObjectProvider<BuildProperties> build;
 
-    public VersionController(JdbcTemplate jdbc, @Value("${bizsim.version:dev}") String version) {
+    public VersionController(JdbcTemplate jdbc, @Value("${bizsim.version:dev}") String version,
+                             ObjectProvider<BuildProperties> build) {
         this.jdbc = jdbc;
         this.version = version;
+        this.build = build;
     }
 
     @GetMapping("/version")
     public VersionView version() {
         long applied = count();
         Map<String, Object> latest = latest();
+        BuildProperties info = build.getIfAvailable();
         return new VersionView(
                 version,
+                // When this image was built. A deploy that ships no migration still moves this.
+                info == null || info.getTime() == null ? "" : info.getTime().toString(),
                 applied,
                 latest == null ? "none" : String.valueOf(latest.get("version")),
                 latest == null ? "" : String.valueOf(latest.get("description")),

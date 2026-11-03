@@ -29,6 +29,9 @@ class VersionApiTest extends PostgresTestBase {
         mvc.perform(get("/api/version"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").isString())
+                // Baked at build time: the only signal that distinguishes two deploys with the same
+                // migration count.
+                .andExpect(jsonPath("$.builtAt").isString())
                 .andExpect(jsonPath("$.migrations").value(14))
                 .andExpect(jsonPath("$.latest").value("14"))
                 .andExpect(jsonPath("$.latestAppliedAt").isString())

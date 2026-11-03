@@ -46,6 +46,20 @@ containers read, so no credential is ever written into a tracked file.
 | `BIZSIM_BOOTSTRAP_ADMIN_SECRET` | a credential of 8+ characters | initial login; remove all of these after signing in |
 | `BIZSIM_BOOTSTRAP_ROLE` | `ADMIN` (default), `FACILITATOR` or `BUILDER` | the first account's role |
 
+### Did the deploy land?
+
+`GET /api/version` needs no login and answers the question directly:
+
+```
+{"version":"0.9.0-workbench","builtAt":"2026-11-03T10:29:09Z",
+ "migrations":14,"latest":"14","latestDescription":"frozen package templates", ...}
+```
+
+`builtAt` is baked into the jar at build time and is the field to trust: **the migration count only
+moves when the schema moves**, so a release that ships only UI or permission changes leaves `latest`
+unchanged. If `builtAt` is older than your last deploy, the old image is still running — redeploy and
+watch that timestamp change.
+
 **Keep the first account an `ADMIN`.** Only an admin may create a `BUILDER` or a `FACILITATOR`
 (D24), and the whole setup workbench — templates, events, companies, packages — is behind `BUILDER`.
 If the first account is a facilitator, nobody can reach the setup screens until you either promote it
