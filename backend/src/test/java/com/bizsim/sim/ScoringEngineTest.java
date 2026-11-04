@@ -207,6 +207,36 @@ class ScoringEngineTest {
         assertThat(line(outcome).sold()).isEqualByComparingTo("100.00");
     }
 
+    @Test
+    void demand_is_split_in_whole_pieces_that_add_up_to_the_market_the_cohort_serves() {
+        EnvironmentService.RoundEnvironment neutral =
+                EnvironmentService.RoundEnvironment.neutral(1, java.util.Set.of("P"));
+        Scenario scenario = scenario();
+        double baseline = scenario.params().baselineShare().doubleValue();
+
+        ScoringEngine.TeamInput first = team(decision(bd("0"), ZERO), bd("1000000"), "ACTIVE",
+                active("PRJ"), ZERO);
+        ScoringEngine.TeamInput second = new ScoringEngine.TeamInput(2L, "ACTIVE", bd("1000000"),
+                bd("50"), ZERO, Map.of("PRODUCTION", 10),
+                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO)),
+                active("PRJ"), decision(bd("0"), ZERO));
+
+        ScoringEngine.RoundResult result = engine.compute(scenario, neutral, List.of(first, second));
+
+        BigDecimal total = ZERO;
+        for (ScoringEngine.TeamOutcome outcome : result.teams()) {
+            BigDecimal demand = line(outcome).demand();
+            assertThat(demand.stripTrailingZeros().scale()).as("whole pieces").isLessThanOrEqualTo(0);
+            total = total.add(demand);
+        }
+        // The cohort serves (1 - baselineShare) of the pool; the split adds up to it exactly, so no
+        // unit is created or lost by rounding.
+        BigDecimal served = engine.marketPool(scenario, neutral, 2)
+                .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(baseline)))
+                .setScale(0, java.math.RoundingMode.HALF_UP);
+        assertThat(total).isEqualByComparingTo(served);
+    }
+
     // ------------------------------------------------------------------ fixtures
 
     private ScoringEngine.TeamOutcome run(ScoringEngine.TeamInput team) {

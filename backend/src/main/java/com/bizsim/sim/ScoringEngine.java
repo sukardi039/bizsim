@@ -315,12 +315,47 @@ public class ScoringEngine {
                 attractiveness[i] = attractiveness(scenario, spec.code(), teams.get(i), plans.get(i));
                 sum += attractiveness[i];
             }
-            BigDecimal pool = poolFor(scenario, spec, environment.round(), teams.size())
-                    .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE)));
-            for (int i = 0; i < teams.size(); i++) {
-                double share = sum <= 0 ? 0 : (attractiveness[i] / sum) * (1 - baselineShare);
-                BigDecimal demand = units(pool.multiply(bd(share)));
-                result.get(teams.get(i).teamId()).put(spec.code(), demand.doubleValue());
+            // D34: the market is a whole number of pieces and it is divided in whole pieces. A share
+            // of a pool used to be rounded to two decimals, which left companies holding 0.94 of a
+            // product while another product stocked out -- numbers nobody can act on.
+            BigDecimal pool = wholePool(scenario, spec, environment, teams.size());
+            int n = teams.size();
+            // The cohort serves (1 - baselineShare) of the pool; the rest is the market this class
+            // never sees. The allocation has to add up to exactly that target in whole pieces.
+            BigDecimal target = pool.multiply(ONE.subtract(bd(baselineShare)))
+                    .setScale(0, RoundingMode.HALF_UP);
+            if (sum <= 0 || n == 0 || target.signum() <= 0) {
+                for (TeamInput team : teams) {
+                    result.get(team.teamId()).put(spec.code(), 0d);
+                }
+                continue;
+            }
+            BigDecimal[] raw = new BigDecimal[n];
+            BigDecimal[] pieces = new BigDecimal[n];
+            BigDecimal assigned = ZERO;
+            for (int i = 0; i < n; i++) {
+                double share = attractiveness[i] / sum;
+                raw[i] = target.multiply(bd(share));
+                pieces[i] = raw[i].setScale(0, RoundingMode.DOWN);
+                assigned = assigned.add(pieces[i]);
+            }
+            // Largest remainder: the units the pool still has go to the companies whose fractional
+            // part was cut most, one each, ties by team order. The piece counts then add up to the
+            // market exactly instead of quietly losing or inventing units.
+            int leftover = target.subtract(assigned).min(BigDecimal.valueOf(n)).intValue();
+            List<Integer> order = new ArrayList<>();
+            for (int i = 0; i < n; i++) {
+                order.add(i);
+            }
+            order.sort((a, b) -> {
+                int byRemainder = raw[b].subtract(pieces[b]).compareTo(raw[a].subtract(pieces[a]));
+                return byRemainder != 0 ? byRemainder : Integer.compare(a, b);
+            });
+            for (int k = 0; k < leftover; k++) {
+                pieces[order.get(k)] = pieces[order.get(k)].add(ONE);
+            }
+            for (int i = 0; i < n; i++) {
+                result.get(teams.get(i).teamId()).put(spec.code(), pieces[i].doubleValue());
             }
         }
         return result;
@@ -331,10 +366,21 @@ public class ScoringEngine {
                                  int companies) {
         BigDecimal pool = ZERO;
         for (Scenario.ProductSpec spec : scenario.products()) {
-            pool = pool.add(poolFor(scenario, spec, environment.round(), companies)
-                    .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE))));
+            pool = pool.add(wholePool(scenario, spec, environment, companies));
         }
-        return units(pool);
+        return pool;
+    }
+
+    /**
+     * The market for one product, in whole pieces: base demand scaled for the cohort, then for the
+     * round's environment. Rounded once, here, so the allocation and the market-share denominator
+     * agree on the same number (D34).
+     */
+    private BigDecimal wholePool(Scenario scenario, Scenario.ProductSpec spec,
+                                 EnvironmentService.RoundEnvironment environment, int companies) {
+        return poolFor(scenario, spec, environment.round(), companies)
+                .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE)))
+                .setScale(0, RoundingMode.HALF_UP);
     }
 
     private BigDecimal poolFor(Scenario scenario, Scenario.ProductSpec spec, int round, int companies) {
@@ -402,7 +448,8 @@ public class ScoringEngine {
             BigDecimal price = plan.prices().get(spec.code());
             BigDecimal unitCost = plan.effectiveCost().get(spec.code());
 
-            BigDecimal demanded = units(bd(demand.getOrDefault(spec.code(), 0.0)));
+            // Demand arrives allocated in whole pieces (D34); no re-scaling here.
+            BigDecimal demanded = bd(demand.getOrDefault(spec.code(), 0.0)).setScale(0, RoundingMode.HALF_UP);
             BigDecimal available = opening.add(produced);
             BigDecimal sold = min(demanded, available);
             BigDecimal lost = demanded.subtract(sold).max(ZERO);

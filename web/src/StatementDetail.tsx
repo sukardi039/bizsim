@@ -35,8 +35,16 @@ export default function StatementDetail({ row, share }: { row: StatementRow; sha
   const cashOpening = Number(row.opening_cash ?? 0);
   const cashMove = cashAfter - cashOpening;
 
+  // The engine writes one line per product into the statement detail (D34). They are the same
+  // numbers that produced revenue and lost sales above, so the table is a breakdown, never a
+  // second calculation.
+  const products = row.detail?.products ?? [];
+  const sumOf = (pick: (line: (typeof products)[number]) => number) =>
+    products.reduce((sum, line) => sum + Number(pick(line) ?? 0), 0);
+
   return (
-    <div className="detail-grid">
+    <>
+      <div className="detail-grid">
       <div>
         <h4>{t("debrief.groupRevenue")}</h4>
         <dl className="lines">
@@ -120,5 +128,57 @@ export default function StatementDetail({ row, share }: { row: StatementRow; sha
         </dl>
       </div>
     </div>
+
+      {products.length > 0 && (
+        <div className="product-lines">
+        <h4>{t("debrief.products")}</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>{t("debrief.product")}</th>
+              <th className="num">{t("debrief.opening")}</th>
+              <th className="num">{t("debrief.produced")}</th>
+              <th className="num">{t("debrief.demand")}</th>
+              <th className="num">{t("debrief.sold")}</th>
+              <th className="num">{t("debrief.lost")}</th>
+              <th className="num">{t("debrief.closing")}</th>
+              <th className="num">{t("debrief.revenue")}</th>
+              <th className="num">{t("debrief.cogs")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((line) => (
+              <tr key={line.product}>
+                <td>{line.product}</td>
+                <td className="num">{number(Number(line.openingStock ?? 0), 0)}</td>
+                <td className="num">{number(Number(line.produced ?? 0), 0)}</td>
+                <td className="num">{number(Number(line.demand ?? 0), 0)}</td>
+                <td className="num">{number(Number(line.sold ?? 0), 0)}</td>
+                <td className={Number(line.lost ?? 0) > 0 ? "num negative" : "num"}>
+                  {number(Number(line.lost ?? 0), 0)}
+                </td>
+                <td className="num">{number(Number(line.closingStock ?? 0), 0)}</td>
+                <td className="num">{money(Number(line.revenue ?? 0))}</td>
+                <td className="num">{money(Number(line.cogs ?? 0))}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>
+                <strong>{t("debrief.class")}</strong>
+              </td>
+              <td className="num" colSpan={3} />
+              <td className="num">{number(sumOf((line) => line.sold), 0)}</td>
+              <td className="num">{number(sumOf((line) => line.lost), 0)}</td>
+              <td className="num">{number(sumOf((line) => line.closingStock), 0)}</td>
+              <td className="num">{money(sumOf((line) => line.revenue))}</td>
+              <td className="num">{money(sumOf((line) => line.cogs))}</td>
+            </tr>
+          </tfoot>
+          </table>
+        </div>
+      )}
+    </>
   );
 }

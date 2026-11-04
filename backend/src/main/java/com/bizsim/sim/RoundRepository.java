@@ -288,17 +288,45 @@ public class RoundRepository {
     }
 
     public List<Map<String, Object>> statements(long runId, long teamId) {
-        return jdbc.queryForList("""
+        // The detail is returned as an object, not as a string: it carries the per-product lines the
+        // debrief shows (D34), and every caller would otherwise have to parse it again.
+        return jdbc.query("""
                 select r.number as round, s.revenue, s.cogs, s.payroll, s.marketing, s.rnd_spend,
                        s.fixed_cost, s.holding_cost, s.hiring_cost, s.capacity_cost, s.report_cost,
                        s.opening_cash, s.profit, s.cash_after, s.brand_after, s.lost_sales,
                        s.capacity_used,
-                       s.capacity_available, s.detail::text as detail
+                       s.capacity_available, s.detail as detail
                 from round_statement s
                 join round r on r.id = s.round_id
                 where r.run_id = ? and s.team_id = ?
                 order by r.number
-                """, runId, teamId);
+                """, (rs, i) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (String money : List.of("revenue", "cogs", "payroll", "marketing", "rnd_spend",
+                    "fixed_cost", "holding_cost", "hiring_cost", "capacity_cost", "report_cost",
+                    "opening_cash", "profit", "cash_after")) {
+                row.put(money, rs.getBigDecimal(money));
+            }
+            row.put("round", rs.getInt("round"));
+            row.put("brand_after", rs.getBigDecimal("brand_after"));
+            row.put("lost_sales", rs.getBigDecimal("lost_sales"));
+            row.put("capacity_used", rs.getBigDecimal("capacity_used"));
+            row.put("capacity_available", rs.getBigDecimal("capacity_available"));
+            row.put("detail", readJson(rs.getString("detail")));
+            return row;
+        }, runId, teamId);
+    }
+
+    private Object readJson(String text) {
+        if (text == null) {
+            return null;
+        }
+        try {
+            return json.readValue(text, Map.class);
+        } catch (JsonProcessingException e) {
+            // A statement that cannot be read is a stored-data fault, not a client error.
+            throw new IllegalStateException("round_statement.detail is not valid json", e);
+        }
     }
 
     // ------------------------------------------------------------------ json

@@ -253,6 +253,14 @@ Under the scoreboard, for any computed round:
 
    Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
    not one of the named lines appears as **Other charges** instead of being folded into a total.
+
+   Under the three columns, **Per product** breaks the same round down line by line — one row per
+   product with **Opening**, **Produced**, **Demand**, **Sold**, **Lost**, **Closing**, **Revenue**
+   and **COGS**. This is the answer to "82 pieces were lost — of which product?" and "0.94 left in
+   stock — of which product?": a company that stocked out on one product and kept a little of
+   another shows both, separately. The rows add up to the totals above, because they are the same
+   stored lines, not a second calculation. Units are whole pieces (D34); the market share stays a
+   percentage of the whole market.
 4. The **Class** footer sums revenue and profit for the whole class.
 
 Every number comes from that round's statements — the debrief cannot disagree with what the engine

@@ -120,6 +120,22 @@ export interface Run {
   players: RunPlayer[];
 }
 
+/** One product's line in a computed round: what was available, what it sold, what it lost. */
+export interface ProductStat {
+  product: string;
+  planned: number;
+  produced: number;
+  openingStock: number;
+  demand: number;
+  sold: number;
+  closingStock: number;
+  lost: number;
+  price: number;
+  unitCost: number;
+  revenue: number;
+  cogs: number;
+}
+
 export interface StatementRow {
   round: number;
   revenue: number;
@@ -140,6 +156,8 @@ export interface StatementRow {
   lost_sales: number;
   capacity_used: number;
   capacity_available: number;
+  /** The per-product lines written by the engine at compute time (D34). */
+  detail?: { products?: ProductStat[] } | null;
 }
 
 export interface ScoreRow {

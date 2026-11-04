@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -601,6 +602,47 @@ class RoundFlowApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + playerTwoToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.submitted").value(false));
+    }
+
+    /**
+     * D34: the statement carries one line per product — opening, produced, demand, sold, lost,
+     * closing — and those lines are the same numbers as the statement totals, not a second
+     * calculation. This is what lets a debrief answer "which product lost the 82 pieces?".
+     */
+    @Test
+    void the_statement_carries_the_per_product_breakdown() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/statements")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode statement = json.readTree(result.getResponse().getContentAsString()).get(0);
+        JsonNode products = statement.get("detail").get("products");
+
+        assertThat(products.size()).isGreaterThan(0);
+        BigDecimal sold = BigDecimal.ZERO;
+        BigDecimal lost = BigDecimal.ZERO;
+        BigDecimal revenue = BigDecimal.ZERO;
+        for (JsonNode line : products) {
+            // Demand is allocated in whole pieces (D34), so nothing on the shelf is a fraction.
+            assertThat(line.get("demand").decimalValue().stripTrailingZeros().scale())
+                    .as("whole pieces for " + line.get("product").asText())
+                    .isLessThanOrEqualTo(0);
+            assertThat(line.get("sold").decimalValue().add(line.get("lost").decimalValue()))
+                    .as("sold + lost = demand for " + line.get("product").asText())
+                    .isEqualByComparingTo(line.get("demand").decimalValue());
+            sold = sold.add(line.get("sold").decimalValue());
+            lost = lost.add(line.get("lost").decimalValue());
+            revenue = revenue.add(line.get("revenue").decimalValue());
+        }
+        assertThat(lost).isEqualByComparingTo(statement.get("lost_sales").decimalValue());
+        assertThat(revenue).isEqualByComparingTo(statement.get("revenue").decimalValue());
+        assertThat(sold).isGreaterThan(BigDecimal.ZERO);
     }
 
     @Test
