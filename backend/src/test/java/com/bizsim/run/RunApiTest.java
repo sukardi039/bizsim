@@ -152,11 +152,28 @@ class RunApiTest extends PostgresTestBase {
     void advancing_closes_the_previous_round_and_opens_the_next() throws Exception {
         long runId = createRun(acmeFacilitator);
 
+        // D38: the console shows one button, so the run itself has to say whether a round is open.
+        mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(jsonPath("$.currentRound").value(0))
+                .andExpect(jsonPath("$.roundOpen").value(false));
+
         mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                         .header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.number").value(1))
                 .andExpect(jsonPath("$.status").value("OPEN"));
+
+        mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(jsonPath("$.currentRound").value(1))
+                .andExpect(jsonPath("$.roundOpen").value(true));
+
+        // Computing the round leaves it closed and no round open: the button flips to "open round 2".
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(jsonPath("$.currentRound").value(1))
+                .andExpect(jsonPath("$.roundOpen").value(false));
 
         mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                         .header("Authorization", "Bearer " + facilitatorToken))

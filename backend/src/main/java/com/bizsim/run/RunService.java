@@ -30,10 +30,16 @@ public class RunService {
     public record TeamSpec(String name, String companyName) {
     }
 
+    /**
+     * @param roundOpen whether a round is open right now. The console shows one button whose job
+     *                  follows this: compute while a round is open, open the next one when it is not
+     *                  (D38). `currentRound` alone cannot tell those apart.
+     */
     public record RunView(long id, String status, int currentRound, String scenarioKey,
                           int rounds, int cycles, String locale,
                           List<RunRepository.TeamRow> teams,
-                          List<RunRepository.PlayerRow> players) {
+                          List<RunRepository.PlayerRow> players,
+                          boolean roundOpen) {
     }
 
     public record RoundState(int number, String status) {
@@ -331,7 +337,8 @@ public class RunService {
         int totalRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
         int cycles = run.cycles() == null ? 0 : run.cycles();
         return new RunView(run.id(), run.status(), run.currentRound(), run.scenarioKey(),
-                totalRounds, cycles, runs.localeOf(runId), runs.teams(runId), runs.players(runId));
+                totalRounds, cycles, runs.localeOf(runId), runs.teams(runId), runs.players(runId),
+                runs.openRoundNumber(runId).isPresent());
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

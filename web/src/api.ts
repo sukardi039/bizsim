@@ -113,6 +113,8 @@ export interface Run {
   id: number;
   status: string;
   currentRound: number;
+  /** True while a round is open to decide: the run page's single button computes, else opens (D38). */
+  roundOpen: boolean;
   scenarioKey: string;
   rounds: number;
   cycles: number;

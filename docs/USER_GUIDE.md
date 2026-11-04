@@ -222,13 +222,18 @@ Every company row on the scoreboard and in the debrief is labelled with the trai
 (*Alpha Industries · Ana*), so "how did she do?" is answered without a separate roster — the seating
 itself stays with the builder and cannot be changed here (D33, D36).
 
-Header: `Run <n>` · status · `round x of y` · cycles. Buttons:
+Header: `Run <n>` · status · `round x of y` · cycles. There is **one** round button, because only
+one of its two jobs is ever the right move (D38):
 
-| Button | What it does |
+| What the button says | What it does |
 |---|---|
-| **Open next round** | opens the next round for decisions (round 0 → 1 → …) |
-| **Compute round** | closes the open round and calculates results for every company |
-| **Delete run** | removes the session and everything played in it — **accounts survive** |
+| **Open round N** | nothing is open: opens round N for decisions (round 0 → 1 → …) |
+| **Compute round** | a round is open: closes it and calculates results for every company |
+| **Session finished** (greyed) | the last round is computed; nothing more to open |
+
+One round is therefore two clicks with a pause in between — **Compute round**, read the debrief,
+then **Open round N+1**. **Delete run** removes the session and everything played in it —
+**accounts survive**.
 
 You can only have **one session in progress at a time**. To run two cohorts in parallel you need two
 facilitator accounts.

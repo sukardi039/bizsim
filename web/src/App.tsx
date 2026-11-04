@@ -406,12 +406,22 @@ export default function App() {
                 </p>
               </div>
               <div className="buttons">
-                <button onClick={() => act("next")} disabled={selected.currentRound >= selected.rounds}>
-                  {t("run.openNext")}
-                </button>
-                <button className="primary" onClick={() => act("close")} disabled={selected.status !== "OPEN"}>
-                  {t("run.compute")}
-                </button>
+                {/* One button, because only one of the two is the right move at any moment: while a
+                    round is open the facilitator computes it; when nothing is open the next round is
+                    opened. Both used to sit side by side, so half of them were always a no-op (D38). */}
+                {selected.roundOpen ? (
+                  <button className="primary" onClick={() => act("close")} disabled={selected.status !== "OPEN"}>
+                    {t("run.compute")}
+                  </button>
+                ) : selected.status === "OPEN" && selected.currentRound < selected.rounds ? (
+                  <button className="primary" onClick={() => act("next")}>
+                    {t("run.openRound", { round: selected.currentRound + 1 })}
+                  </button>
+                ) : (
+                  <button className="primary" disabled>
+                    {t("run.finished")}
+                  </button>
+                )}
                 <button className="danger" onClick={remove}>
                   {t("run.delete")}
                 </button>

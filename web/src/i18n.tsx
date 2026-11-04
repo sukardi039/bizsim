@@ -52,6 +52,8 @@ const en: Dict = {
   "login.again": "Sign in again",
 
   "run.openNext": "Open next round",
+  "run.openRound": "Open round {round}",
+  "run.finished": "Session finished",
   "run.compute": "Compute round",
   "run.delete": "Delete run",
   "run.deleteConfirm":
@@ -446,6 +448,8 @@ const zh: Dict = {
   "login.again": "重新登录",
 
   "run.openNext": "开启下一轮",
+  "run.openRound": "开启第 {round} 轮",
+  "run.finished": "模拟已结束",
   "run.compute": "结算本轮",
   "run.delete": "删除模拟",
   "run.deleteConfirm":
