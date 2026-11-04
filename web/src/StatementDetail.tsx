@@ -166,7 +166,8 @@ export default function StatementDetail({ row, share }: { row: StatementRow; sha
           <tfoot>
             <tr>
               <td>
-                <strong>{t("debrief.class")}</strong>
+                {/* This company's own total for the round, not the class (the trainee sees this too). */}
+                <strong>{t("debrief.total")}</strong>
               </td>
               <td className="num" colSpan={3} />
               <td className="num">{number(sumOf((line) => line.sold), 0)}</td>

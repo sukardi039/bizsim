@@ -303,10 +303,17 @@ package's class list and publishes a new package; the facilitator cannot seat yo
      investment"*: the money cannot be spent again, and leaving it at 0 does not block the round.
    - **Market review** — optional paid report; the cost is deducted from the result
 4. **Submit round n**. Submitting again replaces the decision until the round is computed.
-5. **Your results** — once a round is computed, the trainee sees their own company's round under
-   Revenue · Cost · Result, with a round selector for earlier rounds. It is the same breakdown the
-   class debrief shows for that company, from the same statement row; **competitors' figures and
-   market share stay on the facilitator's screen**.
+5. **Your results** — once a round is computed, the trainee gets the same summary and detail the
+   class debrief shows for their company:
+   - a **summary table**, one row per computed round (revenue, cost, profit, cash, lost sales,
+     capacity used) — click a row to choose it;
+   - the chosen round in **detail** under Revenue · Cost · Result;
+   - **Per product**, the same round broken down by product (opening, produced, demand, sold,
+     lost, closing, revenue, COGS) — this is where "which product lost those pieces?" is answered
+     for the trainee too.
+
+   **Competitors' figures and the market share stay on the facilitator's screen**; the trainee sees
+   only their own company. Everything comes from the same statement rows the debrief reads.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."*

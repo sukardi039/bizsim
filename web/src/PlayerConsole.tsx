@@ -292,11 +292,60 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </label>
         </div>
         <p className="muted">{t("player.resultsHint")}</p>
+
+        {/* The facilitator's debrief, for one company: a summary row per computed round, then the
+            chosen round's detail below. Competitors' figures and the market share stay on the
+            facilitator's screen (D21, D37). */}
+        <table>
+          <thead>
+            <tr>
+              <th>{t("debrief.round")}</th>
+              <th className="num">{t("debrief.revenue")}</th>
+              <th className="num">{t("debrief.cost")}</th>
+              <th className="num">{t("debrief.profit")}</th>
+              <th className="num">{t("debrief.cash")}</th>
+              <th className="num">{t("debrief.lostSales")}</th>
+              <th className="num">{t("debrief.capacity")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {statements.map((row) => {
+              const chosen = row.round === (resultRound ?? statements[statements.length - 1].round);
+              return (
+                <tr
+                  key={row.round}
+                  className={chosen ? "active" : ""}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => setResultRound(row.round)}
+                >
+                  <td>{row.round}</td>
+                  <td className="num">{money(Number(row.revenue ?? 0))}</td>
+                  <td className="num">{money(Number(row.revenue ?? 0) - Number(row.profit ?? 0))}</td>
+                  <td className="num">
+                    <strong>{money(Number(row.profit ?? 0))}</strong>
+                  </td>
+                  <td className="num">{money(Number(row.cash_after ?? 0))}</td>
+                  <td className="num">{plain(Number(row.lost_sales ?? 0), 0)}</td>
+                  <td className="num">
+                    {plain(Number(row.capacity_used ?? 0), 0)} /{" "}
+                    {plain(Number(row.capacity_available ?? 0), 0)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
         {(() => {
           const row =
             statements.find((entry) => entry.round === (resultRound ?? statements[statements.length - 1].round)) ??
             statements[statements.length - 1];
-          return <StatementDetail row={row} />;
+          return (
+            <>
+              <h3 className="pick-head">{t("player.resultsRound", { round: row.round })}</h3>
+              <StatementDetail row={row} />
+            </>
+          );
         })()}
       </section>
     ) : null;
