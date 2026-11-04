@@ -119,9 +119,17 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         // Round 1 opens at the company's starting cash...
         Map<String, Object> first = jdbc.queryForMap("""
-                select s.opening_cash, s.cash_after, s.profit from round_statement s
+                select s.opening_cash, s.cash_after, s.profit,
+                       (s.detail ->> 'cashChange')::numeric as cash_change
+                from round_statement s
                 join round r on r.id = s.round_id where r.run_id = ? and s.team_id = ? and r.number = 1
                 """, runId, teamOne);
+        // The backfill (V17) reads cashChange out of `detail`; the invariant it relies on is that
+        // opening + movement = closing, exactly, with no rounding drift.
+        assertThat(first.get("cash_change")).isNotNull();
+        assertThat(((java.math.BigDecimal) first.get("opening_cash"))
+                .add((java.math.BigDecimal) first.get("cash_change")))
+                .isEqualByComparingTo((java.math.BigDecimal) first.get("cash_after"));
         java.math.BigDecimal opening = (java.math.BigDecimal) first.get("opening_cash");
         assertThat(opening).isEqualByComparingTo(new java.math.BigDecimal("2000000000"));
         // ...and closing - opening is the cash the round actually moved.
@@ -142,6 +150,49 @@ class RoundFlowApiTest extends PostgresTestBase {
                 join round r on r.id = s.round_id where r.run_id = ? and s.team_id = ? and r.number = 2
                 """, runId, teamOne);
         assertThat((java.math.BigDecimal) second.get("opening_cash")).isEqualByComparingTo(closing);
+
+        // V17 exists to fix rows written before the column did. Run the migration's own SQL against
+        // zeroed rows and require it to restore them exactly -- a backfill that ships without being
+        // executed once is a hypothesis, not a fix.
+        List<java.math.BigDecimal> before = jdbc.queryForList(
+                "select opening_cash from round_statement s join round r on r.id = s.round_id "
+                        + "where r.run_id = ? order by r.number, s.team_id",
+                java.math.BigDecimal.class, runId);
+        jdbc.update("update round_statement set opening_cash = 0 where round_id in "
+                + "(select id from round where run_id = ?)", runId);
+        for (String statement : backfillStatements()) {
+            jdbc.execute(statement);
+        }
+        List<java.math.BigDecimal> after = jdbc.queryForList(
+                "select opening_cash from round_statement s join round r on r.id = s.round_id "
+                        + "where r.run_id = ? order by r.number, s.team_id",
+                java.math.BigDecimal.class, runId);
+        assertThat(after).hasSize(before.size());
+        for (int i = 0; i < before.size(); i++) {
+            assertThat(after.get(i)).isEqualByComparingTo(before.get(i));
+        }
+    }
+
+    /** The executable part of V17: line comments dropped, statements split on ';'. */
+    private static List<String> backfillStatements() throws Exception {
+        String sql = new org.springframework.core.io.ClassPathResource(
+                "db/migration/V17__backfill_opening_cash.sql")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        StringBuilder bare = new StringBuilder();
+        for (String line : sql.split("\\R")) {
+            if (!line.trim().startsWith("--")) {
+                bare.append(line).append('\n');
+            }
+        }
+        List<String> statements = new java.util.ArrayList<>();
+        for (String chunk : bare.toString().split(";")) {
+            String trimmed = chunk.trim();
+            String lower = trimmed.toLowerCase();
+            if (lower.startsWith("update") || lower.startsWith("alter") || lower.startsWith("insert")) {
+                statements.add(trimmed);
+            }
+        }
+        return statements;
     }
 
     @Test

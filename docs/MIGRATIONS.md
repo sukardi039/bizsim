@@ -115,6 +115,18 @@ loud.
 | Manual `psql` in production | The schema stops matching the folder, and the next deploy fails |
 | Test-only schema (`H2`, in-memory) | `jsonb`, identity columns and ordering would behave differently; tests run real PostgreSQL |
 
+### Data migrations: correcting rows a schema change exposed
+
+Occasionally a column arrives empty and has to be filled from data already stored (V17 backfills
+`round_statement.opening_cash` from `detail->>'cashChange'`). Rules for those:
+
+| Rule | Why |
+|---|---|
+| Derive from the row itself, never re-run the engine | Recomputing a past round would use today's calibration and rewrite history a class already saw |
+| Guard with the "still empty" predicate (`and opening_cash = 0`) | Makes the statement idempotent and leaves rows the engine already wrote alone |
+| Execute the file's own SQL in a test | A backfill that has never run is a hypothesis: `RoundFlowApiTest` zeroes the rows and replays the migration statements, asserting they come back byte-identical |
+| State the residual | Rows whose `detail` predates the field being backfilled cannot be corrected; say so rather than defaulting silently |
+
 ---
 
 ## 6. What the tests enforce
