@@ -130,6 +130,8 @@ export interface StatementRow {
   hiring_cost: number;
   capacity_cost: number;
   report_cost: number;
+  /** Cash held before the round was computed; cash_after - opening_cash is the movement. */
+  opening_cash: number;
   profit: number;
   cash_after: number;
   brand_after: number;

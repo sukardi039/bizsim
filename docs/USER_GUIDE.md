@@ -212,7 +212,11 @@ Under the scoreboard, for any computed round:
    - **Revenue** — revenue for the round, and units lost to stock-outs
    - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
      hiring/firing, capacity, market review, then **Total cost**
-   - **Result** — profit, cash after the round, brand after the round, capacity used, market share
+   - **Result** — opening cash (the balance the round started from), profit, any stock and capacity
+     movement, then cash after the round, brand after the round, capacity used, market share
+
+   **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
+   exactly where the previous one closed — that is the continuity line
 
    Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
    not one of the named lines appears as **Other charges** instead of being folded into a total.

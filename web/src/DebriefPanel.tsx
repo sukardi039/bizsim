@@ -167,6 +167,9 @@ export default function DebriefPanel({
                         // Whatever the engine charged that is not one of the named lines. Normally 0;
                         // shown rather than hidden so revenue - cost - profit always adds up on screen.
                         const other = revenueAt - profitAt - lineSum;
+                        const cashAfterAt = forRound(row.team_id, "cash_after") ?? 0;
+                        const cashOpening = forRound(row.team_id, "opening_cash") ?? 0;
+                        const cashMove = cashAfterAt - cashOpening;
                         const used = forRound(row.team_id, "capacity_used") ?? 0;
                         const available = forRound(row.team_id, "capacity_available") ?? 0;
                         return (
@@ -214,14 +217,27 @@ export default function DebriefPanel({
                               <h4>{t("debrief.groupResult")}</h4>
                               <dl className="lines">
                                 <div>
+                                  <dt>{t("debrief.openingCash")}</dt>
+                                  <dd>{money(forRound(row.team_id, "opening_cash") ?? 0)}</dd>
+                                </div>
+                                <div>
                                   <dt>{t("debrief.profit")}</dt>
                                   <dd>
                                     <strong>{money(profitAt)}</strong>
                                   </dd>
                                 </div>
-                                <div>
+                                {/* Cash does not move by profit alone: stock and capacity are cash
+                                    out but not profit. Show the gap rather than let the two rows
+                                    fail to add up. */}
+                                {Math.abs(cashMove - profitAt) >= 1 && (
+                                  <div>
+                                    <dt>{t("debrief.stockAndCapacity")}</dt>
+                                    <dd>{money(cashMove - profitAt)}</dd>
+                                  </div>
+                                )}
+                                <div className="total">
                                   <dt>{t("debrief.cashAfter")}</dt>
-                                  <dd>{money(forRound(row.team_id, "cash_after") ?? 0)}</dd>
+                                  <dd>{money(cashAfterAt)}</dd>
                                 </div>
                                 <div>
                                   <dt>{t("debrief.brandAfter")}</dt>

@@ -76,7 +76,8 @@ public class ScoringEngine {
                               BigDecimal revenue, BigDecimal cogs, BigDecimal payroll, BigDecimal marketing,
                               BigDecimal rndSpend, BigDecimal fixedCost, BigDecimal holdingCost,
                               BigDecimal hiringCost, BigDecimal capacityCost, BigDecimal reportCost,
-                              BigDecimal profit, BigDecimal cashChange, BigDecimal lostSales,
+                              BigDecimal openingCash, BigDecimal profit, BigDecimal cashChange,
+                              BigDecimal lostSales,
                               BigDecimal capacityUsed, BigDecimal capacityAvailable,
                               List<RndUpdate> rndUpdates) {
     }
@@ -508,6 +509,7 @@ public class ScoringEngine {
                 money(nz(team.machineWorkers()).add(plan.machineAdded())), plan.staff(), stock, lines,
                 money(revenue), money(cogs), plan.payroll(), plan.marketing(), plan.rndSpend(),
                 money(fixed), plan.holding(), plan.hiring(), plan.capacityCost(), plan.reportCost(),
+                money(nz(team.cash())),
                 money(profit), money(cashChange), units(lostSales), plan.capacityUsed(),
                 plan.capacityAvailable(), rndUpdates);
     }

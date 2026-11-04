@@ -110,6 +110,41 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_statement_carries_the_cash_balance_the_round_opened_with() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        // Round 1 opens at the company's starting cash...
+        Map<String, Object> first = jdbc.queryForMap("""
+                select s.opening_cash, s.cash_after, s.profit from round_statement s
+                join round r on r.id = s.round_id where r.run_id = ? and s.team_id = ? and r.number = 1
+                """, runId, teamOne);
+        java.math.BigDecimal opening = (java.math.BigDecimal) first.get("opening_cash");
+        assertThat(opening).isEqualByComparingTo(new java.math.BigDecimal("2000000000"));
+        // ...and closing - opening is the cash the round actually moved.
+        java.math.BigDecimal closing = (java.math.BigDecimal) first.get("cash_after");
+        java.math.BigDecimal changed = closing.subtract(opening);
+        assertThat(changed).isEqualByComparingTo(
+                (java.math.BigDecimal) first.get("profit"));
+
+        // Round 2 opens exactly where round 1 closed: the continuity the debrief shows.
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        Map<String, Object> second = jdbc.queryForMap("""
+                select s.opening_cash from round_statement s
+                join round r on r.id = s.round_id where r.run_id = ? and s.team_id = ? and r.number = 2
+                """, runId, teamOne);
+        assertThat((java.math.BigDecimal) second.get("opening_cash")).isEqualByComparingTo(closing);
+    }
+
+    @Test
     void closing_twice_does_not_compute_the_month_twice() throws Exception {
         openRound();
         submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
