@@ -275,22 +275,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const resultsSection =
     statements.length > 0 ? (
       <section className="card">
-        <div className="row">
-          <h2>{t("player.results")}</h2>
-          <label className="inline">
-            {t("debrief.round")}
-            <select
-              value={resultRound ?? statements[statements.length - 1].round}
-              onChange={(e) => setResultRound(Number(e.target.value))}
-            >
-              {statements.map((row) => (
-                <option key={row.round} value={row.round}>
-                  {row.round}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        {/* No round dropdown: the summary rows below are the selector (click a round to open it). */}
+        <h2>{t("player.results")}</h2>
         <p className="muted">{t("player.resultsHint")}</p>
 
         {/* The facilitator's debrief, for one company: a summary row per computed round, then the
