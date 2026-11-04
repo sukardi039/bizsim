@@ -547,6 +547,34 @@ class RoundFlowApiTest extends PostgresTestBase {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Before the facilitator opens round 1 the run sits at round 0 and there is nothing to decide.
+     * The context says so explicitly (`roundOpen: false`) instead of leaving the trainee's screen to
+     * render a full decision form with a "Submit round 0" button that the server refuses
+     * (`round.not_open`).
+     */
+    @Test
+    void the_context_says_no_round_is_open_before_the_first_one() throws Exception {
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.round").value(0))
+                .andExpect(jsonPath("$.roundOpen").value(false));
+
+        // And the server refuses the submission the old screen offered.
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 0))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("round.not_open"));
+
+        openRound();
+
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamOne + "/context")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.round").value(1))
+                .andExpect(jsonPath("$.roundOpen").value(true));
+    }
+
     @Test
     void the_form_context_reports_what_was_already_submitted() throws Exception {
         openRound();

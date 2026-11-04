@@ -235,14 +235,18 @@ public class RoundService {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("runId", runId);
+        // Whether a round is actually open, not just which one the run has reached. Before the
+        // facilitator opens round 1 the run sits at round 0 with nothing to decide -- the form used
+        // to render anyway and offer "Submit round 0", which the server then refused.
+        Optional<RoundRepository.RoundRow> open = rounds.openRound(runId);
         body.put("round", run.currentRound());
-        rounds.openRound(runId).ifPresent(r -> body.put("closesAt", r.closesAt()));
+        body.put("roundOpen", open.isPresent());
+        open.ifPresent(r -> body.put("closesAt", r.closesAt()));
 
         // What this company already sent for the open round, if anything. Without it the trainee
         // cannot tell a submitted month from an empty one, and reloading the form silently loses
         // their input -- the decision is an upsert until the round closes, so the form can reopen on
         // the values they saved and let them correct them.
-        Optional<RoundRepository.RoundRow> open = rounds.openRound(runId);
         Optional<DecisionPayload> submitted = open.flatMap(r -> rounds.decision(r.id(), teamId));
         body.put("submitted", submitted.isPresent());
         submitted.ifPresent(d -> body.put("decision", d));

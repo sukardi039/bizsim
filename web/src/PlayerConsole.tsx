@@ -265,6 +265,37 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     );
   }
 
+  // Results are readable on the waiting screen as well: a class whose session has finished should
+  // still see its own statements, and nothing here submits anything.
+  const resultsSection =
+    statements.length > 0 ? (
+      <section className="card">
+        <div className="row">
+          <h2>{t("player.results")}</h2>
+          <label className="inline">
+            {t("debrief.round")}
+            <select
+              value={resultRound ?? statements[statements.length - 1].round}
+              onChange={(e) => setResultRound(Number(e.target.value))}
+            >
+              {statements.map((row) => (
+                <option key={row.round} value={row.round}>
+                  {row.round}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="muted">{t("player.resultsHint")}</p>
+        {(() => {
+          const row =
+            statements.find((entry) => entry.round === (resultRound ?? statements[statements.length - 1].round)) ??
+            statements[statements.length - 1];
+          return <StatementDetail row={row} />;
+        })()}
+      </section>
+    ) : null;
+
   if (!context || !draft) {
     return (
       <div className="player">
@@ -276,6 +307,34 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </p>
           {problem && <p className="error">{problem}</p>}
         </div>
+      </div>
+    );
+  }
+
+  // Nothing is open to decide: the trainee gets the waiting card, not a dashboard with a
+  // "Submit round 0" button that the server would refuse with round.not_open.
+  if (!context.roundOpen) {
+    const finished = run.status !== "OPEN";
+    return (
+      <div className="player">
+        {signOut}
+        <div className="card">
+          <h2>{team.companyName}</h2>
+          <p className="muted">
+            {finished
+              ? t("player.sessionFinished")
+              : run.currentRound === 0
+                ? t("player.waitingRound1")
+                : t("player.waitingNext", { round: run.currentRound + 1 })}
+          </p>
+          {!finished && (
+            <p className="muted" style={{ marginBottom: 0 }}>
+              <small>{t("player.waitingHint")}</small>
+            </p>
+          )}
+          {problem && <p className="error">{problem}</p>}
+        </div>
+        {resultsSection}
       </div>
     );
   }
@@ -522,33 +581,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         </button>
       </section>
 
-      {statements.length > 0 && (
-        <section className="card">
-          <div className="row">
-            <h2>{t("player.results")}</h2>
-            <label className="inline">
-              {t("debrief.round")}
-              <select
-                value={resultRound ?? statements[statements.length - 1].round}
-                onChange={(e) => setResultRound(Number(e.target.value))}
-              >
-                {statements.map((row) => (
-                  <option key={row.round} value={row.round}>
-                    {row.round}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <p className="muted">{t("player.resultsHint")}</p>
-          {(() => {
-            const row =
-              statements.find((entry) => entry.round === (resultRound ?? statements[statements.length - 1].round)) ??
-              statements[statements.length - 1];
-            return <StatementDetail row={row} />;
-          })()}
-        </section>
-      )}
+      {resultsSection}
     </form>
   );
 }

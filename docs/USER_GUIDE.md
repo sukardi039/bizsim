@@ -276,16 +276,20 @@ A feed of what has happened in the session (`round.opened`, `decision.submitted`
 ## 8. Trainee — playing a round
 
 1. Sign in with the trainee account (tenant + email + password).
-2. The decision screen shows the company, **Round x of y**, cash, brand, machines.
+2. The decision screen shows the company, **Round x of y**, cash, brand, machines — but only while a
+   round is **open**. Before the facilitator opens round 1 you get a waiting card (*"Waiting for your
+   facilitator to open round 1"*) with **no form and no submit button**; the same happens between
+   rounds. The page re-checks every 10 seconds, so nothing needs reloading once they open it, and
+   your results from rounds already computed stay readable underneath.
 
-If you see **"No simulation yet"**, one of these is true — the page re-checks every 10 seconds, so
-nothing needs reloading once the facilitator acts:
+If you see **"No simulation yet"**, you are not seated in a session at all — facilitator: seat you
+in the Trainees card.
 
 | What it means | Who fixes it |
 |---|---|
 | you are not seated in any session | facilitator: seat you in the Trainees card |
-| you are seated but **no round is open** yet | facilitator: **Open next round** |
-| the round was computed and the next one is not open | facilitator: **Open next round** |
+| you are seated but **no round is open** yet | you see the waiting card; facilitator: **Open next round** |
+| the round was computed and the next one is not open | you see the waiting card; facilitator: **Open next round** |
 3. Fill in:
    - **Production and price** — units to produce and the price per product (stock and unit cost are
      shown for reference)

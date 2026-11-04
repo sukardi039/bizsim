@@ -332,7 +332,10 @@ export interface TemplateRow {
 
 export interface DecisionFormContext {
   runId: number;
+  /** The round the run has reached; 0 before the facilitator opens round 1. */
   round: number;
+  /** False when nothing is open to decide — before round 1, or once the session has finished. */
+  roundOpen: boolean;
   closesAt?: string | null;
   cash: number;
   brand: number;
