@@ -208,8 +208,14 @@ Under the scoreboard, for any computed round:
 
 1. Pick the **Round** in the selector.
 2. Read across: revenue, cost, profit, cash, share, lost sales, capacity used/available.
-3. **Detail** on a company expands the cost lines: cost of goods sold, payroll, marketing, R&D,
-   fixed cost, stock holding, hiring/firing, capacity, market review.
+3. **Detail** on a company expands a three-column breakdown, so the arithmetic reads left to right:
+   - **Revenue** — revenue for the round, and units lost to stock-outs
+   - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
+     hiring/firing, capacity, market review, then **Total cost**
+   - **Result** — profit, cash after the round, brand after the round, capacity used, market share
+
+   Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
+   not one of the named lines appears as **Other charges** instead of being folded into a total.
 4. The **Class** footer sums revenue and profit for the whole class.
 
 Every number comes from that round's statements — the debrief cannot disagree with what the engine

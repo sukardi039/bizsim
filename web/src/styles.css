@@ -208,3 +208,26 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   .run-head { flex-wrap: wrap; }
   .settings-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 }
+
+/* Debrief detail: revenue, cost and result side by side, each under its own heading. */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem 1.5rem;
+  padding: .4rem 0 .2rem;
+}
+.detail-grid h4 {
+  margin: 0 0 .35rem;
+  font-size: .74rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: .25rem;
+}
+.lines .total {
+  border-top: 1px solid var(--line);
+  margin-top: .25rem;
+  padding-top: .3rem;
+  font-weight: 600;
+}

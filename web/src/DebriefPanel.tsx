@@ -146,26 +146,102 @@ export default function DebriefPanel({
                 {open === row.team_id && (
                   <tr key={`${row.team_id}-detail`}>
                     <td colSpan={9}>
-                      <dl className="lines">
-                        {(
-                          [
-                            ["cogs", "debrief.cogs"],
-                            ["payroll", "debrief.payroll"],
-                            ["marketing", "debrief.marketing"],
-                            ["rnd_spend", "debrief.rnd"],
-                            ["fixed_cost", "debrief.fixed"],
-                            ["holding_cost", "debrief.holding"],
-                            ["hiring_cost", "debrief.hiring"],
-                            ["capacity_cost", "debrief.capacityCost"],
-                            ["report_cost", "debrief.report"],
-                          ] as const
-                        ).map(([key, label]) => (
-                          <div key={key}>
-                            <dt>{t(label)}</dt>
-                            <dd>{money(forRound(row.team_id, key) ?? 0)}</dd>
+                      {(() => {
+                        const lines = [
+                          ["cogs", "debrief.cogs"],
+                          ["payroll", "debrief.payroll"],
+                          ["marketing", "debrief.marketing"],
+                          ["rnd_spend", "debrief.rnd"],
+                          ["fixed_cost", "debrief.fixed"],
+                          ["holding_cost", "debrief.holding"],
+                          ["hiring_cost", "debrief.hiring"],
+                          ["capacity_cost", "debrief.capacityCost"],
+                          ["report_cost", "debrief.report"],
+                        ] as const;
+                        const lineSum = lines.reduce(
+                          (sum, [key]) => sum + (forRound(row.team_id, key) ?? 0),
+                          0,
+                        );
+                        const revenueAt = forRound(row.team_id, "revenue") ?? 0;
+                        const profitAt = forRound(row.team_id, "profit") ?? 0;
+                        // Whatever the engine charged that is not one of the named lines. Normally 0;
+                        // shown rather than hidden so revenue - cost - profit always adds up on screen.
+                        const other = revenueAt - profitAt - lineSum;
+                        const used = forRound(row.team_id, "capacity_used") ?? 0;
+                        const available = forRound(row.team_id, "capacity_available") ?? 0;
+                        return (
+                          <div className="detail-grid">
+                            <div>
+                              <h4>{t("debrief.groupRevenue")}</h4>
+                              <dl className="lines">
+                                <div>
+                                  <dt>{t("debrief.revenue")}</dt>
+                                  <dd>{money(revenueAt)}</dd>
+                                </div>
+                                <div>
+                                  <dt>{t("debrief.lostSales")}</dt>
+                                  <dd>
+                                    {number(forRound(row.team_id, "lost_sales") ?? 0, 0)}{" "}
+                                    {t("debrief.units")}
+                                  </dd>
+                                </div>
+                              </dl>
+                            </div>
+
+                            <div>
+                              <h4>{t("debrief.groupCost")}</h4>
+                              <dl className="lines">
+                                {lines.map(([key, label]) => (
+                                  <div key={key}>
+                                    <dt>{t(label)}</dt>
+                                    <dd>{money(forRound(row.team_id, key) ?? 0)}</dd>
+                                  </div>
+                                ))}
+                                {Math.abs(other) >= 1 && (
+                                  <div>
+                                    <dt>{t("debrief.other")}</dt>
+                                    <dd>{money(other)}</dd>
+                                  </div>
+                                )}
+                                <div className="total">
+                                  <dt>{t("debrief.totalCost")}</dt>
+                                  <dd>{money(revenueAt - profitAt)}</dd>
+                                </div>
+                              </dl>
+                            </div>
+
+                            <div>
+                              <h4>{t("debrief.groupResult")}</h4>
+                              <dl className="lines">
+                                <div>
+                                  <dt>{t("debrief.profit")}</dt>
+                                  <dd>
+                                    <strong>{money(profitAt)}</strong>
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt>{t("debrief.cashAfter")}</dt>
+                                  <dd>{money(forRound(row.team_id, "cash_after") ?? 0)}</dd>
+                                </div>
+                                <div>
+                                  <dt>{t("debrief.brandAfter")}</dt>
+                                  <dd>{number(forRound(row.team_id, "brand_after") ?? 0, 1)}</dd>
+                                </div>
+                                <div>
+                                  <dt>{t("debrief.capacity")}</dt>
+                                  <dd>
+                                    {number(used, 0)} / {number(available, 0)}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt>{t("debrief.share")}</dt>
+                                  <dd>{number(row.market_share, 1)}%</dd>
+                                </div>
+                              </dl>
+                            </div>
                           </div>
-                        ))}
-                      </dl>
+                        );
+                      })()}
                     </td>
                   </tr>
                 )}
