@@ -139,7 +139,8 @@ export default function Trainees({ run, onChanged }: { run: Run; onChanged: () =
 
   const loadUsers = useCallback(async () => {
     try {
-      setUsers(await api.users());
+      // Trainees only: this card fills seats, it has no business reading the staff roster.
+      setUsers(await api.trainees());
     } catch {
       setUsers([]); // the roster is a convenience; seating still works without it
     }
@@ -151,10 +152,7 @@ export default function Trainees({ run, onChanged }: { run: Run; onChanged: () =
 
   // An account already seated in this run cannot be seated twice, and a deactivated one cannot sign in.
   const unseated = users.filter(
-    (user) =>
-      user.role === "PLAYER" &&
-      user.active &&
-      !run.players.some((seat) => seat.userId === user.id),
+    (user) => user.active && !run.players.some((seat) => seat.userId === user.id),
   );
 
   return (

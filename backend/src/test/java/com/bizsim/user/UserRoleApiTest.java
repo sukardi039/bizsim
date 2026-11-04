@@ -121,6 +121,79 @@ class UserRoleApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.role").value("PLAYER"));
     }
 
+    /**
+     * Ruling 4 Nov 2026: the builder builds everything the class is made of — the economy, the
+     * companies, the people and the package — because the facilitator's job is only to run the
+     * session. This is the regression that emptied the Packages form: the builder asked for the
+     * people list, was refused, and lost the template dropdown along with it.
+     */
+    @Test
+    void a_builder_builds_the_people_too() throws Exception {
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "builder@acme.test", "displayName", "Builder",
+                                "password", "builder1234", "role", "BUILDER"))))
+                .andExpect(status().isCreated());
+        String builderToken = loginWith("builder@acme.test", "builder1234");
+
+        // The builder mints the class: trainees, one per company.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "ada@acme.test", "displayName", "Ada",
+                                "password", "trainee1234", "role", "PLAYER"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.role").value("PLAYER"));
+
+        // Both people reads answer: the roster (People screen) and the narrow class list (packages).
+        mvc.perform(get("/api/users").header("Authorization", "Bearer " + builderToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.email == 'ada@acme.test')]").exists());
+        mvc.perform(get("/api/users/trainees").header("Authorization", "Bearer " + builderToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].email").value("ada@acme.test"));
+
+        // Staff roles stay an admin's decision: a builder must not mint the facilitator of the run
+        // or the person who rewrites the economy next term.
+        mvc.perform(post("/api/users")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "email", "sneaky@acme.test", "password", "sneaky1234",
+                                "role", "FACILITATOR"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("user.facilitator_needs_admin"));
+
+        // A trainee's password is the builder's support question; a staff password is not.
+        Long ada = jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'", Long.class);
+        mvc.perform(put("/api/users/" + ada + "/password")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("password", "reset1234"))))
+                .andExpect(status().isNoContent());
+        Long trainer = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@acme.test'", Long.class);
+        mvc.perform(put("/api/users/" + trainer + "/password")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("password", "reset1234"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("user.admin_only"));
+
+        // The trainee still cannot read the roster, and the code is now staff-flavoured rather than
+        // "for facilitators" — a builder hitting it was the confusing part.
+        String adaToken = loginWith("ada@acme.test", "reset1234");
+        mvc.perform(get("/api/users").header("Authorization", "Bearer " + adaToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("auth.staff_only"));
+        mvc.perform(get("/api/users/trainees").header("Authorization", "Bearer " + adaToken))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     void an_admin_fixes_a_role_without_recreating_the_account() throws Exception {
         // The mistake this exists for: an account created as a trainee that should have been a builder.

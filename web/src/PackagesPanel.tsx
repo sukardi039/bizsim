@@ -37,26 +37,33 @@ export default function PackagesPanel() {
   const [tidy, setTidy] = useState<{ id: number; name: string; publishedAt: string }[]>([]);
 
   const load = useCallback(async () => {
-    try {
-      const [packageList, templateList, companyList, tidyList, userList] = await Promise.all([
-        api.packages(),
-        api.templates(),
-        api.companies(),
-        api.tidyPreview(),
-        api.users(),
-      ]);
-      setTrainees(userList.filter((user) => user.role === "PLAYER" && user.active));
-      setPackages(packageList);
-      setTidy(tidyList);
-      setTemplates(templateList);
-      setCompanies(companyList);
-      setDraft((current) => ({
-        ...current,
-        templateKey: current.templateKey || templateList[0]?.key || "",
-      }));
-    } catch (error) {
-      setProblem(describeError(error, t));
-    }
+    // Each list loads on its own. They used to share one Promise.all, so a single failing call
+    // emptied the whole form — a builder without the people list lost the template dropdown, and
+    // the only clue was "This action is for facilitators" under the wrong heading.
+    const failures: string[] = [];
+    let templateList: TemplateRow[] = [];
+    const settle = async <T,>(label: string, call: Promise<T>, apply: (value: T) => void) => {
+      try {
+        apply(await call);
+      } catch (error) {
+        failures.push(`${label}: ${describeError(error, t)}`);
+      }
+    };
+    await Promise.all([
+      settle(t("nav.packages"), api.packages(), setPackages),
+      settle(t("start.companies"), api.companies(), setCompanies),
+      settle(t("start.trainees"), api.trainees(), setTrainees),
+      settle(t("packages.tidy"), api.tidyPreview(), setTidy),
+      settle(t("start.template"), api.templates(), (list) => {
+        templateList = list;
+        setTemplates(list);
+      }),
+    ]);
+    setProblem(failures.length > 0 ? failures.join(" · ") : null);
+    setDraft((current) => ({
+      ...current,
+      templateKey: current.templateKey || templateList[0]?.key || "",
+    }));
   }, [t]);
 
   useEffect(() => {
@@ -294,6 +301,7 @@ export default function PackagesPanel() {
             <>
               <h3 className="pick-head">{t("packages.classList")}</h3>
               <p className="muted">{t("packages.classListHint")}</p>
+              {trainees.length === 0 && <p className="muted">{t("packages.noTrainees")}</p>}
               <table>
                 <thead>
                   <tr>

@@ -455,6 +455,11 @@ export const api = {
       body: JSON.stringify({ projects }),
     }),
   users: () => request<UserRow[]>("/users"),
+  /**
+   * Active trainees only — the people a company can seat. Separate from `users()` on purpose: the
+   * package form builds a class list, it has no business reading the staff roster.
+   */
+  trainees: () => request<UserRow[]>("/users/trainees"),
   companies: () => request<CompanyProfile[]>("/companies"),
   packages: () => request<SimulationPackage[]>("/packages"),
   tidyPreview: () =>

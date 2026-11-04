@@ -10,14 +10,16 @@ The product has **two jobs done by two people**:
 
 | Job | Role | Does |
 |---|---|---|
-| **Building** | `BUILDER` | prepares templates (the economy), companies, and **packages**; happens well before a class |
+| **Building** | `BUILDER` | prepares templates (the economy), companies, **people (the trainees)**, and **packages**; happens well before a class |
 | **Running** | `FACILITATOR` | starts sessions from a published package, seats trainees, opens/computes rounds, runs the debrief |
 | both | `ADMIN` | everything above |
 | neither | `PLAYER` | the trainee: signs in, decides, submits |
 
-A `BUILDER` cannot run a session. A `FACILITATOR` cannot edit a template, a company, or publish a
-package. This is enforced by the server, not just hidden on screen — if you cannot see a section, it
-is the wrong account, not a bug.
+A `BUILDER` cannot run a session. A `FACILITATOR` does not build anything: the template, the
+companies, the people and the package all arrive prepared, and their job is only to run the class.
+The one thing they may still do during a session is fill an open seat from the Trainees card.
+This is enforced by the server, not just hidden on screen — if you cannot see a section, it is the
+wrong account, not a bug.
 
 ---
 
@@ -32,7 +34,7 @@ never translated (D23).
    `/api` to the backend.
 2. Fill the three boxes on the sign-in card:
    - **Tenant** — your organisation's code, e.g. `demo`
-   - **Email** — the address your account was created with (case-sensitive)
+   - **Email** — the address your account was created with (case and stray spaces are forgiven)
    - **Password** — at least 8 characters; the first password is handed to you, change it later
 3. Press **Sign in**.
 
@@ -41,7 +43,7 @@ saved on your account, so it survives a reload. It translates the interface only
 author (product names, event text, trend labels) is never translated.
 
 **Forgot the tenant code or have no account?** An admin creates accounts (People → Add). If nobody
-can sign in at all, see §8 "First account" below.
+can sign in at all, see §9 "First account" below.
 
 ---
 
@@ -52,7 +54,7 @@ can sign in at all, see §8 "First account" below.
 | **Packages** | yes | — | yes |
 | **Templates** | yes | — | yes |
 | **Companies** | yes | — | yes |
-| **People** | yes | yes | yes |
+| **People** | yes | — | yes |
 | **Sessions** | — | yes | yes |
 
 ---
@@ -138,7 +140,33 @@ These profiles are what a package is built from, so make one per company that wi
 
 ---
 
-## 5. Builder — Packages (the hand-over)
+## 5. Builder — People (the class)
+
+People are part of the preparation, exactly like the template and the companies (D30). The builder
+adds the trainees, because the class list travels inside the package and the facilitator only runs
+the session.
+
+1. **People** in the left navigation.
+2. **Add a trainee** — name, email, initial password (8+ characters). A builder only ever creates
+   **Trainee** accounts: the Role selector is an admin's, and the server refuses staff roles for
+   anyone else.
+3. Hand the credential over; the trainee can change it after signing in.
+4. Back in **Packages**, tick a company and pick the trainee in the class list — one person per
+   company (D27). Leave a seat open for a late arrival.
+
+- **Set password** — the per-row button fixes a mistyped or forgotten credential (8+ characters).
+  A builder may reset a **trainee's** password; a staff account's password stays an admin's business.
+- **Deactivate / Activate** — for someone who leaves, before or after playing. The login stops, the
+  history stays readable.
+- **Delete** — only an account that never played; once a decision was submitted the server answers
+  *"deactivate the account instead"*.
+- **Change a role** — admin only, in the same list.
+
+A facilitator does not see **People** at all: the class arrives with the package they start.
+
+---
+
+## 6. Builder — Packages (the hand-over)
 
 A package is the immutable bundle you hand to the facilitator: **one template + the companies + the
 class list**.
@@ -169,9 +197,9 @@ frozen copies) after a confirmation. Packages that taught a class are never offe
 
 ---
 
-## 6. Facilitator — running a class
+## 7. Facilitator — running a class
 
-### 6.1 Start a session
+### 7.1 Start a session
 
 1. **Sessions** in the navigation. With no session selected you see **Start a session**.
 2. Type a **Session name** (defaults to the package name).
@@ -184,7 +212,7 @@ frozen copies) after a confirmation. Packages that taught a class are never offe
 The session opens with one company per profile, its product line already set, and the prepared class
 already seated. If a package is missing, no builder has published one yet.
 
-### 6.2 The run screen
+### 7.2 The run screen
 
 Header: `Run <n>` · status · `round x of y` · cycles. Buttons:
 
@@ -197,7 +225,7 @@ Header: `Run <n>` · status · `round x of y` · cycles. Buttons:
 You can only have **one session in progress at a time**. To run two cohorts in parallel you need two
 facilitator accounts.
 
-### 6.3 Seating trainees — Trainees card
+### 7.3 Seating trainees — Trainees card
 
 Under the run you see one block per company.
 
@@ -206,12 +234,12 @@ Under the run you see one block per company.
 - **…or create a new one** — name, email, initial password (8+) → **Create and seat**. This is the
   walk-in case; the new account outlives the session and can be seated again later.
 
-### 6.4 Scoreboard
+### 7.4 Scoreboard
 
 One row per company for the latest computed round: profit, cash, share, stock. Empty until you
 **Compute round**.
 
-### 6.5 Debrief
+### 7.5 Debrief
 
 Under the scoreboard, for any computed round:
 
@@ -226,7 +254,7 @@ Under the scoreboard, for any computed round:
 
    **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
    exactly where the previous one closed — that is the continuity line. The same breakdown is shown
-   to the trainee for their own company (§7), so a learner can go over their round outside class.
+   to the trainee for their own company (§8), so a learner can go over their round outside class.
 
    Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
    not one of the named lines appears as **Other charges** instead of being folded into a total.
@@ -235,13 +263,13 @@ Under the scoreboard, for any computed round:
 Every number comes from that round's statements — the debrief cannot disagree with what the engine
 charged.
 
-### 6.6 Live
+### 7.6 Live
 
 A feed of what has happened in the session (`round.opened`, `decision.submitted`, `round.closed`).
 
 ---
 
-## 7. Trainee — playing a round
+## 8. Trainee — playing a round
 
 1. Sign in with the trainee account (tenant + email + password).
 2. The decision screen shows the company, **Round x of y**, cash, brand, machines.
@@ -272,17 +300,18 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 
 ---
 
-## 8. Admin — accounts
+## 9. Admin — accounts
 
-**People** lists every account in the tenant with role and status.
+**People** lists every account in the tenant with role and status. Building and admin see it; a
+facilitator does not (D30).
 
 - **Add a trainee** — name, email, initial password (8+), and the **Role** selector:
   **Trainee** / **Facilitator** / **Builder** / **Admin**. Only an admin sees the role selector; the
   server refuses staff roles for anyone else.
-- **Set password** — a per-row button (admins only). Use it when someone cannot sign in: a
-  mistyped credential at creation, a forgotten password, or a password handed to the wrong person.
-  The new password needs 8+ characters and is stored hashed; hand it over and they can change it
-  again after signing in.
+- **Set password** — a per-row button. Staff may reset a **trainee's** password; only an admin may
+  reset a staff password. Use it when someone cannot sign in: a mistyped credential at creation, a
+  forgotten password, or a password handed to the wrong person. The new password needs 8+
+  characters and is stored hashed; hand it over and they can change it again after signing in.
 - **Change a role** — the role cell in the list is a dropdown for admins. Pick the new role and it
   saves immediately; the account keeps its password and its history. Two guards: you cannot change
   your **own** role (ask another admin), and the **last active admin** cannot be demoted — create a
@@ -308,7 +337,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 
 ---
 
-## 9. Rules that surprise people
+## 10. Rules that surprise people
 
 | Rule | Why |
 |---|---|
@@ -323,7 +352,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 
 ---
 
-## 10. If something looks wrong
+## 11. If something looks wrong
 
 | What you see | Cause / fix |
 |---|---|
@@ -331,10 +360,10 @@ accounts are never rewritten by this; remove the variables once you have signed 
 | **sign-in says the password is wrong** | the tenant code and email are now matched ignoring case, so check instead: (1) the account is **active** — a deactivated account gives the same answer, (2) the password actually has 8+ characters, (3) no stray spaces pasted in. Admin fix: **People → Set password** |
 | `This action is for facilitators` | you are signed in as a builder; use a facilitator account for sessions |
 | `only a builder prepares…` | the account is a facilitator; templates/companies/packages need a builder or admin |
-| `No published packages yet` | a builder has not published one; see §5 |
+| `No published packages yet` | a builder has not published one; see §6 |
 | `you already have a simulation in progress` | finish or delete the current run, or use another facilitator |
 | `the shipped profile is read-only` | duplicate it first |
-| **no Role dropdown when adding someone** | you are signed in as a facilitator, or the deployed build predates the selector — an admin sees it; otherwise redeploy (§10, `api/version`) |
+| **no Role dropdown when adding someone** | you are signed in as a facilitator, or the deployed build predates the selector — an admin sees it; otherwise redeploy (§11, `api/version`) |
 | **after a redeploy the screens look unchanged** | the console's `index.html` was cached. Hard-refresh (Ctrl+Shift+R) or use a private window; from this release it is served `no-store` and cannot stick |
 | **no admin account at all** (everyone is a facilitator or trainee) | set `BIZSIM_BOOTSTRAP_EMAIL=<existing account>` + `BIZSIM_BOOTSTRAP_PROMOTE=true` in Dokploy, restart, sign in, remove the variables — role only, password unchanged |
 | **created an account with the wrong role** | **People** → the role cell is a dropdown for admins → pick the right role; no need to delete and recreate |
@@ -343,7 +372,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 
 ---
 
-## 11. Run sheet for a class
+## 12. Run sheet for a class
 
 **Before (builder, days earlier)**
 

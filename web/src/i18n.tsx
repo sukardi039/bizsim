@@ -208,6 +208,7 @@ const en: Dict = {
   "error.template.rounds_exceeded": "This template has only {rounds} rounds.",
   "error.template.invalid_rounds": "Template {template} has no valid round count.",
   "error.auth.facilitator_only": "This action is for facilitators.",
+  "error.auth.staff_only": "This action is for staff (builder, facilitator or admin).",
   "error.auth.player_only": "This action is for trainees.",
   "error.locale.unsupported": "That language is not available.",
   "error.stream.ticket_invalid": "The live connection could not be opened. Reload the page.",
@@ -345,6 +346,8 @@ const en: Dict = {
   "packages.classListHint":
     "One person per company, chosen now so the facilitator does not have to assemble the class on the day. Leave a seat open for a walk-in.",
   "packages.seatOpen": "— open seat —",
+  "packages.noTrainees":
+    "No trainees yet — add them in People → Add a trainee, then come back and seat them here.",
   "start.emptySeat": "seat empty — fill it after the session starts",
 
   "packages.tidy": "Tidy up",
@@ -597,6 +600,7 @@ const zh: Dict = {
   "error.template.rounds_exceeded": "该模板仅有 {rounds} 轮。",
   "error.template.invalid_rounds": "模板 {template} 的轮次设置无效。",
   "error.auth.facilitator_only": "该操作仅限教师。",
+  "error.auth.staff_only": "该操作仅限工作人员（建设者、教师或管理员）。",
   "error.auth.player_only": "该操作仅限学员。",
   "error.locale.unsupported": "暂不支持该语言。",
   "error.stream.ticket_invalid": "实时连接无法建立，请刷新页面。",
@@ -727,6 +731,7 @@ const zh: Dict = {
   "packages.classList": "班级名单",
   "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。可留空位给临时加入者。",
   "packages.seatOpen": "— 空位 —",
+  "packages.noTrainees": "尚无学员——请先到“人员 → 添加学员”创建，再回来安排座位。",
   "start.emptySeat": "座位空缺——可在模拟开始后补上",
 
   "packages.tidy": "清理",

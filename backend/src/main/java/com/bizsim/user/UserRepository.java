@@ -138,6 +138,19 @@ public class UserRepository {
                 MAPPER, tenantId);
     }
 
+    /**
+     * The people who can be seated in a company: active trainees of one tenant, name-ordered so the
+     * picker does not reshuffle between loads. The class list is built with the package (D27), so
+     * whoever builds the package needs this list without the staff roster.
+     */
+    public List<AppUser> findActivePlayers(long tenantId) {
+        return jdbc.query("""
+                select * from app_user
+                where tenant_id = ? and role = 'PLAYER' and active
+                order by display_name, email
+                """, MAPPER, tenantId);
+    }
+
     /** Same case-insensitive rule as login: "Ada@x" and "ada@x" are one account. */
     public Optional<AppUser> findByEmailInTenant(long tenantId, String email) {
         return jdbc.query("select * from app_user where tenant_id = ? and lower(email) = lower(?)",

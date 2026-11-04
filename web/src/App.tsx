@@ -343,11 +343,13 @@ export default function App() {
               <button className={view === "companies" ? "active" : ""} onClick={() => setView("companies")}>
                 {t("nav.companies")}
               </button>
+              {/* People belong with the rest of the preparation: the builder makes the class, the
+                  facilitator only runs it (ruling 4 Nov 2026). */}
+              <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
+                {t("nav.people")}
+              </button>
             </>
           )}
-          <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
-            {t("nav.people")}
-          </button>
         </nav>
 
 
@@ -376,7 +378,7 @@ export default function App() {
           <PackagesPanel />
         ) : view === "companies" ? (
           <CompaniesPanel />
-        ) : view === "people" ? (
+        ) : view === "people" && canBuild ? (
           <PeoplePanel />
         ) : view === "templates" ? (
           <TemplatesPanel />

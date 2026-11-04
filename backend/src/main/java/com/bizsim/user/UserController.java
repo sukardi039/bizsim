@@ -25,10 +25,12 @@ import java.util.List;
 /**
  * Account management inside one tenant.
  *
- * <p>A class needs one account per company, and until now the only ways to make one were the dev
- * seeder and the bootstrap — both of which run at startup and make exactly one account. A
- * facilitator can now create the trainee accounts for their own cohort; the tenant always comes from
- * the token, so an account cannot be created in another tenant.
+ * <p>A class needs one account per company. Building a class is the BUILDER's job (ruling 4 Nov
+ * 2026): the builder prepares the economy, the companies, the people and the package, and the
+ * facilitator does nothing but run the session. So the people screens and the account writes are
+ * open to staff, while the class-list read ({@code GET /api/users/trainees}) returns only active
+ * trainees — that is all a package needs. The tenant always comes from the token, so an account can
+ * never be created in another tenant.
  */
 @RestController
 @RequestMapping("/api/users")
@@ -55,9 +57,21 @@ public class UserController {
         this.users = users;
     }
 
+    /**
+     * The people who can occupy a company in a package or a session. Deliberately narrow: staff
+     * accounts are an administrator's business, and the builder only needs the trainees.
+     */
+    @GetMapping("/trainees")
+    public List<UserView> trainees() {
+        TenantContext.Principal me = requireStaff();
+        return users.findActivePlayers(me.tenantId()).stream()
+                .map(u -> new UserView(u.id(), u.email(), u.displayName(), u.role(), u.active()))
+                .toList();
+    }
+
     @GetMapping
     public List<UserView> list() {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
         return users.findAllInTenant(me.tenantId()).stream()
                 .map(u -> new UserView(u.id(), u.email(), u.displayName(), u.role(), u.active()))
                 .toList();
@@ -66,7 +80,7 @@ public class UserController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserView create(@Valid @RequestBody CreateUserRequest request) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
 
         String role = request.role() == null || request.role().isBlank() ? "PLAYER" : request.role();
         // ADMIN is creatable too: the "make another admin before demoting the last one" rule needs a
@@ -79,7 +93,8 @@ public class UserController {
         // a facilitator adding another facilitator could quietly take over the next class's account.
         // Preparing is a separate job from running (ruling 3 Nov 2026): a builder account is an
         // admin's call, exactly like a facilitator's -- a facilitator must not mint the person who
-        // will rewrite the economy next term.
+        // will rewrite the economy next term, and a builder must not mint the person who will run
+        // next term's class either. Trainees are the one role staff may create.
         if (!"PLAYER".equals(role) && !"ADMIN".equals(me.role())) {
             throw ProblemException.forbidden("user.facilitator_needs_admin",
                     "only an admin may create a staff account");
@@ -110,7 +125,7 @@ public class UserController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable long id) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
         if (me.userId() == id) {
             throw ProblemException.badRequest("user.self_delete", "you cannot delete your own account");
         }
@@ -147,10 +162,18 @@ public class UserController {
     @PutMapping("/{id}/password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@PathVariable long id, @RequestBody PasswordRequest request) {
-        TenantContext.Principal me = requireAdmin();
+        TenantContext.Principal me = requireStaff();
         if (request == null || request.password() == null || request.password().length() < MIN_LENGTH) {
             throw ProblemException.badRequest("user.password_too_short",
                     "the password must be at least " + MIN_LENGTH + " characters", "min", MIN_LENGTH);
+        }
+        // Staff may fix a trainee's credential -- a builder hands out the initial one, so losing it
+        // is their support question. A staff account's password stays an administrator's business.
+        UserRepository.AppUser target = users.findByIdInTenant(id, me.tenantId()).orElseThrow(
+                () -> ProblemException.notFound("user.not_found", "no such account in this tenant"));
+        if (!"PLAYER".equals(target.role()) && !"ADMIN".equals(me.role())) {
+            throw ProblemException.forbidden("user.admin_only",
+                    "only an admin may reset a staff password");
         }
         if (!users.setPassword(me.tenantId(), id, encoder.encode(request.password()))) {
             throw ProblemException.notFound("user.not_found", "no such account in this tenant");
@@ -194,7 +217,7 @@ public class UserController {
     }
 
     private void setActive(long id, boolean active) {
-        TenantContext.Principal me = requireFacilitator();
+        TenantContext.Principal me = requireStaff();
         if (!users.setActive(me.tenantId(), id, active)) {
             throw ProblemException.notFound("user.not_found", "no such trainee in this tenant");
         }
@@ -209,10 +232,15 @@ public class UserController {
         return me;
     }
 
-    private static TenantContext.Principal requireFacilitator() {
+    /**
+     * Building a class needs the people in it, so every staff role may read and write trainee
+     * accounts. Running a session is the facilitator's only job (ruling 4 Nov 2026) -- the console
+     * does not show them the people screens at all.
+     */
+    private static TenantContext.Principal requireStaff() {
         TenantContext.Principal me = TenantContext.require();
-        if (!"FACILITATOR".equals(me.role()) && !"ADMIN".equals(me.role())) {
-            throw ProblemException.forbidden("auth.facilitator_only", "facilitator only");
+        if (!List.of("BUILDER", "FACILITATOR", "ADMIN").contains(me.role())) {
+            throw ProblemException.forbidden("auth.staff_only", "staff role required");
         }
         return me;
     }

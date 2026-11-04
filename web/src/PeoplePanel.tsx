@@ -189,7 +189,9 @@ export default function PeoplePanel() {
                   </span>
                 </td>
                 <td className="num">
-                  {canMintStaff && (
+                  {/* Staff may fix a trainee's credential; a staff account's password stays an
+                      administrator's business (server-enforced). */}
+                  {(canMintStaff || user.role === "PLAYER") && (
                     <button onClick={() => resetPassword(user)} disabled={busy === user.id}>
                       {t("people.setPassword")}
                     </button>
