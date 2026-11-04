@@ -645,6 +645,46 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat(sold).isGreaterThan(BigDecimal.ZERO);
     }
 
+    /**
+     * D35: a finished project must not lock the class out. The trainee's form sends a row for every
+     * project every round, so once one project completed, every submission was refused with
+     * `rnd.not_active` — including rounds that had nothing to do with that project.
+     */
+    @Test
+    void a_finished_project_does_not_block_the_next_round() throws Exception {
+        openRound();
+        // RND-P1-COST costs 300M over 3 months: 100M a month completes it as round 3 is computed.
+        for (int month = 1; month <= 3; month++) {
+            submit(playerOneToken, teamOne, payload(600, 150, 30, 0L, 30, 100_000_000L))
+                    .andExpect(status().isOk());
+            advance();
+        }
+
+        // Round 4: the form still carries RND-P1-COST, with 0. That must be accepted.
+        submit(playerOneToken, teamOne, payloadEveryProject(600, 150, 30, 0L, 30, 0L))
+                .andExpect(status().isOk());
+
+        // Money into a finished project is still refused, and the code names the project.
+        submit(playerOneToken, teamOne, payloadEveryProject(600, 150, 30, 0L, 30, 100_000_000L))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("decision.invalid"))
+                .andExpect(jsonPath("$.problems[0].code").value("rnd.not_active"))
+                .andExpect(jsonPath("$.problems[0].params.project").value("RND-P1-COST"));
+    }
+
+    private static Map<String, Object> payloadEveryProject(int p1, int p2, int p3, long marketing,
+                                                           int production, long rnd) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>(
+                payload(p1, p2, p3, marketing, production, 0L));
+        body.put("rnd", List.of(
+                Map.of("project", "RND-P1-COST", "invest", rnd),
+                Map.of("project", "RND-P2-COST", "invest", 0L),
+                Map.of("project", "RND-P3-QUAL", "invest", 0L),
+                Map.of("project", "RND-CAP", "invest", 0L),
+                Map.of("project", "RND-MKT-P1", "invest", 0L)));
+        return body;
+    }
+
     @Test
     void three_months_in_sequence_accumulate_state_without_drift() throws Exception {
         // RND-P1-COST costs 300M over 3 months: 100M a month must complete it exactly at month 3.

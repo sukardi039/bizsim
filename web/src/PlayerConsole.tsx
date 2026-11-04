@@ -92,7 +92,12 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
     price: context.products.map((p) => ({ product: p.code, unitPrice: draft.price[p.code] ?? p.price })),
     marketing: context.channels.map((c) => ({ channel: c.code, spend: draft.marketing[c.code] ?? 0 })),
     manpower: { production: draft.manpower },
-    rnd: context.rndProjects.map((r) => ({ project: r.code, invest: draft.rnd[r.code] ?? 0 })),
+    // A finished project takes no more money; sending its row as 0 keeps the shape complete without
+    // proposing an investment the server must refuse (D35).
+    rnd: context.rndProjects.map((r) => ({
+      project: r.code,
+      invest: r.status === "ACTIVE" ? (draft.rnd[r.code] ?? 0) : 0,
+    })),
     capacityPurchase: draft.capacity,
     marketReport: draft.marketReport,
   };
@@ -523,13 +528,19 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             </div>
             <label className="project-input">
               {t("player.rndThisMonth")}
+              {/* COMPLETED or FAILED: nothing more can be invested, so the field is closed rather than
+                  letting a trainee type a number the server will refuse (D35). */}
               <input
                 type="number"
                 min={0}
                 step="any"
-                value={draft.rnd[project.code] ?? 0}
+                disabled={project.status !== "ACTIVE"}
+                value={project.status === "ACTIVE" ? (draft.rnd[project.code] ?? 0) : 0}
                 onChange={(e) => setIn("rnd", project.code, Number(e.target.value))}
               />
+              {project.status !== "ACTIVE" && (
+                <small className="muted">{t("player.rndFinished")}</small>
+              )}
             </label>
           </div>
         ))}

@@ -136,7 +136,10 @@ public class DecisionValidator {
                             "rnd." + row.project() + ": invest must be >= 0", "project", row.project()));
                 }
                 ScoringEngine.RndState state = rndState.get(row.project());
-                if (state != null && !"ACTIVE".equals(state.status())) {
+                // A finished project takes no more money -- but a zero row is not money. Rejecting the
+                // row itself locked a class out entirely: the form sends every project every round, so
+                // once one project completed, every submission failed with rnd.not_active.
+                if (state != null && !"ACTIVE".equals(state.status()) && row.invest().signum() > 0) {
                     problems.add(ApiProblem.of("rnd.not_active",
                             "rnd." + row.project() + ": project is already " + state.status(),
                             "project", row.project(), "status", state.status()));

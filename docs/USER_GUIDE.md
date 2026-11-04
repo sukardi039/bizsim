@@ -294,7 +294,9 @@ package's class list and publishes a new package; the facilitator cannot seat yo
      shown for reference)
    - **Workforce and capacity** — production staff
    - **Marketing** — spend per channel
-   - **Research and development** — investment per project, *this month*
+   - **Research and development** — investment per project, *this month*. A project that has
+     already finished (**COMPLETED** or **FAILED**) shows a closed field and *"No further
+     investment"*: the money cannot be spent again, and leaving it at 0 does not block the round.
    - **Market review** — optional paid report; the cost is deducted from the result
 4. **Submit round n**. Submitting again replaces the decision until the round is computed.
 5. **Your results** — once a round is computed, the trainee sees their own company's round under
