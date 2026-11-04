@@ -197,6 +197,56 @@ class PackageApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_class_language_travels_from_the_package_to_the_session() throws Exception {
+        MvcResult published = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Chinese cohort", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "traineeIds", List.of(jdbc.queryForObject(
+                                        "select id from app_user where email = 'ada@acme.test'",
+                                        Long.class)),
+                                "locale", "zh"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.locale").value("zh"))
+                .andReturn();
+        long packageId = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
+
+        // A trainee lists their own run and finds the class language on it, so the console can follow
+        // it without the person having to set anything.
+        mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Monday class"))))
+                .andExpect(status().isCreated());
+        mvc.perform(get("/api/runs").header("Authorization", "Bearer " + login("acme", "ada@acme.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].locale").value("zh"));
+
+        // No language declared: the package says nothing and each person keeps their own.
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Plain cohort", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.locale").doesNotExist());
+
+        // Anything else is refused rather than stored and half-honoured.
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Bad language", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "locale", "fr"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.locale_invalid"));
+    }
+
+    @Test
     void a_malformed_class_list_is_refused() throws Exception {
         long beta = jdbc.queryForObject("""
                 insert into company_profile (tenant_id, name, company_name, products)

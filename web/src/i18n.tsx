@@ -143,6 +143,15 @@ const en: Dict = {
   "player.rndThisMonth": "This month",
   "player.review": "Market review",
   "player.showReview": "Show the purchased review",
+  "player.waitingRound1": "Waiting for your facilitator to open round 1.",
+  "player.loadingForm": "Loading the decision form…",
+  "player.buyMachines": "Buy machines (workers of capacity, {cost} each)",
+  "player.fixedStaff": "Fixed staff on the payroll:",
+  "player.fixedCostMonth": "fixed cost {cost} per month",
+  "player.investedSoFar": "Invested so far {invested} over {months} month(s) · {status}",
+  "player.buyReview": "Buy this month's market review for {cost}",
+  "player.marketIndices": "Demand index {demand} · cost index {cost}",
+  "player.committedCash": "Committed cash this month (marketing, R&D, machines, review)",
   "player.results": "Your results",
   "player.resultsHint":
     "Your company's own numbers for a computed round — the same figures the class debrief shows for this company. Competitors' figures stay with the facilitator.",
@@ -323,6 +332,10 @@ const en: Dict = {
   "start.classListHint":
     "Prepared with the package: one person per company. To change it, publish a new package, or adjust the seats after the session starts.",
   "start.mapping": "Who sits where",
+  "packages.classLanguage": "Class language",
+  "packages.classLanguageHint":
+    "Seated trainees read the interface in this language. Leave it on the default to let each person keep their own.",
+  "packages.languagePerson": "Follow each trainee's own choice",
   "packages.blockedTitle": "To publish, add:",
   "packages.blockedName": "a package name",
   "packages.blockedCompanies": "at least one company (tick a profile above)",
@@ -523,6 +536,18 @@ const zh: Dict = {
   "player.rndThisMonth": "本月投入",
   "player.review": "市场报告",
   "player.showReview": "查看已购买的报告",
+  "player.waitingRound1": "等待教师开启第 1 轮。",
+  "player.loadingForm": "正在载入决策表…",
+  "player.buyMachines": "购买设备（产能用工，每单位 {cost}）",
+  "player.fixedStaff": "固定人员薪资：",
+  "player.fixedCostMonth": "每月固定成本 {cost}",
+  "player.investedSoFar": "已投入 {invested}，共 {months} 个月 · {status}",
+  "player.buyReview": "以 {cost} 购买本月市场调研",
+  "player.marketIndices": "需求指数 {demand} · 成本指数 {cost}",
+  "player.committedCash": "本月已承诺支出（营销、研发、设备、市场调研）",
+  "player.results": "你的结果",
+  "player.resultsHint": "本公司已结算轮次的数据，与课堂复盘一致。竞争对手数据由教师掌握。",
+  "debrief.noStatement": "该轮暂无结算单。",
   "player.submit": "提交第 {round} 轮决策",
   "player.replace": "更新决策",
   "player.submitting": "正在提交…",
@@ -691,6 +716,9 @@ const zh: Dict = {
   "start.classList": "班级名单",
   "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包，或在模拟开始后调整座位。",
   "start.mapping": "座位安排",
+  "packages.classLanguage": "班级语言",
+  "packages.classLanguageHint": "已安排的学员将使用该语言界面。保持默认则由每位学员使用自己的语言。",
+  "packages.languagePerson": "跟随每位学员自己的选择",
   "packages.blockedTitle": "发布前还需：",
   "packages.blockedName": "填写模拟包名称",
   "packages.blockedCompanies": "至少勾选一家公司档案",
@@ -796,27 +824,43 @@ interface I18n {
   setLocale: (locale: Locale) => void;
   /** Adopts the language the server resolved (user choice, then tenant default). */
   adopt: (locale: string | undefined) => void;
+  /**
+   * Applies the class language for this session only. Deliberately not persisted: a trainee seated in
+   * a Chinese class should not have their own preference rewritten by attending it.
+   */
+  applySession: (locale: string | null | undefined) => void;
 }
 
 const Context = createContext<I18n | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(initial);
+  /** The person's own preference: what gets stored and sent to their account. */
+  const [own, setOwnState] = useState<Locale>(initial);
+  /** The class language, when a session declares one. Overrides `own` without replacing it. */
+  const [session, setSession] = useState<Locale | null>(null);
+  const locale = session ?? own;
 
   useEffect(() => {
-    localStorage.setItem(STORAGE, locale);
+    // Only the person's own choice is remembered: a class language must not rewrite their preference,
+    // or attending one Chinese cohort would leave them in Chinese for every later session.
+    localStorage.setItem(STORAGE, own);
     document.documentElement.lang = locale;
-  }, [locale]);
+  }, [own, locale]);
 
   const setLocale = useCallback((next: Locale) => {
-    setLocaleState(next);
+    setSession(null);
+    setOwnState(next);
     // Best effort: the choice is already stored locally, so a failed call only affects other devices.
     if (getToken()) void api.setMyLocale(next).catch(() => undefined);
   }, []);
 
+  const applySession = useCallback((fromRun: string | null | undefined) => {
+    setSession(isLocale(fromRun) ? fromRun : null);
+  }, []);
+
   const adopt = useCallback((fromServer: string | undefined) => {
     if (isLocale(fromServer) && localStorage.getItem(STORAGE) !== fromServer) {
-      setLocaleState(fromServer);
+      setOwnState(fromServer);
     }
   }, []);
 
@@ -840,8 +884,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
         new Intl.NumberFormat(localeTag, { maximumFractionDigits: decimals }).format(v),
       setLocale,
       adopt,
+      applySession,
     };
-  }, [locale, setLocale, adopt]);
+  }, [locale, setLocale, adopt, applySession]);
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

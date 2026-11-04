@@ -133,6 +133,16 @@ public class RunRepository {
                 """, Long.class, runId, name, companyName, cash, brandScore);
     }
 
+    /** The class language of the package this run came from; null when the package set none. */
+    public String localeOf(long runId) {
+        List<String> rows = jdbc.queryForList("""
+                select p.locale from run r
+                left join simulation_package p on p.id = r.package_id
+                where r.id = ?
+                """, String.class, runId);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     public Optional<RunRow> find(long runId, long tenantId) {
         return jdbc.query("select * from run where id = ? and tenant_id = ?", RUN, runId, tenantId)
                 .stream().findFirst();

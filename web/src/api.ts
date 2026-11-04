@@ -108,6 +108,8 @@ export interface RunPlayer {
 }
 
 export interface Run {
+  /** Class language of the package this run came from; absent/blank = follow each person. */
+  locale?: string | null;
   id: number;
   status: string;
   currentRound: number;
@@ -302,6 +304,8 @@ export interface SimulationPackage {
   companyProfileIds: number[];
   /** The prepared class list, in company order. */
   seats: { position: number; userId: number; displayName: string; email: string }[];
+  /** Class language forced on trainees; null = each person keeps their own. */
+  locale?: string | null;
   status: string;
   publishedAt: string;
 }
@@ -462,6 +466,7 @@ export const api = {
     templateKey: string;
     companyProfileIds: number[];
     traineeIds: (number | null)[];
+    locale?: string | null;
   }) =>
     request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
   retirePackage: (id: number) =>

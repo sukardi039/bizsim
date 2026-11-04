@@ -31,7 +31,7 @@ public class RunService {
     }
 
     public record RunView(long id, String status, int currentRound, String scenarioKey,
-                          int rounds, int cycles,
+                          int rounds, int cycles, String locale,
                           List<RunRepository.TeamRow> teams,
                           List<RunRepository.PlayerRow> players) {
     }
@@ -331,7 +331,7 @@ public class RunService {
         int totalRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
         int cycles = run.cycles() == null ? 0 : run.cycles();
         return new RunView(run.id(), run.status(), run.currentRound(), run.scenarioKey(),
-                totalRounds, cycles, runs.teams(runId), runs.players(runId));
+                totalRounds, cycles, runs.localeOf(runId), runs.teams(runId), runs.players(runId));
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

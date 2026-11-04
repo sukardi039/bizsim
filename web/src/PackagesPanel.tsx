@@ -25,7 +25,12 @@ export default function PackagesPanel() {
   const [trainees, setTrainees] = useState<UserRow[]>([]);
   /** company id -> trainee id: the class list is part of the package, so it is chosen here. */
   const [seats, setSeats] = useState<Record<number, string>>({});
-  const [draft, setDraft] = useState({ name: "", templateKey: "", companyIds: [] as number[] });
+  const [draft, setDraft] = useState({
+    name: "",
+    templateKey: "",
+    companyIds: [] as number[],
+    locale: "",
+  });
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -70,9 +75,10 @@ export default function PackagesPanel() {
         companyProfileIds: draft.companyIds,
         // positional: one entry per company, null where the seat is left open
         traineeIds: draft.companyIds.map((id) => (seats[id] ? Number(seats[id]) : null)),
+        locale: draft.locale || null,
       });
       setNotice(t("packages.published", { name: made.name }));
-      setDraft({ name: "", templateKey: draft.templateKey, companyIds: [] });
+      setDraft({ name: "", templateKey: draft.templateKey, companyIds: [], locale: "" });
       setSeats({});
       await load();
     } catch (error) {
@@ -270,6 +276,19 @@ export default function PackagesPanel() {
               </li>
             ))}
           </ul>
+
+          <label>
+            {t("packages.classLanguage")}
+            <select
+              value={draft.locale}
+              onChange={(e) => setDraft((current) => ({ ...current, locale: e.target.value }))}
+            >
+              <option value="">{t("packages.languagePerson")}</option>
+              <option value="en">English</option>
+              <option value="zh">中文</option>
+            </select>
+            <small className="muted">{t("packages.classLanguageHint")}</small>
+          </label>
 
           {draft.companyIds.length > 0 && (
             <>

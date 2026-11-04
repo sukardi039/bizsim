@@ -26,7 +26,7 @@ public class PackageRepository {
 
     public record PackageRow(long id, String name, String templateKey, String sourceTemplateKey,
                              int templateVersion, List<Long> companyProfileIds, List<Seat> seats,
-                             String status, String publishedAt) {
+                             String locale, String status, String publishedAt) {
     }
 
     private final JdbcTemplate jdbc;
@@ -45,14 +45,14 @@ public class PackageRepository {
     @Transactional
     public long insert(long tenantId, String name, String templateKey, String sourceTemplateKey,
                        int templateVersion, List<Long> companyProfileIds, List<Long> seats,
-                       long publishedBy) {
+                       String locale, long publishedBy) {
         long id = jdbc.queryForObject("""
                 insert into simulation_package
                     (tenant_id, name, template_key, source_template_key, template_version,
-                     company_profile_ids, published_by)
-                values (?, ?, ?, ?, ?, ?::jsonb, ?) returning id
+                     company_profile_ids, locale, published_by)
+                values (?, ?, ?, ?, ?, ?::jsonb, ?, ?) returning id
                 """, Long.class, tenantId, name, templateKey, sourceTemplateKey, templateVersion,
-                writeIds(companyProfileIds), publishedBy);
+                writeIds(companyProfileIds), locale, publishedBy);
         if (seats != null) {
             for (int position = 0; position < seats.size(); position++) {
                 Long userId = seats.get(position);
@@ -70,13 +70,14 @@ public class PackageRepository {
     public List<PackageRow> list(long tenantId) {
         return jdbc.query("""
                 select id, name, template_key, source_template_key, template_version,
-                       company_profile_ids::text, status,
+                       company_profile_ids::text, locale, status,
                        to_char(published_at, 'YYYY-MM-DD HH24:MI') as published_at
                 from simulation_package where tenant_id = ? order by published_at desc, id desc
                 """, (rs, i) -> new PackageRow(rs.getLong("id"), rs.getString("name"),
                 rs.getString("template_key"), rs.getString("source_template_key"),
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
-                seatsOf(rs.getLong("id")), rs.getString("status"), rs.getString("published_at")),
+                seatsOf(rs.getLong("id")), rs.getString("locale"), rs.getString("status"),
+                rs.getString("published_at")),
                 tenantId);
     }
 

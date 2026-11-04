@@ -34,7 +34,7 @@ public class PackageController {
      * or null to leave that company open for a walk-in. This is the prepared class list.
      */
     public record PublishRequest(String name, String templateKey, List<Long> companyProfileIds,
-                                 List<Long> traineeIds) {
+                                 List<Long> traineeIds, String locale) {
     }
 
     /** What a facilitator sends when the class begins: a name and who to seat. Nothing else. */
@@ -112,8 +112,17 @@ public class PackageController {
             profilesOf(me.tenantId(), traineeId);
         }
 
+        // The class language travels with the package: a trainee seated from it reads the interface in
+        // this language, whatever their own preference says. Blank/null means "no class language".
+        String locale = request.locale() == null || request.locale().isBlank()
+                ? null : request.locale().trim().toLowerCase();
+        if (locale != null && !java.util.List.of("en", "zh").contains(locale)) {
+            throw ProblemException.badRequest("package.locale_invalid",
+                    "the class language must be en or zh", "field", "locale");
+        }
+
         long id = packages.insert(me.tenantId(), request.name().trim(), frozenKey, template.key(),
-                template.version(), profileIds, seats, me.userId());
+                template.version(), profileIds, seats, locale, me.userId());
         templates.markFrozen(frozenKey, id);
         return packages.find(me.tenantId(), id).orElseThrow();
     }

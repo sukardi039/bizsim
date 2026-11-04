@@ -101,7 +101,7 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
 /* ------------------------------------------------------------------ screen */
 
 export default function PlayerConsole({ userId, onSignOut }: { userId: number; onSignOut: () => void }) {
-  const { t, money, number: plain } = useI18n();
+  const { t, money, number: plain, applySession } = useI18n();
   const [run, setRun] = useState<Run | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [context, setContext] = useState<DecisionFormContext | null>(null);
@@ -126,6 +126,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         setContext(null);
         return;
       }
+      // The package decides the class language; it applies for this session only.
+      applySession(active.locale);
       const seat = active.players.find((p) => p.userId === userId);
       const mine = seat ? active.teams.find((t) => t.id === seat.teamId) ?? null : null;
       setTeam(mine);
@@ -156,7 +158,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     } catch (error) {
       setProblem(errorText(error, t));
     }
-  }, [userId]);
+  }, [userId, applySession, t]);
 
   useEffect(() => {
     void load();
@@ -270,7 +272,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         <div className="card">
           <h2>{team.companyName}</h2>
           <p className="muted">
-            {run.currentRound === 0 ? "Waiting for your facilitator to open round 1." : "Loading the decision form…"}
+            {run.currentRound === 0 ? t("player.waitingRound1") : t("player.loadingForm")}
           </p>
           {problem && <p className="error">{problem}</p>}
         </div>
@@ -421,7 +423,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             />
           </label>
           <label>
-            Buy machines (workers of capacity, {money(context.machineCostPerWorker)} each)
+            {t("player.buyMachines", { cost: money(context.machineCostPerWorker) })}
             <input
               type="number"
               min={0}
@@ -432,12 +434,12 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </label>
         </div>
         <p className="muted" style={{ marginBottom: 0 }}>
-          Fixed staff on the payroll:{" "}
+          {t("player.fixedStaff")}{" "}
           {Object.entries(context.staff)
             .filter(([role]) => role !== "PRODUCTION")
             .map(([role, count]) => `${role.toLowerCase()} ${count}`)
             .join(" · ")}{" "}
-          · fixed cost {money(context.fixedCostPerMonth)} per month
+          · {t("player.fixedCostMonth", { cost: money(context.fixedCostPerMonth) })}
         </p>
       </section>
 
@@ -452,7 +454,11 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                 {project.durationMonths} months · published estimate {money(project.hintLow)}–{money(project.hintHigh)}
               </p>
               <p className="muted">
-                Invested so far {money(project.invested)} over {project.monthsInvested} month(s) · {project.status.toLowerCase()}
+                {t("player.investedSoFar", {
+                  invested: money(project.invested),
+                  months: project.monthsInvested,
+                  status: project.status.toLowerCase(),
+                })}
                 {project.overfunding === "REFUND" ? " · over-funding refunded" : ""}
               </p>
             </div>
@@ -479,10 +485,13 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             onChange={(e) => set("marketReport", e.target.checked)}
             style={{ width: "auto" }}
           />
-          Buy this month's market review for {money(context.marketReportCost)}
+          {t("player.buyReview", { cost: money(context.marketReportCost) })}
         </label>
         <p className="muted">
-          Demand index {plain(context.market.demandIndex)} · cost index {plain(context.market.costIndex)} · wages{" "}
+          {t("player.marketIndices", {
+            demand: plain(context.market.demandIndex),
+            cost: plain(context.market.costIndex),
+          })}{" "}
           {plain(context.market.wageIndex)}
         </p>
         <button type="button" onClick={buyReport} disabled={!context.submitted}>
@@ -504,7 +513,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       <section className="card submit-bar">
         <div>
           <p className="muted" style={{ margin: 0 }}>
-            Committed cash this month (marketing, R&amp;D, machines, review): <strong className={overCash ? "negative" : ""}>{money(committed)}</strong>{" "}
+            {t("player.committedCash")}: <strong className={overCash ? "negative" : ""}>{money(committed)}</strong>{" "}
             of {money(context.cash)} · payroll, materials and holding cost are charged when the round is computed.
           </p>
         </div>

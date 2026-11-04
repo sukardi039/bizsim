@@ -23,6 +23,11 @@ is the wrong account, not a bug.
 
 ## 1. Signing in
 
+**Interface language.** The console ships in English and Chinese. Yours comes from, in order: the
+**class language of the package** you are seated under (trainees), your own choice on the account,
+the tenant default, then English. Template content — product names, trend labels, event text — is
+never translated (D23).
+
 1. Open your site: `https://<your-domain>/` — the browser serves the console and forwards
    `/api` to the backend.
 2. Fill the three boxes on the sign-in card:
@@ -141,11 +146,15 @@ class list**.
 1. **Packages** → **Publish a package**.
 2. Give it a name used in class, e.g. *Autumn 2026*.
 3. Choose the **Template** (your edited copy, not the global one).
-4. Tick the **Companies** that will compete.
-5. **Class list** — for each company, pick the trainee who will run it (accounts come from **People**).
+4. **Class language** — English, 中文, or *follow each trainee's own choice*. A trainee seated from this
+   package reads the interface in that language for the whole session, whatever their own preference
+   says. Their preference is not overwritten: the class language is scoped to the session and their
+   stored choice is untouched.
+5. Tick the **Companies** that will compete.
+6. **Class list** — for each company, pick the trainee who will run it (accounts come from **People**).
    Leave a seat open if a walk-in will fill it. One person per company; the same person cannot sit in
    two competing companies.
-6. **Publish**.
+7. **Publish**.
 
 The class list is part of the package because preparing happens before the class, not on the day.
 
