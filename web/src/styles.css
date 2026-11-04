@@ -225,6 +225,18 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   border-bottom: 1px solid var(--line);
   padding-bottom: .25rem;
 }
+/* Label and amount on one line, amount right-aligned: a debrief is read as a column of figures. */
+.lines { margin: 0; }
+.lines > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: .75rem;
+  padding: .16rem 0;
+}
+.lines dt { margin: 0; color: var(--muted); font-size: .86rem; }
+.lines dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+
 .lines .total {
   border-top: 1px solid var(--line);
   margin-top: .25rem;
