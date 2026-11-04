@@ -218,6 +218,10 @@ already seated. If a package is missing, no builder has published one yet.
 
 ### 7.2 The run screen
 
+Every company row on the scoreboard and in the debrief is labelled with the trainee seated in it
+(*Alpha Industries · Ana*), so "how did she do?" is answered without a separate roster — the seating
+itself stays with the builder and cannot be changed here (D33, D36).
+
 Header: `Run <n>` · status · `round x of y` · cycles. Buttons:
 
 | Button | What it does |

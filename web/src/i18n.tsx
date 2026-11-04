@@ -319,7 +319,7 @@ const en: Dict = {
   "start.starting": "Starting…",
   "start.classList": "Class list",
   "start.classListHint":
-    "Prepared with the package: one person per company. To change it, publish a new package, or adjust the seats after the session starts.",
+    "Prepared with the package: one person per company. To change it, publish a new package — seats cannot be changed once the session starts.",
   "start.mapping": "Who sits where",
   "packages.classLanguage": "Class language",
   "packages.classLanguageHint":
@@ -702,7 +702,7 @@ const zh: Dict = {
   "start.start": "开始模拟",
   "start.starting": "正在开始…",
   "start.classList": "班级名单",
-  "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包，或在模拟开始后调整座位。",
+  "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包——模拟开始后无法调整座位。",
   "start.mapping": "座位安排",
   "packages.classLanguage": "班级语言",
   "packages.classLanguageHint": "已安排的学员将使用该语言界面。保持默认则由每位学员使用自己的语言。",

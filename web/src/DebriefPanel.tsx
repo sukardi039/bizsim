@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type ScoreRow, type StatementRow, type Team } from "./api";
+import { api, type RunPlayer, type ScoreRow, type StatementRow, type Team } from "./api";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import { useI18n } from "./i18n";
@@ -16,11 +16,14 @@ export default function DebriefPanel({
   teams,
   rounds,
   currentRound,
+  players,
 }: {
   runId: number;
   teams: Team[];
   rounds: number;
   currentRound: number;
+  /** Who is seated where: performance is per company, but the class asks "whose company?". */
+  players: RunPlayer[];
 }) {
   const { t, money, number } = useI18n();
   const [round, setRound] = useState(Math.max(1, currentRound || 1));
@@ -51,6 +54,13 @@ export default function DebriefPanel({
   useEffect(() => {
     if (currentRound > 0) setRound(currentRound);
   }, [currentRound]);
+
+  /** The trainee(s) seated in a company, so a row reads as a person's performance (D36). */
+  const seats = (teamId: number) =>
+    players
+      .filter((player) => player.teamId === teamId)
+      .map((player) => player.displayName)
+      .join(" · ");
 
   const forRound = (teamId: number, key: keyof StatementRow) => {
     const row = (statements[teamId] ?? []).find((entry) => entry.round === round);
@@ -120,6 +130,9 @@ export default function DebriefPanel({
                 <tr key={row.team_id}>
                   <td>
                     <strong>{row.company_name}</strong>
+                    {seats(row.team_id) && (
+                      <small className="muted"> · {seats(row.team_id)}</small>
+                    )}
                   </td>
                   <td className="num">{revenue === null ? "—" : money(revenue)}</td>
                   <td className="num">{cost === null ? "—" : money(cost)}</td>

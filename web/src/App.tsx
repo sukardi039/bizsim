@@ -149,6 +149,12 @@ export default function App() {
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const selected = runs.find((run) => run.id === selectedId) ?? null;
+  /** Company -> the trainee(s) seated in it, for the scoreboard and the debrief (D36). */
+  const seatNames = (teamId: number) =>
+    (selected?.players ?? [])
+      .filter((player) => player.teamId === teamId)
+      .map((player) => player.displayName)
+      .join(" · ");
   const [board, setBoard] = useState<ScoreRow[]>([]);
   const [boardRound, setBoardRound] = useState<number | null>(null);
   const [feed, setFeed] = useState<FeedItem[]>([]);
@@ -432,7 +438,15 @@ export default function App() {
                     {board.map((row, index) => (
                         <tr key={row.team_id}>
                           <td className="num">{index + 1}</td>
-                          <td>{row.company_name}</td>
+                          <td>
+                            {row.company_name}
+                            {/* Who is behind the numbers: the run page no longer has a seating card
+                                (D33), and performance is read per company, so the trainee is named
+                                here (D36). */}
+                            {seatNames(row.team_id) && (
+                              <small className="muted"> · {seatNames(row.team_id)}</small>
+                            )}
+                          </td>
                           <td className={row.profit < 0 ? "num negative" : "num positive"}>{money(row.profit)}</td>
                           <td className="num">{money(row.cash)}</td>
                           <td className="num">{row.market_share.toFixed(1)}%</td>
@@ -447,6 +461,7 @@ export default function App() {
             <DebriefPanel
               runId={selected.id}
               teams={selected.teams}
+              players={selected.players}
               rounds={selected.rounds}
               currentRound={selected.currentRound}
             />
