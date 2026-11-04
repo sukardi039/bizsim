@@ -216,7 +216,8 @@ Under the scoreboard, for any computed round:
      movement, then cash after the round, brand after the round, capacity used, market share
 
    **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
-   exactly where the previous one closed — that is the continuity line
+   exactly where the previous one closed — that is the continuity line. The same breakdown is shown
+   to the trainee for their own company (§7), so a learner can go over their round outside class.
 
    Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
    not one of the named lines appears as **Other charges** instead of being folded into a total.
@@ -252,6 +253,10 @@ nothing needs reloading once the facilitator acts:
    - **Research and development** — investment per project, *this month*
    - **Market review** — optional paid report; the cost is deducted from the result
 4. **Submit round n**. Submitting again replaces the decision until the round is computed.
+5. **Your results** — once a round is computed, the trainee sees their own company's round under
+   Revenue · Cost · Result, with a round selector for earlier rounds. It is the same breakdown the
+   class debrief shows for that company, from the same statement row; **competitors' figures and
+   market share stay on the facilitator's screen**.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."*

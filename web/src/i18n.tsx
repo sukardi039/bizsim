@@ -143,6 +143,10 @@ const en: Dict = {
   "player.rndThisMonth": "This month",
   "player.review": "Market review",
   "player.showReview": "Show the purchased review",
+  "player.results": "Your results",
+  "player.resultsHint":
+    "Your company's own numbers for a computed round — the same figures the class debrief shows for this company. Competitors' figures stay with the facilitator.",
+  "debrief.noStatement": "No statement for this round.",
   "player.submit": "Submit round {round}",
   "player.replace": "Replace decision",
   "player.submitting": "Submitting…",

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
+import StatementDetail from "./StatementDetail";
 import {
   api,
   ApiError,
@@ -8,6 +9,7 @@ import {
   type DecisionInput,
   type MarketForecast,
   type Run,
+  type StatementRow,
   type Team,
 } from "./api";
 
@@ -109,6 +111,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [report, setReport] = useState<{ forecast: MarketForecast[] } | null>(null);
+  /** The trainee's own computed rounds: same statements the facilitator's debrief reads. */
+  const [statements, setStatements] = useState<StatementRow[]>([]);
+  const [resultRound, setResultRound] = useState<number | null>(null);
   const roundRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
@@ -130,6 +135,18 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       }
       const next = await api.context(active.id, mine.id);
       setContext(next);
+      try {
+        const history = await api.statements(active.id, mine.id);
+        setStatements(history);
+        setResultRound((current) => {
+          const latest = history.length > 0 ? history[history.length - 1].round : null;
+          const stillThere = current !== null && history.some((row) => row.round === current);
+          return stillThere ? current : latest;
+        });
+      } catch {
+        // Results are a convenience: a trainee must still be able to decide if this call fails.
+        setStatements([]);
+      }
       // A new round must reset the form; a poll inside the same round must not wipe edits.
       if (roundRef.current !== next.round) {
         roundRef.current = next.round;
@@ -495,6 +512,34 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {busy ? t("player.submitting") : context.submitted ? t("player.replace") : t("player.submit", { round: context.round })}
         </button>
       </section>
+
+      {statements.length > 0 && (
+        <section className="card">
+          <div className="row">
+            <h2>{t("player.results")}</h2>
+            <label className="inline">
+              {t("debrief.round")}
+              <select
+                value={resultRound ?? statements[statements.length - 1].round}
+                onChange={(e) => setResultRound(Number(e.target.value))}
+              >
+                {statements.map((row) => (
+                  <option key={row.round} value={row.round}>
+                    {row.round}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <p className="muted">{t("player.resultsHint")}</p>
+          {(() => {
+            const row =
+              statements.find((entry) => entry.round === (resultRound ?? statements[statements.length - 1].round)) ??
+              statements[statements.length - 1];
+            return <StatementDetail row={row} />;
+          })()}
+        </section>
+      )}
     </form>
   );
 }
