@@ -110,8 +110,9 @@ The workbench is where a facilitator prepares; the console stays the place where
 | **Setup → People** | facilitator accounts; trainee roster (name, email, generated credential, status) | `app_user` |
 | **Console → Start session** | pick template + companies + trainees → creates the run and fills the seats | `run`, `team`, `player` |
 
-The existing Trainees card survives as the *in-session* fallback (walk-in trainee), because a real
-class always has one person who is not in the roster.
+The Trainees card that used to sit under the run screen was removed (D33, ruling 4 Nov 2026): the
+facilitator's page holds rounds, scoreboard, debrief and live events only, and a seat left open in a
+package stays open.
 
 ---
 
@@ -200,7 +201,7 @@ guard. The console shows the list with a confirmation before deleting anything.
    the current arrangement first").** *Current arrangement, in force:* the class list is part of the
    frozen package (D27). To change who sits where before a session you either publish a new package,
    or pass an explicit `traineeIds` on the start request (which overrides the package without
-   touching it); after the session starts the Trainees card can fill or replace a seat. *The
+   touching it); after the session starts nothing fills or replaces a seat (D33). *The
    suggestion, held for later:* split the seat table out of the freeze — seats editable on a
    published package, template + companies still frozen. That would let a builder fix a roster
    without minting a new package version, at the cost of one more "what did this package mean when it

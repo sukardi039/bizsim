@@ -109,12 +109,11 @@ The interface is available in **English** and **中文**: the language switch si
 and the choice is stored on the account (tenant default when unset, D23). Only interface chrome is
 translated — template content such as product or project names is shown exactly as authored.
 
-Trainee accounts are made in the console: pick a run, and the **Trainees** card has one row per
-company with a name, the email they sign in with, and an initial password. **Create and seat** does
-both steps at once — it creates the account and puts it on that company. Trainees who already exist
-are seated from the **Seat an existing trainee** picker in the same row. Accounts themselves live in
-**People**: prepare them before the session, deactivate them when a trainee leaves. Hand the trainee
-the email and password; there is no email delivery in this product.
+Trainee accounts are made in **People** (builder): name, email, initial password. The builder then
+seats each one in the package's **class list**, one person per company, and publishes. The facilitator
+only starts a session from that package — there is no seating step during a class (D33), so a seat
+left open stays open. Hand the trainee the email and password; there is no email delivery in this
+product.
 
 ## Deploy
 

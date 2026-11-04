@@ -68,22 +68,6 @@ const en: Dict = {
   "score.stock": "Stock",
   "score.empty": "No round computed yet.",
 
-  "trainees.title": "Trainees",
-  "trainees.hint":
-    "A trainee is a person, not a seat: prepare accounts in People, then seat them here. Each company needs one seat.",
-  "trainees.none": "no trainee yet",
-  "trainees.seatExisting": "Seat an existing trainee",
-  "trainees.pick": "— pick an account —",
-  "trainees.seat": "Seat",
-  "trainees.seating": "Seating…",
-  "trainees.new": "…or create a new one — name",
-  "trainees.namePlaceholder": "Walk-in trainee",
-  "trainees.email": "Email",
-  "trainees.password": "Initial password (8+)",
-  "trainees.passwordPlaceholder": "hand this over",
-  "trainees.createSeat": "Create and seat",
-  "trainees.seated": "Seated. They can sign in and see this company.",
-
   "people.title": "People",
   "people.hint":
     "Trainee accounts belong to the person and outlive a session. A trainee who has already played is deactivated, not deleted — their results stay readable.",
@@ -350,11 +334,11 @@ const en: Dict = {
   "packages.companyCount": "{count} of {max} companies — one company per profile, one profile per company",
   "packages.classList": "Class list",
   "packages.classListHint":
-    "One person per company, chosen now so the facilitator does not have to assemble the class on the day. Leave a seat open for a walk-in.",
+    "One person per company, chosen now so the facilitator does not have to assemble the class on the day. A seat left open means that company plays with nobody — it cannot be filled after publishing.",
   "packages.seatOpen": "— open seat —",
   "packages.noTrainees":
     "No trainees yet — add them in People → Add a trainee, then come back and seat them here.",
-  "start.emptySeat": "seat empty — fill it after the session starts",
+  "start.emptySeat": "seat empty — this company has no trainee",
 
   "packages.tidy": "Tidy up",
   "packages.tidyHint":
@@ -469,22 +453,6 @@ const zh: Dict = {
   "score.share": "市场份额",
   "score.stock": "库存",
   "score.empty": "本轮尚未结算。",
-
-  "trainees.title": "学员",
-  "trainees.hint":
-    "学员是个人，而非席位：先在“人员”中建立账号，再在这里分配席位。每家公司需要一个席位。",
-  "trainees.none": "尚无学员",
-  "trainees.seatExisting": "分配已有学员",
-  "trainees.pick": "— 选择账号 —",
-  "trainees.seat": "分配",
-  "trainees.seating": "正在分配…",
-  "trainees.new": "…或新建账号 — 姓名",
-  "trainees.namePlaceholder": "临时学员",
-  "trainees.email": "邮箱",
-  "trainees.password": "初始密码（8 位以上）",
-  "trainees.passwordPlaceholder": "交给学员",
-  "trainees.createSeat": "创建并分配",
-  "trainees.seated": "已分配。该学员可以登录并查看此公司。",
 
   "people.title": "人员",
   "people.hint":
@@ -741,10 +709,10 @@ const zh: Dict = {
   "packages.blockedTemplate": "选择模板",
   "packages.companyCount": "{count} / {max} 家公司 —— 每个档案一家公司",
   "packages.classList": "班级名单",
-  "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。可留空位给临时加入者。",
+  "packages.classListHint": "每家公司一位，现在就确定，教师无需在上课时临时安排。留空表示该公司无人参与，发布后无法补上。",
   "packages.seatOpen": "— 空位 —",
   "packages.noTrainees": "尚无学员——请先到“人员 → 添加学员”创建，再回来安排座位。",
-  "start.emptySeat": "座位空缺——可在模拟开始后补上",
+  "start.emptySeat": "座位空缺——该公司暂无学员",
 
   "packages.tidy": "清理",
   "packages.tidyHint":

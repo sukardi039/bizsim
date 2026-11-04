@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import PlayerConsole from "./PlayerConsole";
-import Trainees from "./Trainees";
 import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
 import StartSession from "./StartSession";
@@ -451,8 +450,6 @@ export default function App() {
               rounds={selected.rounds}
               currentRound={selected.currentRound}
             />
-
-            <Trainees run={selected} onChanged={refreshRuns} />
 
             <section className="card">
               <h2>Live</h2>

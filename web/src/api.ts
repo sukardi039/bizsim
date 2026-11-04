@@ -414,11 +414,6 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, displayName, password, role }),
     }),
-  addPlayer: (runId: number, teamId: number, userId: number, roleKey = "OWNER") =>
-    request<RunPlayer>(`/runs/${runId}/players`, {
-      method: "POST",
-      body: JSON.stringify({ teamId, userId, roleKey }),
-    }),
   templates: () => request<TemplateRow[]>("/templates"),
   copyTemplate: (key: string, name?: string) =>
     request<TemplateRow>(`/templates/${encodeURIComponent(key)}/copy`, {

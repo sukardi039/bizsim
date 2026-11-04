@@ -11,14 +11,14 @@ The product has **two jobs done by two people**:
 | Job | Role | Does |
 |---|---|---|
 | **Building** | `BUILDER` | prepares templates (the economy), companies, **people (the trainees)**, and **packages**; happens well before a class |
-| **Running** | `FACILITATOR` | starts sessions from a published package, seats trainees, opens/computes rounds, runs the debrief |
+| **Running** | `FACILITATOR` | starts sessions from a published package, opens/computes rounds, runs the debrief |
 | both | `ADMIN` | everything above |
 | neither | `PLAYER` | the trainee: signs in, decides, submits |
 
 A `BUILDER` cannot run a session. A `FACILITATOR` does not build anything: the template, the
 companies, the people and the package all arrive prepared, and their job is only to run the class.
-The one thing they may still do during a session is fill an open seat from the Trainees card.
-This is enforced by the server, not just hidden on screen — if you cannot see a section, it is the
+A facilitator never seats anyone either: the class list is sealed inside the package, and a seat
+left open stays open. This is enforced by the server, not just hidden on screen — if you cannot see a section, it is the
 wrong account, not a bug.
 
 ---
@@ -152,7 +152,7 @@ the session.
    anyone else.
 3. Hand the credential over; the trainee can change it after signing in.
 4. Back in **Packages**, tick a company and pick the trainee in the class list — one person per
-   company (D27). Leave a seat open for a late arrival.
+   company (D27). A seat left open means that company plays with nobody; nothing can fill it later.
 
 - **Show trainees already seated in a company** — a switch above the list, **off** by default. With it
   off the list shows only the people still free to put in a company: anyone who already holds a seat in
@@ -184,8 +184,8 @@ class list**.
    stored choice is untouched.
 5. Tick the **Companies** that will compete.
 6. **Class list** — for each company, pick the trainee who will run it (accounts come from **People**).
-   Leave a seat open if a walk-in will fill it. One person per company; the same person cannot sit in
-   two competing companies.
+   One person per company; the same person cannot sit in two competing companies. A seat left open
+   means that company plays with nobody: **there is no way to fill it after publishing** (D33).
 7. **Publish**.
 
 The class list is part of the package because preparing happens before the class, not on the day.
@@ -210,7 +210,7 @@ frozen copies) after a confirmation. Packages that taught a class are never offe
 3. Choose the **Package** — the line below shows the competing companies and the template version,
    so you can confirm you are running what you think you are.
 4. Check the **Class list** shown under it: one line per company with the person prepared for it
-   (*seat empty* means a walk-in can be added after the session starts).
+   (*seat empty* means that company has no trainee — nobody can fill it once the session starts).
 5. **Start session** — everyone on the class list is seated automatically.
 
 The session opens with one company per profile, its product line already set, and the prepared class
@@ -229,21 +229,12 @@ Header: `Run <n>` · status · `round x of y` · cycles. Buttons:
 You can only have **one session in progress at a time**. To run two cohorts in parallel you need two
 facilitator accounts.
 
-### 7.3 Seating trainees — Trainees card
-
-Under the run you see one block per company.
-
-- **Seat an existing trainee** → pick an account → **Seat**. Use this to fill a seat left open in the
-  package, or to replace someone who could not attend.
-- **…or create a new one** — name, email, initial password (8+) → **Create and seat**. This is the
-  walk-in case; the new account outlives the session and can be seated again later.
-
-### 7.4 Scoreboard
+### 7.3 Scoreboard
 
 One row per company for the latest computed round: profit, cash, share, stock. Empty until you
 **Compute round**.
 
-### 7.5 Debrief
+### 7.4 Debrief
 
 Under the scoreboard, for any computed round:
 
@@ -267,7 +258,7 @@ Under the scoreboard, for any computed round:
 Every number comes from that round's statements — the debrief cannot disagree with what the engine
 charged.
 
-### 7.6 Live
+### 7.5 Live
 
 A feed of what has happened in the session (`round.opened`, `decision.submitted`, `round.closed`).
 
@@ -282,12 +273,12 @@ A feed of what has happened in the session (`round.opened`, `decision.submitted`
    rounds. The page re-checks every 10 seconds, so nothing needs reloading once they open it, and
    your results from rounds already computed stay readable underneath.
 
-If you see **"No simulation yet"**, you are not seated in a session at all — facilitator: seat you
-in the Trainees card.
+If you see **"No simulation yet"**, you are not on any class list: the builder seats you in the
+package's class list and publishes a new package; the facilitator cannot seat you during a session.
 
 | What it means | Who fixes it |
 |---|---|
-| you are not seated in any session | facilitator: seat you in the Trainees card |
+| you are not seated in any session | builder: seat you in the package class list (People → then Packages) |
 | you are seated but **no round is open** yet | you see the waiting card; facilitator: **Open next round** |
 | the round was computed and the next one is not open | you see the waiting card; facilitator: **Open next round** |
 3. Fill in:
