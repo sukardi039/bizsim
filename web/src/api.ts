@@ -454,7 +454,13 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ projects }),
     }),
-  users: () => request<UserRow[]>("/users"),
+  /**
+   * The roster. `includeAssigned` is the People page switch: off (the default) leaves out trainees
+   * who already hold a seat in a package or a session, so the list shows who is still free to put
+   * in a company.
+   */
+  users: (includeAssigned = false) =>
+    request<UserRow[]>(`/users${includeAssigned ? "?includeAssigned=true" : ""}`),
   /**
    * Active trainees only — the people a company can seat. Separate from `users()` on purpose: the
    * package form builds a class list, it has no business reading the staff roster.

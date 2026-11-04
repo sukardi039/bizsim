@@ -25,18 +25,20 @@ export default function PeoplePanel() {
   const [role, setRole] = useState("PLAYER");
   const [canMintStaff, setCanMintStaff] = useState(false);
   const [busy, setBusy] = useState<number | "new" | null>(null);
+  /** Off by default: the roster is for assigning people, and someone already in a company is noise. */
+  const [showAssigned, setShowAssigned] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [list, me] = await Promise.all([api.users(), api.me()]);
+      const [list, me] = await Promise.all([api.users(showAssigned), api.me()]);
       setUsers(list);
       setCanMintStaff(me.role === "ADMIN");
     } catch (error) {
       setProblem(errorText(error, t));
     }
-  }, [t]);
+  }, [t, showAssigned]);
 
   useEffect(() => {
     void load();
@@ -152,6 +154,17 @@ export default function PeoplePanel() {
         </p>
         {notice && <p className="banner good">{notice}</p>}
         {problem && <p className="error">{problem}</p>}
+        <label className="inline">
+          <input
+            type="checkbox"
+            checked={showAssigned}
+            onChange={(e) => setShowAssigned(e.target.checked)}
+          />
+          {t("people.showAssigned")}
+        </label>
+        <p className="muted">
+          <small>{t("people.showAssignedHint")}</small>
+        </p>
         <table>
           <thead>
             <tr>

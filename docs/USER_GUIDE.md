@@ -154,6 +154,10 @@ the session.
 4. Back in **Packages**, tick a company and pick the trainee in the class list — one person per
    company (D27). Leave a seat open for a late arrival.
 
+- **Show trainees already seated in a company** — a switch above the list, **off** by default. With it
+  off the list shows only the people still free to put in a company: anyone who already holds a seat in
+  a package's class list or in a session is left out. Switch it on to see the whole roster again —
+  that is what you need before resetting the password of someone who already played.
 - **Set password** — the per-row button fixes a mistyped or forgotten credential (8+ characters).
   A builder may reset a **trainee's** password; a staff account's password stays an admin's business.
 - **Deactivate / Activate** — for someone who leaves, before or after playing. The login stops, the

@@ -107,6 +107,9 @@ const en: Dict = {
   "people.deactivate": "Deactivate",
   "people.activate": "Activate",
   "people.delete": "Delete",
+  "people.showAssigned": "Show trainees already seated in a company",
+  "people.showAssignedHint":
+    "Off by default: the list shows the people still free to put in a company. Switch it on to include trainees already seated in a package or a session — needed when resetting the password of someone who already played.",
   "people.add": "Add a trainee",
   "people.create": "Create account",
   "people.creating": "Creating…",
@@ -503,6 +506,9 @@ const zh: Dict = {
   "people.deactivate": "停用",
   "people.activate": "启用",
   "people.delete": "删除",
+  "people.showAssigned": "显示已安排到公司的学员",
+  "people.showAssignedHint":
+    "默认关闭：列表只显示尚未安排进公司的人员。开启后会包含已安排在模拟包或模拟中的学员——为已参与的学员重置密码时需要。",
   "people.add": "添加学员",
   "people.create": "创建账号",
   "people.creating": "正在创建…",

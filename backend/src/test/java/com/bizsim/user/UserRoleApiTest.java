@@ -194,6 +194,54 @@ class UserRoleApiTest extends PostgresTestBase {
                 .andExpect(status().isForbidden());
     }
 
+    /**
+     * The People list is for assigning people, so someone who already sits in a company is noise.
+     * Off by default: a trainee with a seat in a package class list (D27) or a session is left out,
+     * and `includeAssigned=true` brings them back. Staff are never filtered.
+     */
+    @Test
+    void the_people_list_hides_trainees_already_in_a_company_by_default() throws Exception {
+        for (String email : List.of("ada@acme.test", "grace@acme.test")) {
+            mvc.perform(post("/api/users")
+                            .header("Authorization", "Bearer " + adminToken)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json.writeValueAsString(Map.of(
+                                    "email", email, "displayName", email,
+                                    "password", "trainee1234", "role", "PLAYER"))))
+                    .andExpect(status().isCreated());
+        }
+        Long ada = jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'", Long.class);
+        Long profile = jdbc.queryForObject("""
+                insert into company_profile (tenant_id, name, company_name, products)
+                values (?, 'Alpha Industries', 'Alpha Industries', '[]'::jsonb) returning id
+                """, Long.class, acme);
+        Long packageId = jdbc.queryForObject("""
+                insert into simulation_package (tenant_id, name, template_key, template_version,
+                                                company_profile_ids)
+                values (?, 'Autumn 2026', 'standard-v1', 1, to_jsonb(array[?])) returning id
+                """, Long.class, acme, profile);
+        jdbc.update("insert into simulation_package_seat (package_id, position, user_id) values (?, 0, ?)",
+                packageId, ada);
+
+        // Default: the seated trainee is gone, the free one and the staff stay.
+        mvc.perform(get("/api/users").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.email == 'ada@acme.test')]").isEmpty())
+                .andExpect(jsonPath("$[?(@.email == 'grace@acme.test')]").exists())
+                .andExpect(jsonPath("$[?(@.email == 'owner@acme.test')]").exists());
+
+        // The switch on the People page.
+        mvc.perform(get("/api/users").param("includeAssigned", "true")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.email == 'ada@acme.test')]").exists());
+
+        // The class list of a package is unaffected: a person may be seated in a new package too.
+        mvc.perform(get("/api/users/trainees").header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
     @Test
     void an_admin_fixes_a_role_without_recreating_the_account() throws Exception {
         // The mistake this exists for: an account created as a trainee that should have been a builder.

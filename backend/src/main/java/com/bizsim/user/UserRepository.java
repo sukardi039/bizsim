@@ -132,10 +132,31 @@ public class UserRepository {
                 locale, userId, tenantId) > 0;
     }
 
-    /** Every account of one tenant, for the facilitator's trainee list. Never returns password_hash. */
+    /** Every account of one tenant, for the people list. Never returns password_hash. */
     public List<AppUser> findAllInTenant(long tenantId) {
-        return jdbc.query("select * from app_user where tenant_id = ? order by role, email",
-                MAPPER, tenantId);
+        return findAllInTenant(tenantId, true);
+    }
+
+    /**
+     * The roster, optionally narrowed to the people who are still free to assign.
+     *
+     * <p>"Associated with a company" means the person holds a seat: in a package's class list
+     * ({@code simulation_package_seat}, D27) or in a session ({@code player}). Staff are never
+     * filtered -- they are not seated anywhere and the list would become useless.
+     */
+    public List<AppUser> findAllInTenant(long tenantId, boolean includeAssigned) {
+        if (includeAssigned) {
+            return jdbc.query("select * from app_user where tenant_id = ? order by role, email",
+                    MAPPER, tenantId);
+        }
+        return jdbc.query("""
+                select u.* from app_user u
+                where u.tenant_id = ?
+                  and (u.role <> 'PLAYER' or not (
+                        exists (select 1 from simulation_package_seat s where s.user_id = u.id)
+                     or exists (select 1 from player p where p.user_id = u.id)))
+                order by u.role, u.email
+                """, MAPPER, tenantId);
     }
 
     /**
