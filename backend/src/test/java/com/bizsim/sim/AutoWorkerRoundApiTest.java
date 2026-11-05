@@ -188,6 +188,19 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
         mvc.perform(post("/api/runs/" + runId + "/rounds/close")
                 .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
 
+        // D52: hidden until the facilitator shows it.
+        mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + login("one@acme.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mvc.perform(post("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("visible", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.visible").value(true));
+
         MvcResult result = mvc.perform(get("/api/runs/" + runId + "/standings")
                         .header("Authorization", "Bearer " + login("one@acme.test")))
                 .andExpect(status().isOk())
@@ -202,6 +215,22 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
         assertThat(body).doesNotContain("marketShare").doesNotContain("cash")
                 .doesNotContain("stock").doesNotContain("share");
         assertThat(body).contains("\"own\":true");
+
+        // Hiding it again closes the class view but never the facilitator's.
+        mvc.perform(post("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("visible", false))))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + login("one@acme.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        // D52: both moments are in the audit trail, so a class can ask when the ranking appeared.
+        assertThat(jdbc.queryForList("select action from facilitator_action where run_id = ? "
+                + "and action like 'STANDINGS%' order by id", String.class, runId))
+                .containsExactly("STANDINGS_SHOW", "STANDINGS_HIDE");
 
         // The facilitator reads the same table: it is a view of the round, not a trainee privilege.
         mvc.perform(get("/api/runs/" + runId + "/standings")

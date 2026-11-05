@@ -17,7 +17,9 @@ import java.util.Optional;
 public class RunRepository {
 
     public record RunRow(long id, long tenantId, long simulationId, String scenarioKey,
-                         String status, int currentRound, Integer rounds, Integer cycles) {
+                         String status, int currentRound, Integer rounds, Integer cycles,
+                         /** D52: may trainees read the standings table yet? */
+                         boolean standingsVisible) {
     }
 
     public record TeamRow(long id, String name, String companyName, BigDecimal cash,
@@ -32,7 +34,8 @@ public class RunRepository {
     private static final RowMapper<RunRow> RUN = (rs, i) -> new RunRow(
             rs.getLong("id"), rs.getLong("tenant_id"), rs.getLong("simulation_id"),
             rs.getString("scenario_key"), rs.getString("status"), rs.getInt("current_round"),
-            (Integer) rs.getObject("rounds"), (Integer) rs.getObject("cycles"));
+            (Integer) rs.getObject("rounds"), (Integer) rs.getObject("cycles"),
+            rs.getBoolean("standings_visible"));
 
     private static final RowMapper<TeamRow> TEAM = (rs, i) -> new TeamRow(
             rs.getLong("id"), rs.getString("name"), rs.getString("company_name"),
@@ -181,6 +184,11 @@ public class RunRepository {
                 "select exists (select 1 from app_user where id = ? and role = 'AUTO_WORKER')",
                 Boolean.class, userId);
         return Boolean.TRUE.equals(auto);
+    }
+
+    /** D52: the facilitator shows or hides the class table; the moment is audited. */
+    public void setStandingsVisible(long runId, boolean visible) {
+        jdbc.update("update run set standings_visible = ? where id = ?", visible, runId);
     }
 
     public boolean userBelongsToTenant(long userId, long tenantId) {

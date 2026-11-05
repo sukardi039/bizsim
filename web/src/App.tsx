@@ -4,6 +4,7 @@ import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
 import AutoWorkersPanel from "./AutoWorkersPanel";
 import BotPanel from "./BotPanel";
+import StandingsPanel from "./StandingsPanel";
 import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
@@ -477,6 +478,14 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <StandingsPanel
+              run={selected}
+              onChanged={() => {
+                void refreshRuns();
+                if (selectedId !== null) void refreshBoard(selectedId);
+              }}
+            />
 
             <BotPanel run={selected} />
 

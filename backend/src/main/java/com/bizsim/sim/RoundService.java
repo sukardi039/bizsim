@@ -399,8 +399,15 @@ public class RoundService {
         runs.find(runId, tenantId).orElseThrow(
                 () -> ProblemException.notFound("run.not_found", "no such run"));
         boolean staff = List.of("FACILITATOR", "ADMIN", "BUILDER").contains(role);
-        if (!staff && !rounds.userInRun(userId, runId)) {
-            throw ProblemException.forbidden("team.not_yours", "you are not seated in this session");
+        if (!staff) {
+            if (!rounds.userInRun(userId, runId)) {
+                throw ProblemException.forbidden("team.not_yours", "you are not seated in this session");
+            }
+            // D52: the facilitator decides when the class may see the table. Hidden reads as an empty
+            // table, not an error — the trainee console simply has nothing to show.
+            if (!runs.find(runId, tenantId).map(RunRepository.RunRow::standingsVisible).orElse(false)) {
+                return List.of();
+            }
         }
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> row : rounds.standings(runId, round)) {
@@ -413,6 +420,20 @@ public class RoundService {
             rows.add(view);
         }
         return rows;
+    }
+
+    /**
+     * D52: show or hide the class table. It is a session control like pausing the clock, so it is
+     * audited — a class can ask when the ranking became visible.
+     */
+    @Transactional
+    public boolean setStandingsVisible(long tenantId, long actorId, long runId, boolean visible) {
+        runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        runs.setStandingsVisible(runId, visible);
+        rounds.audit(tenantId, runId, null, null, visible ? "STANDINGS_SHOW" : "STANDINGS_HIDE",
+                null, null, actorId);
+        return visible;
     }
 
     @Transactional(readOnly = true)

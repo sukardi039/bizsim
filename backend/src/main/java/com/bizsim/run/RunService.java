@@ -45,7 +45,9 @@ public class RunService {
                           java.time.Instant closesAt,
                           boolean clockPaused,
                           /** Seconds left, already frozen while paused; -1 for an untimed round. */
-                          long clockRemainingSeconds) {
+                          long clockRemainingSeconds,
+                          /** D52: whether the class may read the standings table. */
+                          boolean standingsVisible) {
     }
 
     public record RoundState(int number, String status) {
@@ -370,7 +372,8 @@ public class RunService {
                 clock.isPresent(),
                 clock.map(RoundService.ClockState::closesAt).orElse(null),
                 clock.map(RoundService.ClockState::paused).orElse(false),
-                clock.map(RoundService.ClockState::remainingSeconds).orElse(-1L));
+                clock.map(RoundService.ClockState::remainingSeconds).orElse(-1L),
+                run.standingsVisible());
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

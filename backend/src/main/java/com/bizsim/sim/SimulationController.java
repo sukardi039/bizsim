@@ -82,6 +82,17 @@ public class SimulationController {
         return rounds.standings(me.tenantId(), me.userId(), me.role(), runId, round);
     }
 
+    /**
+     * D52: show the class table to trainees, or hide it again. Audited as a session control.
+     */
+    @PostMapping("/standings")
+    public Map<String, Object> revealStandings(@PathVariable long runId,
+                                               @RequestBody(required = false) Map<String, Object> body) {
+        TenantContext.Principal me = requireFacilitator();
+        boolean visible = body == null || !Boolean.FALSE.equals(body.get("visible"));
+        return Map.of("visible", rounds.setStandingsVisible(me.tenantId(), me.userId(), runId, visible));
+    }
+
     /** Facilitator power "close a round" without opening the next one (D12). */
     @PostMapping("/rounds/close")
     public ResponseEntity<ScoringEngine.RoundResult> close(@PathVariable long runId) {

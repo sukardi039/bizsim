@@ -153,6 +153,8 @@ export interface Run {
   clockPaused?: boolean;
   /** Seconds left, already frozen while paused; -1 for an untimed round. */
   clockRemainingSeconds?: number;
+  /** D52: whether trainees may read the class standings table yet. */
+  standingsVisible?: boolean;
   scenarioKey: string;
   rounds: number;
   cycles: number;
@@ -606,6 +608,11 @@ export const api = {
   botTrace: (runId: number) => request<BotTraceRow[]>(`/runs/${runId}/bots`),
   standings: (runId: number, round?: number) =>
     request<StandingsRow[]>(`/runs/${runId}/standings${round ? `?round=${round}` : ""}`),
+  setStandingsVisible: (runId: number, visible: boolean) =>
+    request<{ visible: boolean }>(`/runs/${runId}/standings`, {
+      method: "POST",
+      body: JSON.stringify({ visible }),
+    }),
   askBots: (runId: number) =>
     request<{ decided: number }>(`/runs/${runId}/bots/decide`, { method: "POST" }),
   replayBot: (runId: number, teamId: number, round: number) =>
