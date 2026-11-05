@@ -349,6 +349,16 @@ public class DebriefExportService {
         PdfPTable table = new PdfPTable(2 + productColumns + 5);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
+        // Content decides the widths: names need room, numbers need just enough (D45).
+        List<Float> widths = new ArrayList<>(List.of(2.6f, 1.9f));
+        for (int i = 0; i < report.products().size(); i++) {
+            widths.add(1.0f);
+            widths.add(1.6f);
+            widths.add(0.95f);
+        }
+        widths.addAll(List.of(1.8f, 1.4f, 0.9f, 1.5f, 1.0f));
+        setWidths(table, widths);
+        table.setHeaderRows(1);
 
         List<String> columns = new ArrayList<>(List.of(labels.company(), labels.trainee()));
         for (ProductColumn product : report.products()) {
@@ -385,10 +395,19 @@ public class DebriefExportService {
     }
 
     private PdfPTable resultTable(Report report, RoundReport round, Labels labels, Font head, Font body) {
-        int columns = report.classScope() ? 11 : 10;
+        int columns = report.classScope() ? 12 : 11;
         PdfPTable table = new PdfPTable(columns);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
+        // Twelve columns only fit a landscape page when each one is sized for what it holds: the
+        // company and trainee columns take the space, the numbers take what a figure needs.
+        List<Float> widths = new ArrayList<>(List.of(2.9f, 1.9f, 2.15f, 2.15f, 2.0f, 2.25f, 2.15f));
+        if (report.classScope()) {
+            widths.add(1.05f);
+        }
+        widths.addAll(List.of(0.95f, 0.95f, 1.25f, 1.7f));
+        setWidths(table, widths);
+        table.setHeaderRows(1);
 
         List<String> headers = new ArrayList<>(List.of(labels.company(), labels.trainee(),
                 labels.revenue(), labels.cost(), labels.profit(), labels.cumulative(), labels.cash()));
@@ -421,6 +440,12 @@ public class DebriefExportService {
         PdfPTable table = new PdfPTable(COST_KEYS.size() + 2);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
+        List<Float> widths = new ArrayList<>(List.of(2.9f, 1.9f));
+        for (int i = 0; i < COST_KEYS.size(); i++) {
+            widths.add(2.0f);
+        }
+        setWidths(table, widths);
+        table.setHeaderRows(1);
         List<String> columns = new ArrayList<>(List.of(labels.company(), labels.trainee()));
         for (int i = 0; i < COST_KEYS.size(); i++) {
             columns.add(labels.costName(i));
@@ -443,6 +468,15 @@ public class DebriefExportService {
         }
     }
 
+    /** OpenPDF wants a float[], and the ratios are easier to read as a list of weights. */
+    private static void setWidths(PdfPTable table, List<Float> widths) {
+        float[] values = new float[widths.size()];
+        for (int i = 0; i < values.length; i++) {
+            values[i] = widths.get(i);
+        }
+        table.setWidths(values);
+    }
+
     private static void header(PdfPTable table, Font font, String... labels) {
         for (String label : labels) {
             PdfPCell cell = new PdfPCell(new Phrase(label, font));
@@ -461,6 +495,7 @@ public class DebriefExportService {
     private static void money(PdfPTable table, Font font, BigDecimal value) {
         PdfPCell cell = new PdfPCell(new Phrase(grouped(value), font));
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        cell.setNoWrap(true);
         cell.setPadding(3);
         table.addCell(cell);
     }
