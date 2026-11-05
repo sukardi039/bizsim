@@ -82,6 +82,17 @@ export default function DebriefPanel({
         <h2>{t("debrief.title")}</h2>
         <p className="muted">{t("debrief.noRound")}</p>
         {problem && <p className="error">{problem}</p>}
+        {slides && (
+          <DebriefSlides
+            board={board}
+            statements={statements}
+            players={players}
+            round={round}
+            lastComputed={Math.max(1, currentRound)}
+            onRoundChange={setRound}
+            onClose={() => setSlides(false)}
+          />
+        )}
       </section>
     );
   }
@@ -238,7 +249,7 @@ export default function DebriefPanel({
           statements={statements}
           players={players}
           round={round}
-          rounds={Math.max(rounds, currentRound)}
+          lastComputed={Math.max(1, currentRound)}
           onRoundChange={setRound}
           onClose={() => setSlides(false)}
         />

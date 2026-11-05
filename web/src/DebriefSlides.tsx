@@ -12,7 +12,7 @@ export default function DebriefSlides({
   statements,
   players,
   round,
-  rounds,
+  lastComputed,
   onRoundChange,
   onClose,
 }: {
@@ -20,7 +20,8 @@ export default function DebriefSlides({
   statements: Record<number, StatementRow[]>;
   players: RunPlayer[];
   round: number;
-  rounds: number;
+  /** The highest round with results. Arrows stop here: a round that has not run has nothing to show. */
+  lastComputed: number;
   onRoundChange: (round: number) => void;
   onClose: () => void;
 }) {
@@ -33,12 +34,12 @@ export default function DebriefSlides({
       if (event.key === "Escape") onClose();
       if (event.key === "ArrowRight") setPage(2);
       if (event.key === "ArrowLeft") setPage(1);
-      if (event.key === "ArrowDown" && round < rounds) onRoundChange(round + 1);
+      if (event.key === "ArrowDown" && round < lastComputed) onRoundChange(round + 1);
       if (event.key === "ArrowUp" && round > 1) onRoundChange(round - 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onRoundChange, round, rounds]);
+  }, [onClose, onRoundChange, round, lastComputed]);
 
   const seats = (teamId: number) =>
     players
@@ -70,7 +71,10 @@ export default function DebriefSlides({
           <button onClick={() => onRoundChange(Math.max(1, round - 1))} disabled={round <= 1}>
             ‹
           </button>
-          <button onClick={() => onRoundChange(Math.min(rounds, round + 1))} disabled={round >= rounds}>
+          <button
+            onClick={() => onRoundChange(Math.min(lastComputed, round + 1))}
+            disabled={round >= lastComputed}
+          >
             ›
           </button>
           <button onClick={() => setPage(page === 1 ? 2 : 1)}>
