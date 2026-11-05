@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -42,14 +41,17 @@ public class BotRoundService {
     private final RoundRepository roundRepository;
     private final ScenarioRepository scenarios;
     private final EnvironmentService environment;
+    private final ScoringEngine engine;
 
     public BotRoundService(BotRepository bots, RoundService rounds, RoundRepository roundRepository,
-                           ScenarioRepository scenarios, EnvironmentService environment) {
+                           ScenarioRepository scenarios, EnvironmentService environment,
+                           ScoringEngine engine) {
         this.bots = bots;
         this.rounds = rounds;
         this.roundRepository = roundRepository;
         this.scenarios = scenarios;
         this.environment = environment;
+        this.engine = engine;
     }
 
     /** Every five seconds: whoever is due to move, moves. Failures are logged per seat. */
@@ -74,7 +76,7 @@ public class BotRoundService {
     }
 
     /** "Ask the opponents to move now" — a facilitator's button and the tests' entry point. */
-    @Transactional
+    // Same reasoning as decideBeforeClose: one seat's refusal must not poison the others' commits.
     public int decideNow(long tenantId, long runId) {
         int decided = 0;
         for (BotRepository.Due due : bots.due(tenantId, runId)) {
@@ -96,7 +98,9 @@ public class BotRoundService {
      * the chance a person at the keyboard had. An opponent whose moment *did* pass and still produced
      * nothing keeps its absence visible, so a broken worker is not hidden by this.
      */
-    @Transactional
+    // Deliberately NOT transactional: each submission below is its own transaction (RoundService.submit),
+    // and a seat that fails must not mark a surrounding transaction rollback-only — that turned one bad
+    // opponent into an opaque Internal Server Error for the whole compute (D59).
     public int decideBeforeClose(long tenantId, long runId) {
         int decided = 0;
         for (BotRepository.Due due : bots.due(tenantId, runId)) {
@@ -131,12 +135,15 @@ public class BotRoundService {
         AutoWorker.Profile profile = profileOf(tenantId, runId, teamId);
         AutoWorker.Context context = context(scenario, runId, roundNumber, state);
         AutoWorker.Decision decision = AutoWorker.decide(scenario, runId, teamId, context, profile);
+        // Same trimming the live path applies, or a trimmed month would replay as a mismatch.
+        DecisionPayload replayed = affordable(scenario,
+                environment.forRound(scenario, runId, roundNumber), state, teamId, decision.payload());
 
         String stored = roundRepository.decisionPayload(runId, roundNumber, teamId).orElse(null);
         boolean identical = stored != null
-                && canonical(stored).equals(canonical(toJson(decision.payload())));
+                && canonical(stored).equals(canonical(toJson(replayed)));
         return new Replay(roundNumber, teamId, profile.level(), profile.personality(),
-                digest(context), decision.rationale(), stored, toJson(decision.payload()), identical);
+                digest(context), decision.rationale(), stored, toJson(replayed), identical);
     }
 
     public record Replay(int round, long teamId, String level, String personality,
@@ -145,6 +152,95 @@ public class BotRoundService {
     }
 
     // ------------------------------------------------------------------ one seat
+
+    /**
+     * A plan the company can pay for (D59). The engine's own preview decides: materials, marketing, R&D,
+     * capacity purchases and hiring must fit inside cash, or the submission is refused — which is how a
+     * policy that plans too boldly ends up skipping months. Cuts come cheap first (marketing, then R&D,
+     * then capacity, then production), so what survives is the plan that keeps the company trading.
+     */
+    private DecisionPayload affordable(Scenario scenario, EnvironmentService.RoundEnvironment env,
+                                       BotRepository.State state, long teamId, DecisionPayload plan) {
+        BigDecimal cash = state.cash() == null ? BigDecimal.ZERO : state.cash();
+        DecisionPayload current = plan;
+        ScoringEngine.Commitment last = null;
+        for (int attempt = 0; attempt < 14; attempt++) {
+            ScoringEngine.Commitment commitment = engine.preview(scenario, env,
+                    new ScoringEngine.TeamInput(teamId, state.status(), cash, state.brand(),
+                            state.machineWorkers(), state.staff(), state.products(), state.rnd(),
+                            current));
+            boolean overCash = commitment.discretionary().compareTo(cash) > 0;
+            boolean overStaff = commitment.plannedWorkers().compareTo(commitment.capacityAvailable()) > 0;
+            last = commitment;
+            if (!overCash && !overStaff) {
+                return current;
+            }
+            DecisionPayload next = shrink(current, overStaff);
+            if (next.equals(current)) {
+                break;
+            }
+            current = next;
+        }
+        // Nothing left to cut: a company that cannot pay for materials or marketing still has to send
+        // *something*, or the month is skipped. It sends the only plan it can afford — no spending at
+        // all, prices held, so whatever stock it has can still sell.
+        List<DecisionPayload.ProductRow> idle = current.production() == null ? List.of()
+                : current.production().stream().map(row ->
+                        new DecisionPayload.ProductRow(row.product(), BigDecimal.ZERO)).toList();
+        // Workers must fit the plant the company actually has: an idle plan that still claims more
+        // workers than capacity is refused as hard as an expensive one.
+        // Workers must fit both the plant and the payroll: deploying more people than are employed
+        // costs a hiring fee, which is itself a discretionary cost the company cannot pay.
+        int employed = state.staff() == null ? 0 : state.staff().getOrDefault("PRODUCTION", 0);
+        int idleWorkers = last == null ? 0
+                : Math.min(employed, last.capacityAvailable().intValue());
+        DecisionPayload.ManpowerRow idleManpower =
+                new DecisionPayload.ManpowerRow(Math.max(0, idleWorkers));
+        return new DecisionPayload(idle, current.price(), List.of(), idleManpower, List.of(),
+                List.of(), BigDecimal.ZERO, current.marketReport());
+    }
+
+    /** One notch cheaper: marketing first, then R&D, then capacity, then units. */
+    private static DecisionPayload shrink(DecisionPayload plan, boolean cutOutput) {
+        List<DecisionPayload.ChannelRow> marketing = plan.marketing() == null ? List.of() : plan.marketing();
+        BigDecimal spend = marketing.stream().map(DecisionPayload.ChannelRow::spend)
+                .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (spend.signum() > 0) {
+            return new DecisionPayload(plan.production(), plan.price(),
+                    marketing.stream().map(row -> new DecisionPayload.ChannelRow(row.channel(),
+                            row.spend() == null ? BigDecimal.ZERO
+                                    : row.spend().multiply(new BigDecimal("0.5"))
+                                    .setScale(0, java.math.RoundingMode.DOWN))).toList(),
+                    plan.manpower(), plan.rnd(), plan.quality(), plan.capacityPurchase(),
+                    plan.marketReport());
+        }
+        List<DecisionPayload.RndRow> rnd = plan.rnd() == null ? List.of() : plan.rnd();
+        BigDecimal invest = rnd.stream().map(DecisionPayload.RndRow::invest)
+                .filter(java.util.Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (invest.signum() > 0) {
+            return new DecisionPayload(plan.production(), plan.price(), plan.marketing(), plan.manpower(),
+                    rnd.stream().map(row -> new DecisionPayload.RndRow(row.project(),
+                            row.invest() == null ? BigDecimal.ZERO
+                                    : row.invest().multiply(new BigDecimal("0.5"))
+                                    .setScale(0, java.math.RoundingMode.DOWN))).toList(),
+                    plan.quality(), plan.capacityPurchase(), plan.marketReport());
+        }
+        if (plan.capacityPurchase() != null && plan.capacityPurchase().signum() > 0) {
+            return new DecisionPayload(plan.production(), plan.price(), plan.marketing(), plan.manpower(),
+                    plan.rnd(), plan.quality(), BigDecimal.ZERO, plan.marketReport());
+        }
+        if (plan.production() != null && !plan.production().isEmpty()) {
+            // Output is the last thing to go, and only when the workforce cannot cover it either.
+            return new DecisionPayload(plan.production().stream()
+                    .map(row -> new DecisionPayload.ProductRow(row.product(),
+                            row.units() == null ? BigDecimal.ZERO
+                                    : row.units().multiply(new BigDecimal("0.7"))
+                                    .setScale(0, java.math.RoundingMode.DOWN))).toList(),
+                    plan.price(), plan.marketing(), plan.manpower(), plan.rnd(), plan.quality(),
+                    plan.capacityPurchase(), plan.marketReport());
+        }
+        return plan;
+    }
 
     private void decideOne(BotRepository.Due due, String mode) {
         Scenario scenario = scenarios.load(due.scenarioKey());
@@ -159,7 +255,12 @@ public class BotRoundService {
                 context, profile);
 
         // The same method a trainee's form posts to: same clock, same validator, same affordability.
-        rounds.submit(due.tenantId(), due.userId(), due.runId(), due.teamId(), decision.payload());
+        // A plan the company cannot pay for is trimmed against the engine's own preview before it is
+        // submitted, so a bold month becomes a smaller one instead of a missing one.
+        DecisionPayload payload = affordable(scenario,
+                environment.forRound(scenario, due.runId(), due.roundNumber()), state, due.teamId(),
+                decision.payload());
+        rounds.submit(due.tenantId(), due.userId(), due.runId(), due.teamId(), payload);
         bots.record(due.roundId(), due.teamId(), due.profileKey(), due.profileVersion(),
                 due.paramsJson(), digest(due.paramsJson()), decision.seedKey(), digest(context),
                 decision.rationale(), mode);

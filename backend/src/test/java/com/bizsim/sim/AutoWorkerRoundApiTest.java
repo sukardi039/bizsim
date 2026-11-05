@@ -166,6 +166,34 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_broke_opponent_plays_a_smaller_month_instead_of_breaking_the_compute() throws Exception {
+        // D59: a policy that plans beyond its cash used to poison the whole compute with an opaque
+        // 500 (UnexpectedRollbackException) and leave the month unplayed.
+        jdbc.update("update team set cash = 1000 where id = ?", botTeamId);
+        openRound();
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("""
+                select count(*) from decision d join round r on r.id = d.round_id
+                where r.run_id = ? and d.team_id = ?
+                """, Integer.class, runId, botTeamId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from round_statement where team_id = ?",
+                Integer.class, botTeamId)).isEqualTo(1);
+    }
+
+    @Test
+    void an_opponent_that_cannot_pay_at_all_does_not_fail_the_compute() throws Exception {
+        // Below zero, even a plan with no spending is unaffordable: the month is skipped, but the
+        // compute must still land — one company's refusal is not the class's problem.
+        jdbc.update("update team set cash = -5000000 where id = ?", botTeamId);
+        openRound();
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select count(*) from round_statement where team_id = ?",
+                Integer.class, botTeamId)).isEqualTo(1);
+    }
+
+    @Test
     void a_reset_puts_the_session_back_to_month_zero() throws Exception {
         long teamOne = jdbc.queryForObject(
                 "select id from team where run_id = ? order by id limit 1", Long.class, runId);
