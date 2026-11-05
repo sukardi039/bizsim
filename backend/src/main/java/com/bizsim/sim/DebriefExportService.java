@@ -49,17 +49,63 @@ import java.util.Map;
 public class DebriefExportService {
 
     /** The named costs a statement carries; profit is revenue minus their sum. */
-    private static final List<Map.Entry<String, String>> COST_LINES = List.of(
-            Map.entry("cogs", "Cost of goods sold"),
-            Map.entry("payroll", "Payroll"),
-            Map.entry("marketing", "Marketing"),
-            Map.entry("rnd_spend", "R&D"),
-            Map.entry("quality_cost", "Quality upgrade"),
-            Map.entry("fixed_cost", "Fixed cost"),
-            Map.entry("holding_cost", "Stock holding"),
-            Map.entry("hiring_cost", "Hiring and firing"),
-            Map.entry("capacity_cost", "Capacity"),
-            Map.entry("report_cost", "Market review"));
+    private static final List<String> COST_KEYS = Labels.COST_KEYS;
+
+
+    /**
+     * The words in the document, in the reader's language (D44). Class content — company, product and
+     * trainee names — is authored data and is never translated; only these labels are.
+     */
+    public record Labels(String runLine, String classReport, String companyReport, String roundWord,
+                         String computedWord, String sentBlock, String producedBlock, String costBlock,
+                         String company, String trainee, String units, String price, String quality,
+                         String marketing, String rnd, String staff, String machines, String review,
+                         String bought, String notBought, String noDecision,
+                         String roundColumn, String submitted, String yes, String noAnswer,
+                         String revenue, String cost, String profit, String cumulative, String cash,
+                         String share, String brand, String stock, String lostSales, String capacity,
+                         String capacityAvailable, String rndCompleted, String status,
+                         String resultsSheet, String submissionsSheet, String costSheet,
+                         java.util.List<String> costLineNames) {
+
+        private static final java.util.List<String> COST_KEYS = java.util.List.of(
+                "cogs", "payroll", "marketing", "rnd_spend", "quality_cost", "fixed_cost",
+                "holding_cost", "hiring_cost", "capacity_cost", "report_cost");
+
+        public static Labels of(String code) {
+            return "zh".equalsIgnoreCase(code) ? ZH : EN;
+        }
+
+        static final Labels EN = new Labels(
+                "Run %d · %s · rounds %d–%d", "class debrief", "company report", "Round %s", "computed",
+                "What each company sent", "What the month produced", "Cost lines",
+                "Company", "Trainee", "units", "price", "quality", "Marketing", "R&D", "Staff",
+                "Machines", "Review", "bought", "no", "no decision submitted",
+                "Round", "Submitted", "yes", "no",
+                "Revenue", "Cost", "Profit", "Cumulative", "Cash", "Share %", "Brand", "Stock",
+                "Lost sales", "Capacity", "Capacity available", "R&D completed", "Status",
+                "Results", "Submissions", "Cost lines",
+                java.util.List.of("Cost of goods sold", "Payroll", "Marketing", "R&D",
+                        "Quality upgrade", "Fixed cost", "Stock holding", "Hiring and firing",
+                        "Capacity", "Market review"));
+
+        static final Labels ZH = new Labels(
+                "模拟 %d · %s · 第 %d–%d 轮", "全班复盘", "公司报告", "第 %s 轮", "结算于",
+                "各家提交", "本月结果", "成本明细",
+                "公司", "学员", "数量", "单价", "质量", "营销", "研发", "生产人员",
+                "设备", "市场报告", "已购买", "未购买", "未提交决策",
+                "轮次", "已提交", "是", "否",
+                "收入", "成本", "利润", "累计利润", "现金", "市场份额", "品牌", "库存",
+                "损失销量", "产能", "可用产能", "完成研发数", "状态",
+                "结果", "提交", "成本明细",
+                java.util.List.of("销货成本", "工资", "营销", "研发",
+                        "质量升级", "固定成本", "库存持有", "招聘/解雇",
+                        "产能", "市场报告"));
+
+        public String costName(int index) {
+            return costLineNames.get(index);
+        }
+    }
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
@@ -168,8 +214,8 @@ public class DebriefExportService {
             row.put("capacityUsed", nz(rs.getBigDecimal("capacity_used")));
             row.put("capacityAvailable", nz(rs.getBigDecimal("capacity_available")));
             Map<String, BigDecimal> costs = new LinkedHashMap<>();
-            for (Map.Entry<String, String> line : COST_LINES) {
-                costs.put(line.getKey(), nz(rs.getBigDecimal(line.getKey())));
+            for (String key : COST_KEYS) {
+                costs.put(key, nz(rs.getBigDecimal(key)));
             }
             row.put("costLines", costs);
             row.put("payload", rs.getString("payload"));
@@ -246,7 +292,7 @@ public class DebriefExportService {
 
     // ------------------------------------------------------------------ PDF
 
-    public byte[] pdf(Report report) {
+    public byte[] pdf(Report report, Labels labels) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.A4.rotate(), 30, 30, 28, 28);
             PdfWriter.getInstance(document, out);
@@ -261,10 +307,11 @@ public class DebriefExportService {
             Font body = new Font(face, 8);
 
             document.add(new Paragraph(report.title(), title));
-            document.add(new Paragraph("Run " + report.runId() + " · " + report.scenarioKey() + " · "
-                    + (report.classScope() ? "class debrief" : "company report") + " · rounds "
-                    + report.rounds().get(0).round() + "–"
-                    + report.rounds().get(report.rounds().size() - 1).round(), subtitle));
+            document.add(new Paragraph(String.format(labels.runLine(), report.runId(),
+                    report.scenarioKey(), report.rounds().get(0).round(),
+                    report.rounds().get(report.rounds().size() - 1).round()), subtitle));
+            document.add(new Paragraph(report.classScope() ? labels.classReport()
+                    : labels.companyReport(), subtitle));
 
             boolean first = true;
             for (RoundReport round : report.rounds()) {
@@ -273,19 +320,19 @@ public class DebriefExportService {
                     document.newPage();
                 }
                 first = false;
-                document.add(new Paragraph("Round " + round.round(), roundHead));
+                document.add(new Paragraph(String.format(labels.roundWord(), round.round()), roundHead));
                 if (round.computedAt() != null) {
-                    document.add(new Paragraph("computed " + round.computedAt(), subtitle));
+                    document.add(new Paragraph(labels.computedWord() + " " + round.computedAt(), subtitle));
                 }
 
-                document.add(new Paragraph("What each company sent", blockHead));
-                document.add(submissionTable(report, round, head, body));
+                document.add(new Paragraph(labels.sentBlock(), blockHead));
+                document.add(submissionTable(report, round, labels, head, body));
 
-                document.add(new Paragraph("What the month produced", blockHead));
-                document.add(resultTable(report, round, head, body));
+                document.add(new Paragraph(labels.producedBlock(), blockHead));
+                document.add(resultTable(report, round, labels, head, body));
 
-                document.add(new Paragraph("Cost lines", blockHead));
-                document.add(costTable(round, head, body));
+                document.add(new Paragraph(labels.costBlock(), blockHead));
+                document.add(costTable(round, labels, head, body));
             }
 
             document.close();
@@ -296,34 +343,33 @@ public class DebriefExportService {
     }
 
     /** One row per company: per-product plan, then the money the plan commits. */
-    private PdfPTable submissionTable(Report report, RoundReport round, Font head, Font body) {
+    private PdfPTable submissionTable(Report report, RoundReport round, Labels labels, Font head,
+                                      Font body) {
         int productColumns = report.products().size() * 3;
         PdfPTable table = new PdfPTable(2 + productColumns + 5);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
 
-        List<String> labels = new ArrayList<>(List.of("Company", "Trainee"));
+        List<String> columns = new ArrayList<>(List.of(labels.company(), labels.trainee()));
         for (ProductColumn product : report.products()) {
-            labels.add(product.code() + " units");
-            labels.add(product.code() + " price");
-            labels.add(product.code() + " quality");
+            columns.add(product.code() + " " + labels.units());
+            columns.add(product.code() + " " + labels.price());
+            columns.add(product.code() + " " + labels.quality());
         }
-        labels.addAll(List.of("Marketing", "R&D", "Staff", "Machines", "Review"));
-        header(table, head, labels.toArray(new String[0]));
+        columns.addAll(List.of(labels.marketing(), labels.rnd(), labels.staff(), labels.machines(),
+                labels.review()));
+        header(table, head, columns.toArray(new String[0]));
 
         for (Row row : round.rows()) {
             cell(table, body, row.company());
             cell(table, body, row.trainees());
             for (ProductColumn product : report.products()) {
-                cell(table, body, row.planSent()
-                        ? plain(row.units().get(product.code())) : "—");
-                cell(table, body, row.planSent()
-                        ? grouped(row.prices().get(product.code())) : "—");
-                cell(table, body, row.planSent()
-                        ? grouped(row.qualitySpend().get(product.code())) : "—");
+                cell(table, body, row.planSent() ? plain(row.units().get(product.code())) : "—");
+                cell(table, body, row.planSent() ? grouped(row.prices().get(product.code())) : "—");
+                cell(table, body, row.planSent() ? grouped(row.qualitySpend().get(product.code())) : "—");
             }
             if (!row.planSent()) {
-                cell(table, body, "no decision submitted");
+                cell(table, body, labels.noDecision());
                 for (int i = 0; i < 4; i++) {
                     cell(table, body, "—");
                 }
@@ -332,25 +378,25 @@ public class DebriefExportService {
                 money(table, body, row.rnd());
                 cell(table, body, String.valueOf(row.staff()));
                 money(table, body, row.machines());
-                cell(table, body, row.review() ? "bought" : "no");
+                cell(table, body, row.review() ? labels.bought() : labels.notBought());
             }
         }
         return table;
     }
 
-    private PdfPTable resultTable(Report report, RoundReport round, Font head, Font body) {
+    private PdfPTable resultTable(Report report, RoundReport round, Labels labels, Font head, Font body) {
         int columns = report.classScope() ? 11 : 10;
         PdfPTable table = new PdfPTable(columns);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
 
-        List<String> labels = new ArrayList<>(List.of("Company", "Trainee", "Revenue", "Cost", "Profit",
-                "Cumulative", "Cash"));
+        List<String> headers = new ArrayList<>(List.of(labels.company(), labels.trainee(),
+                labels.revenue(), labels.cost(), labels.profit(), labels.cumulative(), labels.cash()));
         if (report.classScope()) {
-            labels.add("Share %");
+            headers.add(labels.share());
         }
-        labels.addAll(List.of("Brand", "Stock", "Lost sales", "Capacity"));
-        header(table, head, labels.toArray(new String[0]));
+        headers.addAll(List.of(labels.brand(), labels.stock(), labels.lostSales(), labels.capacity()));
+        header(table, head, headers.toArray(new String[0]));
 
         for (Row row : round.rows()) {
             cell(table, body, row.company());
@@ -371,20 +417,20 @@ public class DebriefExportService {
         return table;
     }
 
-    private PdfPTable costTable(RoundReport round, Font head, Font body) {
-        PdfPTable table = new PdfPTable(COST_LINES.size() + 2);
+    private PdfPTable costTable(RoundReport round, Labels labels, Font head, Font body) {
+        PdfPTable table = new PdfPTable(COST_KEYS.size() + 2);
         table.setWidthPercentage(100);
         table.setSpacingBefore(4);
-        List<String> labels = new ArrayList<>(List.of("Company", "Trainee"));
-        for (Map.Entry<String, String> line : COST_LINES) {
-            labels.add(line.getValue());
+        List<String> columns = new ArrayList<>(List.of(labels.company(), labels.trainee()));
+        for (int i = 0; i < COST_KEYS.size(); i++) {
+            columns.add(labels.costName(i));
         }
-        header(table, head, labels.toArray(new String[0]));
+        header(table, head, columns.toArray(new String[0]));
         for (Row row : round.rows()) {
             cell(table, body, row.company());
             cell(table, body, row.trainees());
-            for (Map.Entry<String, String> line : COST_LINES) {
-                money(table, body, row.costLines().getOrDefault(line.getKey(), BigDecimal.ZERO));
+            for (String key : COST_KEYS) {
+                money(table, body, row.costLines().getOrDefault(key, BigDecimal.ZERO));
             }
         }
         return table;
@@ -421,7 +467,7 @@ public class DebriefExportService {
 
     // ------------------------------------------------------------------ XLSX
 
-    public byte[] xlsx(Report report) {
+    public byte[] xlsx(Report report, Labels labels) {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             CellStyle head = workbook.createCellStyle();
             org.apache.poi.ss.usermodel.Font boldFont = workbook.createFont();
@@ -430,9 +476,9 @@ public class DebriefExportService {
             head.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             head.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            summarySheet(workbook, report, head);
-            submissionSheet(workbook, report, head);
-            costSheet(workbook, report, head);
+            summarySheet(workbook, report, labels, head);
+            submissionSheet(workbook, report, labels, head);
+            costSheet(workbook, report, labels, head);
 
             workbook.write(out);
             return out.toByteArray();
@@ -441,15 +487,16 @@ public class DebriefExportService {
         }
     }
 
-    private void summarySheet(Workbook workbook, Report report, CellStyle head) {
-        Sheet sheet = workbook.createSheet("Results");
-        List<String> columns = new ArrayList<>(List.of("Round", "Company", "Trainee", "Revenue", "Cost",
-                "Profit", "Cumulative profit", "Cash"));
+    private void summarySheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
+        Sheet sheet = workbook.createSheet(labels.resultsSheet());
+        List<String> columns = new ArrayList<>(List.of(labels.roundColumn(),
+                labels.company(), labels.trainee(), labels.revenue(), labels.cost(), labels.profit(),
+                labels.cumulative(), labels.cash()));
         if (report.classScope()) {
-            columns.add("Market share %");
+            columns.add(labels.share());
         }
-        columns.addAll(List.of("Brand", "Stock", "Lost sales", "Capacity used", "Capacity available",
-                "R&D completed", "Status"));
+        columns.addAll(List.of(labels.brand(), labels.stock(), labels.lostSales(), labels.capacity(),
+                labels.capacityAvailable(), labels.rndCompleted(), labels.status()));
         writeHeader(sheet, head, columns.toArray(new String[0]));
 
         int index = 1;
@@ -482,16 +529,17 @@ public class DebriefExportService {
         sheet.setColumnWidth(2, 26 * 256);
     }
 
-    private void submissionSheet(Workbook workbook, Report report, CellStyle head) {
-        Sheet sheet = workbook.createSheet("Submissions");
-        List<String> columns = new ArrayList<>(List.of("Round", "Company", "Trainee"));
+    private void submissionSheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
+        Sheet sheet = workbook.createSheet(labels.submissionsSheet());
+        List<String> columns = new ArrayList<>(List.of(labels.roundColumn(),
+                labels.company(), labels.trainee()));
         for (ProductColumn product : report.products()) {
-            columns.add(product.code() + " units");
-            columns.add(product.code() + " price");
-            columns.add(product.code() + " quality spend");
+            columns.add(product.code() + " " + labels.units());
+            columns.add(product.code() + " " + labels.price());
+            columns.add(product.code() + " " + labels.quality());
         }
-        columns.addAll(List.of("Marketing", "R&D", "Quality", "Production staff", "Machines",
-                "Market review", "Submitted"));
+        columns.addAll(List.of(labels.marketing(), labels.rnd(), labels.quality(), labels.staff(),
+                labels.machines(), labels.review(), labels.submitted()));
         writeHeader(sheet, head, columns.toArray(new String[0]));
 
         int index = 1;
@@ -512,8 +560,8 @@ public class DebriefExportService {
                 c = number(line, c, row.quality());
                 line.createCell(c++).setCellValue(row.staff());
                 c = number(line, c, row.machines());
-                line.createCell(c++).setCellValue(row.review() ? "bought" : "no");
-                line.createCell(c).setCellValue(row.planSent() ? "yes" : "no");
+                line.createCell(c++).setCellValue(row.review() ? labels.bought() : labels.notBought());
+                line.createCell(c).setCellValue(row.planSent() ? labels.yes() : labels.noAnswer());
             }
         }
         sizes(sheet, columns.size());
@@ -521,11 +569,12 @@ public class DebriefExportService {
         sheet.setColumnWidth(2, 26 * 256);
     }
 
-    private void costSheet(Workbook workbook, Report report, CellStyle head) {
-        Sheet sheet = workbook.createSheet("Cost lines");
-        List<String> columns = new ArrayList<>(List.of("Round", "Company"));
-        for (Map.Entry<String, String> line : COST_LINES) {
-            columns.add(line.getValue());
+    private void costSheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
+        Sheet sheet = workbook.createSheet(labels.costSheet());
+        List<String> columns = new ArrayList<>(List.of(labels.roundColumn(),
+                labels.company()));
+        for (int i = 0; i < COST_KEYS.size(); i++) {
+            columns.add(labels.costName(i));
         }
         writeHeader(sheet, head, columns.toArray(new String[0]));
 
@@ -536,8 +585,8 @@ public class DebriefExportService {
                 int c = 0;
                 line.createCell(c++).setCellValue(round.round());
                 line.createCell(c++).setCellValue(row.company());
-                for (Map.Entry<String, String> cost : COST_LINES) {
-                    c = number(line, c, row.costLines().getOrDefault(cost.getKey(), BigDecimal.ZERO));
+                for (String key : COST_KEYS) {
+                    c = number(line, c, row.costLines().getOrDefault(key, BigDecimal.ZERO));
                 }
             }
         }

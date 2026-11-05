@@ -121,7 +121,7 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
 /* ------------------------------------------------------------------ screen */
 
 export default function PlayerConsole({ userId, onSignOut }: { userId: number; onSignOut: () => void }) {
-  const { t, money, number: plain, applySession } = useI18n();
+  const { t, money, number: plain, applySession, locale } = useI18n();
   const [run, setRun] = useState<Run | null>(null);
   const [team, setTeam] = useState<Team | null>(null);
   const [context, setContext] = useState<DecisionFormContext | null>(null);
@@ -232,7 +232,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     setDownloading(format);
     setProblem(null);
     try {
-      await downloadDebrief(run.id, format);
+      await downloadDebrief(run.id, format, locale);
     } catch (error) {
       setProblem(errorText(error, t));
     } finally {

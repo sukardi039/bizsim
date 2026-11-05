@@ -325,7 +325,9 @@ Three buttons sit next to the round selector:
 | **Download Excel** | the same numbers as a workbook: **Results** (one row per company per round), **Submissions** (the plan per company per round) and **Cost lines**, each with a Round column so the whole term can be filtered or pivoted. |
 
 Both files are built from the stored results, never a recomputation, so a downloaded report matches
-what the class saw on screen. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
+what the class saw on screen. **The document is written in the language you are using** — switch the
+console to 中文 and the download comes out in Chinese, labels and sheet names included. Company,
+product and trainee names stay exactly as they were entered. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
 hides the console and keeps the cards.
 
 ### 7.6 Live

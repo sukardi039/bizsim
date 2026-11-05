@@ -61,9 +61,13 @@ export function eventStreamUrl(runId: number, ticket: string): string {
 export async function downloadDebrief(
   runId: number,
   format: "pdf" | "xlsx",
+  /** The language the reader is using: the document is written in it (D44). */
+  locale?: string,
 ): Promise<void> {
   const token = getToken();
-  const response = await fetch(`${BASE}/runs/${runId}/debrief/export?format=${format}`, {
+  const query = new URLSearchParams({ format });
+  if (locale) query.set("locale", locale);
+  const response = await fetch(`${BASE}/runs/${runId}/debrief/export?${query.toString()}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {

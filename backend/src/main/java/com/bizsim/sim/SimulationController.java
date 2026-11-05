@@ -152,7 +152,8 @@ public class SimulationController {
     @GetMapping("/debrief/export")
     public ResponseEntity<byte[]> exportDebrief(@PathVariable long runId,
                                                 @RequestParam(required = false) Integer round,
-                                                @RequestParam(defaultValue = "pdf") String format) {
+                                                @RequestParam(defaultValue = "pdf") String format,
+                                                @RequestParam(required = false) String locale) {
         TenantContext.Principal me = TenantContext.require();
         boolean staff = "FACILITATOR".equals(me.role()) || "ADMIN".equals(me.role());
         Long teamFilter = null;
@@ -165,8 +166,11 @@ public class SimulationController {
                             "you are not seated in this session"));
         }
         DebriefExportService.Report report = debrief.load(me.tenantId(), runId, round, teamFilter);
+        // The document speaks the reader's language (D44). The client sends the locale it is showing;
+        // anything else falls back to English rather than failing a download.
+        DebriefExportService.Labels labels = DebriefExportService.Labels.of(locale);
         boolean excel = "xlsx".equalsIgnoreCase(format) || "excel".equalsIgnoreCase(format);
-        byte[] body = excel ? debrief.xlsx(report) : debrief.pdf(report);
+        byte[] body = excel ? debrief.xlsx(report, labels) : debrief.pdf(report, labels);
         String extension = excel ? "xlsx" : "pdf";
         String mediaType = excel
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

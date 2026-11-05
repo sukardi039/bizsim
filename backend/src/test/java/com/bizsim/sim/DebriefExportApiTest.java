@@ -216,6 +216,45 @@ class DebriefExportApiTest extends PostgresTestBase {
     }
 
     @Test
+    void the_document_follows_the_readers_language() throws Exception {
+        MvcResult zh = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "pdf")
+                        .param("locale", "zh")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        String chinese = new PdfTextExtractor(
+                new PdfReader(zh.getResponse().getContentAsByteArray())).getTextFromPage(1);
+        assertThat(chinese).contains("全班复盘");
+        assertThat(chinese).contains("第 1 轮");
+        assertThat(chinese).contains("各家提交");
+        assertThat(chinese).contains("本月结果");
+        assertThat(chinese).contains("成本明细");
+        assertThat(chinese).contains("收入");
+        // Authored content is untouched: the company name is the same in either language.
+        assertThat(chinese).contains("阿尔法制造");
+
+        MvcResult workbook = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "xlsx")
+                        .param("locale", "zh")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        try (XSSFWorkbook opened = new XSSFWorkbook(
+                new ByteArrayInputStream(workbook.getResponse().getContentAsByteArray()))) {
+            assertThat(opened.getSheet("结果")).isNotNull();
+            assertThat(opened.getSheet("提交")).isNotNull();
+            assertThat(opened.getSheet("成本明细")).isNotNull();
+            assertThat(opened.getSheet("结果").getRow(0).getCell(1).getStringCellValue()).isEqualTo("公司");
+        }
+
+        // No locale asked for: English, as before.
+        String english = new PdfTextExtractor(new PdfReader(resultPdf(facilitatorToken)))
+                .getTextFromPage(1);
+        assertThat(english).contains("What each company sent");
+    }
+
+    @Test
     void a_trainee_who_is_not_seated_is_refused() throws Exception {
         String strangerToken = login("two@acme.test");
         mvc.perform(get("/api/runs/" + runId + "/debrief/export")

@@ -34,7 +34,7 @@ export default function DebriefPanel({
   /** Who is seated where: performance is per company, but the class asks "whose company?". */
   players: RunPlayer[];
 }) {
-  const { t, money, number } = useI18n();
+  const { t, money, number, locale } = useI18n();
   const [round, setRound] = useState(Math.max(1, currentRound || 1));
   const [board, setBoard] = useState<ScoreRow[]>([]);
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
@@ -138,7 +138,7 @@ export default function DebriefPanel({
               setProblem(null);
               setDownloading("pdf");
               try {
-                await downloadDebrief(runId, "pdf");
+                await downloadDebrief(runId, "pdf", locale);
               } catch (error) {
                 setProblem(describeError(error, t));
               } finally {
@@ -154,7 +154,7 @@ export default function DebriefPanel({
               setProblem(null);
               setDownloading("xlsx");
               try {
-                await downloadDebrief(runId, "xlsx");
+                await downloadDebrief(runId, "xlsx", locale);
               } catch (error) {
                 setProblem(describeError(error, t));
               } finally {
