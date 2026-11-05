@@ -352,3 +352,7 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 /* Destructive session controls (D58): a reset is never a primary action. */
 button.danger { border-color: rgba(255, 120, 120, .5); color: #ff9d9d; }
 button.danger:hover { background: rgba(255, 120, 120, .12); }
+
+/* The teaching guide's pre-filled draft (D61): informational, not an alert. */
+.card.guided { border-color: rgba(120, 180, 255, .45); background: rgba(90, 140, 220, .08); }
+.card.guided .buttons { margin-top: .5rem; }

@@ -27,6 +27,7 @@ const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
   { field: "hiringCostMonths", kind: "decimal" },
   { field: "severanceMonths", kind: "decimal" },
   { field: "marketReportCost", kind: "money" },
+  { field: "guidedRounds", kind: "int" },
   { field: "forecastHorizon", kind: "int" },
   { field: "forecastBand", kind: "decimal" },
   { field: "minRndBenefitRatio", kind: "decimal" },

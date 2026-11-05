@@ -57,7 +57,9 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          /** D15: off unless the template turns it on, so a copy keeps its behaviour. */
                          boolean qualityUpgrade, BigDecimal qualityCostPerPoint,
                          /** D48: auto workers are a per-template mechanic, off unless turned on. */
-                         boolean autoWorkers) {
+                         boolean autoWorkers,
+                         /** D61: how many opening rounds come with a suggested plan, 0 = none. */
+                         int guidedRounds) {
     }
 
     /** The economy for one cycle position. Missing positions fall back to neutral (1.0). */

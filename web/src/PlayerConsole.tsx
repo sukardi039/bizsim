@@ -137,6 +137,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const [statements, setStatements] = useState<StatementRow[]>([]);
   /** The class table: rank, company and profit — the only competitor figures a trainee may see (D51). */
   const [standings, setStandings] = useState<StandingsRow[]>([]);
+  /** D61: the round whose form arrived pre-filled by the teaching guide, if any. */
+  const [guidedRound, setGuidedRound] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
   const [resultRound, setResultRound] = useState<number | null>(null);
   const roundRef = useRef<number | null>(null);
@@ -183,7 +185,21 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       if (roundRef.current !== next.round) {
         roundRef.current = next.round;
         setDraft(draftFrom(next));
+        setGuidedRound(null);
         setReport(null);
+        // D61: the opening rounds come with a suggested plan for a human seat. Only when the company
+        // has nothing stored for this round — a saved draft is the trainee's own work, never replaced.
+        if (!next.decision) {
+          try {
+            const suggestion = await api.suggestion(active.id, mine.id);
+            if (suggestion.guided && suggestion.payload) {
+              setDraft(draftFrom({ ...next, decision: suggestion.payload }));
+              setGuidedRound(next.round);
+            }
+          } catch {
+            // No guide is a normal round, not an error: leave the form blank.
+          }
+        }
       }
     } catch (error) {
       setProblem(errorText(error, t));
@@ -466,6 +482,26 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     // the form lets the request through and shows what comes back.
     <form className="player" onSubmit={submit} noValidate>
       {signOut}
+
+      {guidedRound === context.round && (
+        <div className="card guided">
+          <p style={{ margin: 0 }}>
+            {t("player.guided", { round: context.round })}
+          </p>
+          <div className="buttons">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                setDraft(draftFrom(context));
+                setGuidedRound(null);
+              }}
+            >
+              {t("player.guidedBlank")}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="run-head">

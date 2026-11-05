@@ -118,6 +118,45 @@ public class BotRoundService {
         return decided;
     }
 
+    /**
+     * D61: a suggested plan for a *human* seat in the opening rounds — the same policy a bot would run
+     * on this company, returned as a draft the trainee can edit. Never submitted, never stored: nothing
+     * here becomes a decision, and the seat stays human. The guide is fixed at MID/BALANCED whatever the
+     * class's opponents are, because the point is a sane plan, not an opponent's style.
+     *
+     * <p>Empty means "no help this round": mechanic off, past the guided rounds, nothing open, already
+     * submitted, or the caller does not own the seat.
+     */
+    public Optional<DecisionPayload> suggest(long tenantId, long userId, long runId, long teamId) {
+        String scenarioKey = roundRepository.scenarioKeyOfRun(tenantId, runId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        Scenario scenario = scenarios.load(scenarioKey);
+        if (scenario.params().guidedRounds() <= 0) {
+            return Optional.empty();
+        }
+        if (!roundRepository.teamBelongsToRun(teamId, runId)) {
+            throw ProblemException.notFound("team.not_found", "no such company in this run");
+        }
+        if (!roundRepository.userOwnsTeam(userId, teamId)) {
+            throw ProblemException.forbidden("team.not_yours",
+                    "this company is not yours: a guide cannot plan for someone else");
+        }
+        Optional<RoundRepository.RoundRow> open = roundRepository.openRound(runId);
+        if (open.isEmpty() || open.get().number() > scenario.params().guidedRounds()) {
+            return Optional.empty();
+        }
+        int number = open.get().number();
+        if (roundRepository.decisionPayload(runId, number, teamId).isPresent()) {
+            return Optional.empty();
+        }
+        BotRepository.State state = bots.state(scenario, runId, number, teamId);
+        AutoWorker.Context context = context(scenario, runId, number, state);
+        AutoWorker.Profile guide = AutoWorker.profile("MID", "BALANCED");
+        AutoWorker.Decision decision = AutoWorker.decide(scenario, runId, teamId, context, guide);
+        return Optional.of(affordable(scenario, environment.forRound(scenario, runId, number), state,
+                teamId, decision.payload()));
+    }
+
     public List<BotRepository.TraceRow> trace(long tenantId, long runId) {
         return bots.trace(tenantId, runId);
     }

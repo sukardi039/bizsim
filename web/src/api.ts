@@ -609,6 +609,14 @@ export const api = {
   standings: (runId: number, round?: number) =>
     request<StandingsRow[]>(`/runs/${runId}/standings${round ? `?round=${round}` : ""}`),
   /** D58: back to the pre-start condition — same companies and seats, month 0, no rounds. */
+  /**
+   * D61: a suggested plan for the opening rounds. `guided: false` means "no help this round" — the
+   * console leaves the form blank, which is the normal case after round 2.
+   */
+  suggestion: (runId: number, teamId: number) =>
+    request<{ guided: boolean; payload?: DecisionInput | null }>(
+      `/runs/${runId}/teams/${teamId}/suggestion`,
+    ),
   resetRun: (runId: number, reason?: string) =>
     request<{ roundsRemoved: number; companiesRestored: number }>(`/runs/${runId}/reset`, {
       method: "POST",

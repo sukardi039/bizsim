@@ -83,6 +83,18 @@ public class SimulationController {
     }
 
     /**
+     * D61: the suggested plan for a trainee's opening rounds, as a draft to edit. Empty body when the
+     * guide is not on offer this round, so the console simply leaves the form blank.
+     */
+    @GetMapping("/teams/{teamId}/suggestion")
+    public Map<String, Object> suggestion(@PathVariable long runId, @PathVariable long teamId) {
+        TenantContext.Principal me = TenantContext.require();
+        return bots.suggest(me.tenantId(), me.userId(), runId, teamId)
+                .<Map<String, Object>>map(payload -> Map.of("guided", true, "payload", payload))
+                .orElseGet(() -> Map.of("guided", false));
+    }
+
+    /**
      * D58: put the session back to its pre-start condition — same companies, same seats, month 0, no
      * rounds. The confirm lives in the console; the API does what it says.
      */

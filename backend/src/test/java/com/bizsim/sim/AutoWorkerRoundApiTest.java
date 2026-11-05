@@ -111,6 +111,7 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     @AfterEach
     void restoreTemplate() {
         setAutoWorkers(false);
+        setGuidedRounds(0);
     }
 
     @Test
@@ -163,6 +164,74 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of("tenantCode", "acme",
                                 "email", "market-1-high@bots.invalid", "password", "x"))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void the_opening_rounds_come_with_a_suggested_plan_that_is_never_submitted() throws Exception {
+        setGuidedRounds(2);
+        long playerTeam = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        long player = otherPlayer("guided@acme.test");
+        // A seat of their own: the trainer is seated on team one in the seed, so use a fresh company.
+        seat(playerTeam, player);
+        String token = login("guided@acme.test");
+        openRound();
+
+        MvcResult suggested = mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/suggestion")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.guided").value(true))
+                .andExpect(jsonPath("$.payload.production").isArray())
+                .andExpect(jsonPath("$.payload.production.length()").value(3))
+                .andReturn();
+
+        // A draft, not a decision: the round still waits for the trainee.
+        assertThat(jdbc.queryForObject("select count(*) from decision", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from bot_decision", Integer.class)).isZero();
+
+        // Submitting the suggestion is a normal submission — the plan is valid as it stands.
+        String body = json.readTree(suggested.getResponse().getContentAsString())
+                .get("payload").toString();
+        mvc.perform(post("/api/runs/" + runId + "/teams/" + playerTeam + "/decisions")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        // Once they have submitted, there is nothing to guide.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/suggestion")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.guided").value(false));
+    }
+
+    @Test
+    void the_guide_stops_after_the_configured_rounds_and_is_not_for_other_companies() throws Exception {
+        setGuidedRounds(1);
+        long playerTeam = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        long player = otherPlayer("guided2@acme.test");
+        seat(playerTeam, player);
+        String token = login("guided2@acme.test");
+
+        // Someone else's company is refused outright, not silently guided.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + botTeamId + "/suggestion")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+
+        openRound();
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/suggestion")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.guided").value(true));
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        // Round 2 is past the one guided round.
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/suggestion")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.guided").value(false));
     }
 
     @Test
@@ -434,6 +503,11 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private void setGuidedRounds(int rounds) {
+        jdbc.update("update scenario set definition = jsonb_set(definition, '{guidedRounds}', ?::jsonb) "
+                + "where key = 'standard-v1'", String.valueOf(rounds));
+    }
 
     private long profile(String companyName) {
         return jdbc.queryForObject("""

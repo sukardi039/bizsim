@@ -96,7 +96,8 @@ public class ScenarioRepository {
                 dec(d.path("qualityCostPerPoint")).signum() > 0
                         ? dec(d.path("qualityCostPerPoint")) : new BigDecimal("60000000"),
                 // D48: absent means off, so an existing package seats the same companies it always did.
-                d.path("autoWorkers").asBoolean(false));
+                d.path("autoWorkers").asBoolean(false),
+                d.path("guidedRounds").asInt(0));
 
 
         List<Scenario.ProductSpec> products = jdbc.query("""
@@ -335,7 +336,9 @@ public class ScenarioRepository {
             "forecastHorizon", "forecastBand", "cycles", "cycleLength", "cycleDemandDrift",
             "cycleCostDrift", "salaries", "startingStaff",
             // D15/D26: the quality mechanic is a per-template switch; the price is a builder number.
-            "qualityUpgrade", "qualityCostPerPoint", "autoWorkers");
+            "qualityUpgrade", "qualityCostPerPoint", "autoWorkers",
+            // D61: how many opening rounds a trainee sees a suggested plan in.
+            "guidedRounds");
 
     /** The editable part of the definition document, as stored. */
     public Map<String, Object> settings(String key) {

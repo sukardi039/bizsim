@@ -303,7 +303,7 @@ class ScoringEngineTest {
                         List.of(ONE), ZERO, ZERO, ZERO, ZERO,
                         Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10),
                         bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01"),
-                        false, ZERO, false),
+                        false, ZERO, false, 0),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
                         bd("10000"), bd("10"), ONE, ZERO)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
@@ -320,7 +320,7 @@ class ScoringEngineTest {
                 p.priceElasticity(), p.qualityElasticity(), p.brandElasticity(), p.marketingElasticity(),
                 p.salaries(), p.startingStaff(), p.marketReportCost(), p.forecastHorizon(),
                 p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
-                true, bd("60000000"), false);
+                true, bd("60000000"), false, 0);
         return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
                 base.rounds(), base.events());
     }
