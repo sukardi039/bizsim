@@ -385,6 +385,12 @@ A feed of what has happened in the session (`round.opened`, `decision.submitted`
 
 ## 8. Trainee — playing a round
 
+**Guided rounds.** If your facilitator switched it on, the **first one or two rounds** arrive with the
+form already filled in — a sensible starting plan. Read it, change anything you like, then submit:
+nothing is sent until you press **Submit**, and the results are yours either way. **Start from blank**
+clears it if you would rather build your own. From the following round the form is blank again.
+
+
 1. Sign in with the trainee account (tenant + email + password).
 2. The decision screen shows the company, **Round x of y**, cash, brand, machines — but only while a
    round is **open**. Before the facilitator opens round 1 you get a waiting card (*"Waiting for your
