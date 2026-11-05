@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Owns the round state machine and the writes that must happen together.
@@ -39,7 +40,12 @@ public class RunService {
                           int rounds, int cycles, String locale,
                           List<RunRepository.TeamRow> teams,
                           List<RunRepository.PlayerRow> players,
-                          boolean roundOpen) {
+                          boolean roundOpen,
+                          /** The open round's deadline, so the console can count down (D12). */
+                          java.time.Instant closesAt,
+                          boolean clockPaused,
+                          /** Seconds left, already frozen while paused; -1 for an untimed round. */
+                          long clockRemainingSeconds) {
     }
 
     public record RoundState(int number, String status) {
@@ -336,9 +342,13 @@ public class RunService {
         RunRepository.RunRow run = requireRun(tenantId, runId);
         int totalRounds = run.rounds() == null ? maxRounds(run.scenarioKey()) : run.rounds();
         int cycles = run.cycles() == null ? 0 : run.cycles();
+        Optional<RoundService.ClockState> clock = rounds.openClock(runId);
         return new RunView(run.id(), run.status(), run.currentRound(), run.scenarioKey(),
                 totalRounds, cycles, runs.localeOf(runId), runs.teams(runId), runs.players(runId),
-                runs.openRoundNumber(runId).isPresent());
+                clock.isPresent(),
+                clock.map(RoundService.ClockState::closesAt).orElse(null),
+                clock.map(RoundService.ClockState::paused).orElse(false),
+                clock.map(RoundService.ClockState::remainingSeconds).orElse(-1L));
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

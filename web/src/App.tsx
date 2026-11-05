@@ -6,6 +6,7 @@ import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
 import DebriefPanel from "./DebriefPanel";
+import SessionTools from "./SessionTools";
 import { useI18n, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
@@ -467,6 +468,15 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <SessionTools
+              run={selected}
+              refreshKey={feed.length}
+              onChanged={() => {
+                void refreshRuns();
+                if (selectedId !== null) void refreshBoard(selectedId);
+              }}
+            />
 
             <DebriefPanel
               runId={selected.id}

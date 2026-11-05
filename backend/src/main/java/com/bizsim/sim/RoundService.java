@@ -63,7 +63,10 @@ public class RoundService {
         }
         RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
                 () -> ProblemException.conflict("round.not_open", "no round is open"));
-        if (round.closesAt() != null && Instant.now().isAfter(round.closesAt())) {
+        // A paused clock is stopped, not expired: its stored deadline may already be in the past,
+        // but the facilitator stopped time on purpose and the class may still submit.
+        if (round.pausedAt() == null && round.closesAt() != null
+                && Instant.now().isAfter(round.closesAt())) {
             throw ProblemException.conflict("round.closed",
                     "round " + round.number() + " closed at " + round.closesAt(),
                     "round", round.number());
@@ -102,6 +105,9 @@ public class RoundService {
             lines.put("rnd", commitment.rnd());
             lines.put("capacity", commitment.capacity());
             lines.put("hiring", commitment.hiring());
+            if (commitment.quality().signum() > 0) {
+                lines.put("quality", commitment.quality());
+            }
             throw new CashShortfallException(input.cash(), commitment.discretionary(), lines);
         }
 
@@ -126,6 +132,10 @@ public class RoundService {
         if (!rounds.markClosed(round.id())) {
             return Optional.empty();
         }
+
+        // The state this round is about to overwrite, kept so "void the last round" can put it back
+        // exactly. Written before any outcome is applied, in the same transaction as the results.
+        rounds.writeSnapshots(round.id(), runId);
 
         Scenario scenario = scenarios.load(run.scenarioKey());
         EnvironmentService.RoundEnvironment environment =
@@ -179,6 +189,169 @@ public class RoundService {
                 Map.of("round", round.number(), "teams", summary));
 
         return Optional.of(new ScoringEngine.RoundResult(outcomes));
+    }
+
+    public record ClockState(int round, Instant closesAt, boolean paused, long remainingSeconds) {
+    }
+
+    // ------------------------------------------------------------------ facilitator powers (D12)
+
+    /**
+     * Stop the clock. The deadline is frozen where it stands and the round clock sweep ignores the
+     * row, so nothing computes while the class is talking.
+     */
+    @Transactional
+    public ClockState pauseClock(long tenantId, long runId, long userId) {
+        RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
+                () -> ProblemException.conflict("round.not_open", "no round is open"));
+        if (round.pausedAt() != null) {
+            return clock(round);
+        }
+        rounds.pauseClock(round.id());
+        rounds.audit(tenantId, runId, round.number(), null, "CLOCK_PAUSE", null, null, userId);
+        events.publishAfterCommit(runId, "clock.paused", Map.of("round", round.number()));
+        return clock(rounds.openRound(runId).orElseThrow());
+    }
+
+    /** Start it again, giving back exactly the time it was stopped. */
+    @Transactional
+    public ClockState resumeClock(long tenantId, long runId, long userId) {
+        RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
+                () -> ProblemException.conflict("round.not_open", "no round is open"));
+        if (round.pausedAt() == null) {
+            return clock(round);
+        }
+        rounds.resumeClock(round.id());
+        rounds.audit(tenantId, runId, round.number(), null, "CLOCK_RESUME", null, null, userId);
+        events.publishAfterCommit(runId, "clock.resumed", Map.of("round", round.number()));
+        return clock(rounds.openRound(runId).orElseThrow());
+    }
+
+    /** Push the deadline out. An untimed round gains one, which is what "we need more time" means. */
+    @Transactional
+    public ClockState extendClock(long tenantId, long runId, long userId, int minutes) {
+        if (minutes <= 0 || minutes > 24 * 60) {
+            throw ProblemException.badRequest("clock.extend_out_of_range",
+                    "minutes must be between 1 and 1440", "max", 1440);
+        }
+        runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        RoundRepository.RoundRow round = rounds.openRound(runId).orElseThrow(
+                () -> ProblemException.conflict("round.not_open", "no round is open"));
+        rounds.extendClock(round.id(), minutes);
+        rounds.audit(tenantId, runId, round.number(), null, "CLOCK_EXTEND",
+                new BigDecimal(minutes), "added " + minutes + " minutes", userId);
+        events.publishAfterCommit(runId, "clock.extended", Map.of("round", round.number(), "minutes", minutes));
+        return clock(rounds.openRound(runId).orElseThrow());
+    }
+
+    /** One company's cash moved by hand, with the reason the class will read in the audit trail. */
+    @Transactional
+    public Map<String, Object> adjustCash(long tenantId, long runId, long userId, long teamId,
+                                          BigDecimal delta, String reason) {
+        RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        if ("FINISHED".equals(run.status())) {
+            throw ProblemException.conflict("run.finished", "the session has finished");
+        }
+        if (delta == null || delta.signum() == 0) {
+            throw ProblemException.badRequest("cash.delta_required",
+                    "the adjustment must be a non-zero amount", "field", "delta");
+        }
+        String note = reason == null ? "" : reason.trim();
+        if (note.length() < 3) {
+            // D12/Q-G: the reason is mandatory. An unexplained cash change is not auditable.
+            throw ProblemException.badRequest("cash.reason_required",
+                    "a reason is required for a cash adjustment", "field", "reason");
+        }
+        if (!rounds.teamBelongsToRun(teamId, runId)) {
+            throw ProblemException.notFound("team.not_found", "no such company in this run");
+        }
+        BigDecimal cash = rounds.adjustCash(teamId, delta);
+        Integer number = rounds.openRound(runId).map(RoundRepository.RoundRow::number)
+                .orElse(run.currentRound());
+        rounds.audit(tenantId, runId, number, teamId, "CASH_ADJUST", delta, note, userId);
+        events.publishAfterCommit(runId, "cash.adjusted",
+                Map.of("teamId", teamId, "delta", delta, "cash", cash));
+        return Map.of("teamId", teamId, "cash", cash, "delta", delta);
+    }
+
+    /**
+     * Undo the last computed round: put every company back where it stood, delete that round's
+     * results and statements, and reopen it so the class can correct the month and compute again.
+     *
+     * <p>The undo reads {@code round_snapshot}, written when the round was computed. Rounds computed
+     * before that table existed carry no snapshot and are refused rather than half-restored.
+     */
+    @Transactional
+    public Map<String, Object> voidLastRound(long tenantId, long runId, long userId, String reason) {
+        RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        if (rounds.openRound(runId).isPresent()) {
+            throw ProblemException.conflict("round.still_open",
+                    "compute or close the open round before voiding the previous one");
+        }
+        RoundRepository.RoundRow round = rounds.lastComputed(runId).orElseThrow(
+                () -> ProblemException.conflict("round.none_computed", "no computed round to void"));
+        int companies = rounds.teams(runId).size();
+        if (rounds.snapshotTeams(round.id()) < companies) {
+            throw ProblemException.conflict("round.no_snapshot",
+                    "round " + round.number() + " was computed before voiding existed and cannot be "
+                            + "restored", "round", round.number());
+        }
+
+        rounds.restoreSnapshots(round.id());
+        int minutes = scenarios.load(run.scenarioKey()).params().roundMinutes();
+        rounds.reopenVoidedRound(round.id(), minutes);
+        runs.reopenRun(runId);
+        rounds.audit(tenantId, runId, round.number(), null, "ROUND_VOID",
+                null, reason == null || reason.isBlank() ? null : reason.trim(), userId);
+        events.publishAfterCommit(runId, "round.reopened", Map.of("round", round.number()));
+        return Map.of("round", round.number(), "status", "OPEN");
+    }
+
+    /** Every company's submission for one round — or for the open one — as the facilitator sees it. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> submissions(long tenantId, long runId, Integer roundNumber) {
+        RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        int number = roundNumber != null ? roundNumber
+                : rounds.openRound(runId).map(RoundRepository.RoundRow::number)
+                .orElse(run.currentRound());
+        if (number < 1) {
+            throw ProblemException.conflict("round.not_open", "no round has been opened yet");
+        }
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("round", number);
+        body.put("companies", rounds.decisionsOfRound(runId, number));
+        return body;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> audit(long tenantId, long runId) {
+        runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        return rounds.auditOf(runId);
+    }
+
+    /** The clock of the open round, for the console header. Empty when nothing is open. */
+    @Transactional(readOnly = true)
+    public Optional<ClockState> openClock(long runId) {
+        return rounds.openRound(runId).map(RoundService::clock);
+    }
+
+    private static ClockState clock(RoundRepository.RoundRow round) {
+        Instant deadline = round.closesAt();
+        if (deadline == null) {
+            return new ClockState(round.number(), null, round.pausedAt() != null, -1);
+        }
+        Instant until = round.pausedAt() != null ? round.pausedAt() : Instant.now();
+        long remaining = Math.max(0, deadline.getEpochSecond() - until.getEpochSecond());
+        return new ClockState(round.number(), deadline, round.pausedAt() != null, remaining);
     }
 
     /** Opens the next round, carrying the scenario's clock (D12). */
@@ -306,6 +479,10 @@ public class RoundService {
         body.put("rndProjects", projects);
         body.put("market", environment.conditions(scenario, runId, run.currentRound()));
         body.put("marketReportCost", scenario.params().marketReportCost());
+        // D15: the form shows the quality input only when this template sells the mechanic, and it
+        // must know the price per point to show what a purchase would cost.
+        body.put("qualityUpgrade", scenario.params().qualityUpgrade());
+        body.put("qualityCostPerPoint", scenario.params().qualityCostPerPoint());
         return body;
     }
 

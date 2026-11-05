@@ -87,7 +87,15 @@ public class ScenarioRepository {
                 d.path("cycles").asInt(2),
                 d.path("cycleLength").asInt(4),
                 dec(d.path("cycleDemandDrift")),
-                dec(d.path("cycleCostDrift")));
+                dec(d.path("cycleCostDrift")),
+                // Absent means off: a template written before the mechanic existed keeps its
+                // behaviour exactly, which is what "default = current behaviour" means.
+                d.path("qualityUpgrade").asBoolean(false),
+                // A template that turns the switch on without naming a price would sell quality for
+                // nothing; the loader supplies the shipped rate instead of failing at round close.
+                dec(d.path("qualityCostPerPoint")).signum() > 0
+                        ? dec(d.path("qualityCostPerPoint")) : new BigDecimal("60000000"));
+
 
         List<Scenario.ProductSpec> products = jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
@@ -323,7 +331,9 @@ public class ScenarioRepository {
             "holdingCostPerUnit", "referenceQuality", "referenceSpend", "machineCostPerWorker",
             "hiringCostMonths", "severanceMonths", "minRndBenefitRatio", "marketReportCost",
             "forecastHorizon", "forecastBand", "cycles", "cycleLength", "cycleDemandDrift",
-            "cycleCostDrift", "salaries", "startingStaff");
+            "cycleCostDrift", "salaries", "startingStaff",
+            // D15/D26: the quality mechanic is a per-template switch; the price is a builder number.
+            "qualityUpgrade", "qualityCostPerPoint");
 
     /** The editable part of the definition document, as stored. */
     public Map<String, Object> settings(String key) {

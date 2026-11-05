@@ -243,3 +243,92 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   padding-top: .3rem;
   font-weight: 600;
 }
+
+/* ---------------------------------------------------------------- facilitator tools (D12) */
+.check { display: flex; align-items: center; gap: .5rem; margin: .75rem 0 .25rem; }
+.cash-row { display: flex; gap: .35rem; align-items: center; }
+.cash-row input[type="number"] { width: 7.5rem; }
+.cash-row input[type="text"] { width: 10rem; }
+.notice {
+  border-left: 3px solid var(--good);
+  background: rgba(22, 163, 74, .08);
+  padding: .4rem .6rem;
+  margin: .5rem 0;
+}
+.decision-summary { margin: .4rem 0 0; padding-left: 1.1rem; font-size: .86rem; }
+
+/* ---------------------------------------------------------------- debrief slides (D13) */
+.slides-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: #0b1220;
+  color: #e8eef6;
+  display: flex;
+  flex-direction: column;
+  padding: 1.4rem 2rem 1rem;
+  overflow: auto;
+}
+.slides-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+.slides-head h1 { margin: .1rem 0 0; font-size: clamp(1.4rem, 2.4vw, 2.2rem); }
+.slide-kicker { text-transform: uppercase; letter-spacing: .12em; font-size: .72rem; color: #7f93ad; }
+.slides-nav { display: flex; gap: .4rem; flex-wrap: wrap; }
+.slides-nav button {
+  background: #17233a;
+  color: #e8eef6;
+  border: 1px solid #2b3b57;
+  border-radius: .4rem;
+  padding: .4rem .8rem;
+  cursor: pointer;
+}
+.slides-nav button:disabled { opacity: .35; cursor: default; }
+.slide-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  align-content: start;
+  margin-top: 1.2rem;
+}
+.slide-card {
+  background: #131d2f;
+  border: 1px solid #23304a;
+  border-radius: .7rem;
+  padding: .9rem 1rem;
+}
+.slide-card h2 { margin: 0 0 .6rem; font-size: 1.05rem; }
+.slide-card h2 small { color: #8fa3bd; font-weight: 400; }
+.kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .55rem .9rem; margin: 0; }
+.kpi-grid dt { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: #7f93ad; }
+.kpi-grid dd {
+  margin: .1rem 0 0;
+  font-size: clamp(1rem, 1.5vw, 1.4rem);
+  font-variant-numeric: tabular-nums;
+}
+.kpi-grid dd.positive { color: #4ade80; }
+.kpi-grid dd.negative { color: #f87171; }
+.slides-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  border-top: 1px solid #23304a;
+  padding-top: .6rem;
+  margin-top: 1rem;
+  font-size: .84rem;
+}
+
+/* The slides are the thing to print: hide the app, keep the overlay, drop the navigation. */
+@media print {
+  body * { visibility: hidden; }
+  .slides-overlay, .slides-overlay * { visibility: visible; }
+  .slides-overlay {
+    position: absolute;
+    inset: 0;
+    background: #fff;
+    color: #111;
+    padding: 0;
+  }
+  .slide-card { border-color: #ccc; background: #fff; break-inside: avoid; }
+  .slides-nav, .slides-foot { display: none; }
+  .kpi-grid dt { color: #555; }
+}

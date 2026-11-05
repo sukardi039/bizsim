@@ -62,7 +62,8 @@ public class ScoringEngine {
     public record ProductLine(String product, BigDecimal planned, BigDecimal produced,
                               BigDecimal openingStock, BigDecimal demand, BigDecimal sold,
                               BigDecimal closingStock, BigDecimal lost, BigDecimal price,
-                              BigDecimal unitCost, BigDecimal revenue, BigDecimal cogs) {
+                              BigDecimal unitCost, BigDecimal quality, BigDecimal revenue,
+                              BigDecimal cogs) {
     }
 
     public record RndUpdate(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
@@ -76,6 +77,7 @@ public class ScoringEngine {
                               BigDecimal revenue, BigDecimal cogs, BigDecimal payroll, BigDecimal marketing,
                               BigDecimal rndSpend, BigDecimal fixedCost, BigDecimal holdingCost,
                               BigDecimal hiringCost, BigDecimal capacityCost, BigDecimal reportCost,
+                              BigDecimal qualitySpend,
                               BigDecimal openingCash, BigDecimal profit, BigDecimal cashChange,
                               BigDecimal lostSales,
                               BigDecimal capacityUsed, BigDecimal capacityAvailable,
@@ -84,7 +86,8 @@ public class ScoringEngine {
 
     public record Commitment(BigDecimal materials, BigDecimal payroll, BigDecimal hiring,
                              BigDecimal marketing, BigDecimal rnd, BigDecimal fixedCost,
-                             BigDecimal holding, BigDecimal capacity, BigDecimal discretionary,
+                             BigDecimal holding, BigDecimal capacity, BigDecimal quality,
+                             BigDecimal discretionary,
                              BigDecimal total, BigDecimal plannedWorkers, BigDecimal capacityUsed,
                              BigDecimal capacityAvailable) {
     }
@@ -98,11 +101,14 @@ public class ScoringEngine {
 
     private record Plan(Map<String, BigDecimal> planned, Map<String, BigDecimal> produced,
                         Map<String, BigDecimal> prices, Map<String, BigDecimal> effectiveCost,
-                        Map<String, BigDecimal> effectiveQuality, Effects effects,
+                        Map<String, BigDecimal> effectiveQuality,
+                        Map<String, BigDecimal> qualityBought,
+                        Effects effects,
                         Map<String, BigDecimal> spendByChannel, Map<String, BigDecimal> investByProject,
                         Map<String, Integer> staff,
                         BigDecimal materials, BigDecimal payroll, BigDecimal hiring, BigDecimal marketing,
-                        BigDecimal rndSpend, BigDecimal holding, BigDecimal capacityCost,
+                        BigDecimal rndSpend, BigDecimal qualitySpend, BigDecimal holding,
+                        BigDecimal capacityCost,
                         BigDecimal reportCost, BigDecimal machineAdded, BigDecimal plannedWorkers,
                         BigDecimal capacityUsed, BigDecimal capacityAvailable) {
     }
@@ -114,11 +120,11 @@ public class ScoringEngine {
                               TeamInput team) {
         Plan p = plan(scenario, environment, team);
         BigDecimal discretionary = p.materials().add(p.marketing()).add(p.rndSpend())
-                .add(p.capacityCost()).add(p.hiring()).add(p.reportCost());
+                .add(p.capacityCost()).add(p.hiring()).add(p.reportCost()).add(p.qualitySpend());
         BigDecimal total = discretionary.add(p.payroll()).add(p.holding())
                 .add(scenario.params().fixedCostPerMonth());
         return new Commitment(p.materials(), p.payroll(), p.hiring(), p.marketing(), p.rndSpend(),
-                scenario.params().fixedCostPerMonth(), p.holding(), p.capacityCost(),
+                scenario.params().fixedCostPerMonth(), p.holding(), p.capacityCost(), p.qualitySpend(),
                 money(discretionary), money(total), units(p.plannedWorkers()), p.capacityUsed(),
                 p.capacityAvailable());
     }
@@ -161,6 +167,8 @@ public class ScoringEngine {
         Map<String, BigDecimal> prices = new LinkedHashMap<>();
         Map<String, BigDecimal> effectiveCost = new LinkedHashMap<>();
         Map<String, BigDecimal> effectiveQuality = new LinkedHashMap<>();
+        Map<String, BigDecimal> qualityBought = new LinkedHashMap<>();
+        BigDecimal qualitySpend = ZERO;
 
         for (Scenario.ProductSpec spec : scenario.products()) {
             ProductState state = team.products().get(spec.code());
@@ -173,8 +181,23 @@ public class ScoringEngine {
             effectiveCost.put(spec.code(), money(nz(state == null ? spec.baseUnitCost() : state.unitCost())
                     .multiply(effects.costMult().getOrDefault(spec.code(), ONE))
                     .multiply(nz(environment.costIndex()))));
-            effectiveQuality.put(spec.code(), currentQuality
-                    .add(effects.qualityAdd().getOrDefault(spec.code(), ZERO)));
+
+            // D15: quality bought this month is added on top of whatever R&D has delivered, and the
+            // line stops at 100 -- money that cannot buy another point is simply not charged.
+            BigDecimal quality = currentQuality
+                    .add(effects.qualityAdd().getOrDefault(spec.code(), ZERO));
+            BigDecimal bought = ZERO;
+            BigDecimal rate = nz(scenario.params().qualityCostPerPoint());
+            if (scenario.params().qualityUpgrade() && !insolvent && rate.signum() > 0) {
+                BigDecimal wanted = nz(d.qualityInvest(spec.code()));
+                if (wanted.signum() > 0) {
+                    BigDecimal room = HUNDRED.subtract(quality).max(ZERO);
+                    bought = min(div(wanted, rate), room).setScale(2, RoundingMode.HALF_UP);
+                    qualitySpend = qualitySpend.add(bought.multiply(rate));
+                }
+            }
+            qualityBought.put(spec.code(), bought);
+            effectiveQuality.put(spec.code(), quality.add(bought));
 
             BigDecimal units = insolvent ? ZERO : nz(d.units(spec.code())).max(ZERO);
             planned.put(spec.code(), units);
@@ -256,9 +279,11 @@ public class ScoringEngine {
         BigDecimal reportCost = Boolean.TRUE.equals(d.marketReport())
                 ? nz(scenario.params().marketReportCost()) : ZERO;
 
-        return new Plan(planned, produced, prices, effectiveCost, effectiveQuality, effects,
+        return new Plan(planned, produced, prices, effectiveCost, effectiveQuality, qualityBought,
+                effects,
                 spendByChannel, investByProject, staff, materials, money(payroll), money(hiring),
-                money(marketing), money(rndSpend), money(holding), money(capacityCost),
+                money(marketing), money(rndSpend), money(qualitySpend), money(holding),
+                money(capacityCost),
                 money(reportCost),
                 div(capacityCost, nz(scenario.params().machineCostPerWorker())),
                 units(required), units(capacityUsed), workers);
@@ -272,7 +297,8 @@ public class ScoringEngine {
     private Plan fitToCash(Scenario scenario, TeamInput team, Plan p) {
         BigDecimal fixed = nz(scenario.params().fixedCostPerMonth());
         BigDecimal other = p.payroll().add(p.hiring()).add(p.marketing()).add(p.rndSpend())
-                .add(p.holding()).add(fixed).add(p.capacityCost()).add(p.reportCost());
+                .add(p.qualitySpend()).add(p.holding()).add(fixed).add(p.capacityCost())
+                .add(p.reportCost());
         BigDecimal available = nz(team.cash()).subtract(other).max(ZERO);
         if (p.materials().compareTo(available) <= 0) {
             return p;
@@ -291,8 +317,10 @@ public class ScoringEngine {
             capacityUsed = capacityUsed.add(div(produced.get(spec.code()), upw));
         }
         return new Plan(p.planned(), produced, p.prices(), p.effectiveCost(), p.effectiveQuality(),
-                p.effects(), p.spendByChannel(), p.investByProject(), p.staff(), money(materials),
-                p.payroll(), p.hiring(), p.marketing(), p.rndSpend(), p.holding(), p.capacityCost(),
+                p.qualityBought(), p.effects(), p.spendByChannel(), p.investByProject(), p.staff(),
+                money(materials),
+                p.payroll(), p.hiring(), p.marketing(), p.rndSpend(), p.qualitySpend(), p.holding(),
+                p.capacityCost(),
                 p.reportCost(), p.machineAdded(), p.plannedWorkers(), units(capacityUsed),
                 p.capacityAvailable());
     }
@@ -465,7 +493,7 @@ public class ScoringEngine {
 
             lines.add(new ProductLine(spec.code(), units(plan.planned().get(spec.code())), produced,
                     units(opening), demanded, sold, units(closing), units(lost), price, unitCost,
-                    lineRevenue, lineCogs));
+                    units(plan.effectiveQuality().get(spec.code())), lineRevenue, lineCogs));
         }
 
         // R&D: fixed duration, evaluated at the deadline (D10). Advantages reach the market next month.
@@ -540,11 +568,12 @@ public class ScoringEngine {
 
         BigDecimal fixed = nz(p.fixedCostPerMonth());
         BigDecimal profit = revenue.subtract(cogs).subtract(plan.payroll()).subtract(plan.marketing())
-                .subtract(plan.rndSpend()).subtract(fixed).subtract(plan.holding())
-                .subtract(plan.hiring()).subtract(plan.reportCost());
+                .subtract(plan.rndSpend()).subtract(plan.qualitySpend()).subtract(fixed)
+                .subtract(plan.holding()).subtract(plan.hiring()).subtract(plan.reportCost());
         BigDecimal cashAfter = nz(team.cash()).add(revenue).subtract(plan.materials())
                 .subtract(plan.payroll()).subtract(plan.marketing()).subtract(plan.rndSpend())
-                .subtract(fixed).subtract(plan.holding()).subtract(plan.hiring())
+                .subtract(plan.qualitySpend()).subtract(fixed).subtract(plan.holding())
+                .subtract(plan.hiring())
                 .subtract(plan.capacityCost()).subtract(plan.reportCost()).add(refund);
         BigDecimal cashChange = cashAfter.subtract(nz(team.cash()));
 
@@ -556,6 +585,7 @@ public class ScoringEngine {
                 money(nz(team.machineWorkers()).add(plan.machineAdded())), plan.staff(), stock, lines,
                 money(revenue), money(cogs), plan.payroll(), plan.marketing(), plan.rndSpend(),
                 money(fixed), plan.holding(), plan.hiring(), plan.capacityCost(), plan.reportCost(),
+                plan.qualitySpend(),
                 money(nz(team.cash())),
                 money(profit), money(cashChange), units(lostSales), plan.capacityUsed(),
                 plan.capacityAvailable(), rndUpdates);

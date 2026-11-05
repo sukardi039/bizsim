@@ -239,6 +239,41 @@ class ScoringEngineTest {
 
     // ------------------------------------------------------------------ fixtures
 
+    @Test
+    void a_quality_purchase_raises_the_level_and_is_charged_as_an_expense() {
+        // D15: one point at the template's rate, bought with this month's decision.
+        ScoringEngine.TeamOutcome outcome = runAt(1,
+                team(qualityDecision(bd("60000000")), bd("1000000000"), "ACTIVE", active("PRJ"), ZERO),
+                scenarioWithQuality());
+
+        assertThat(line(outcome).quality()).isEqualByComparingTo("51.00");
+        assertThat(outcome.qualitySpend()).isEqualByComparingTo("60000000.00");
+        // It behaves like R&D spend, not like a machine: both profit and cash carry it.
+        assertThat(outcome.profit()).isEqualByComparingTo("-60000000.00");
+        assertThat(outcome.cash()).isEqualByComparingTo("940000000.00");
+    }
+
+    @Test
+    void quality_stops_at_one_hundred_and_the_rest_of_the_money_is_not_charged() {
+        // 100 points of money against 50 points of room: only the room is sold.
+        ScoringEngine.TeamOutcome outcome = runAt(1,
+                team(qualityDecision(bd("6000000000")), bd("10000000000"), "ACTIVE", active("PRJ"), ZERO),
+                scenarioWithQuality());
+
+        assertThat(line(outcome).quality()).isEqualByComparingTo("100.00");
+        assertThat(outcome.qualitySpend()).isEqualByComparingTo("3000000000.00");
+    }
+
+    @Test
+    void a_template_that_does_not_offer_quality_ignores_the_money() {
+        ScoringEngine.TeamOutcome outcome = runAt(1,
+                team(qualityDecision(bd("60000000")), bd("1000000000"), "ACTIVE", active("PRJ"), ZERO),
+                scenario());
+
+        assertThat(line(outcome).quality()).isEqualByComparingTo("50.00");
+        assertThat(outcome.qualitySpend()).isEqualByComparingTo("0.00");
+    }
+
     private ScoringEngine.TeamOutcome run(ScoringEngine.TeamInput team) {
         return runAt(1, team);
     }
@@ -267,11 +302,38 @@ class ScoringEngineTest {
                         bd("50"), bd("1000000"), bd("100000"), ONE, ONE, bd("0.80"), ZERO,
                         List.of(ONE), ZERO, ZERO, ZERO, ZERO,
                         Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10),
-                        bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01")),
+                        bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01"),
+                        false, ZERO),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
                         bd("10000"), bd("10"), ONE, ZERO)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
                 List.of(project), List.of(), List.of());
+    }
+
+    private static Scenario scenarioWithQuality() {
+        Scenario base = scenario();
+        Scenario.Params p = base.params();
+        Scenario.Params q = new Scenario.Params(p.rounds(), p.roundMinutes(), p.startingCash(),
+                p.startingBrand(), p.fixedCostPerMonth(), p.brandDecay(), p.holdingCostPerUnit(),
+                p.referenceQuality(), p.referenceSpend(), p.machineCostPerWorker(), p.hiringCostMonths(),
+                p.severanceMonths(), p.minRndBenefitRatio(), p.baselineShare(), p.seasonality(),
+                p.priceElasticity(), p.qualityElasticity(), p.brandElasticity(), p.marketingElasticity(),
+                p.salaries(), p.startingStaff(), p.marketReportCost(), p.forecastHorizon(),
+                p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
+                true, bd("60000000"));
+        return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
+                base.rounds(), base.events());
+    }
+
+    private static DecisionPayload qualityDecision(BigDecimal invest) {
+        return new DecisionPayload(
+                List.of(new DecisionPayload.ProductRow("P", ZERO)),
+                List.of(new DecisionPayload.PriceRow("P", bd("100"))),
+                List.of(),
+                new DecisionPayload.ManpowerRow(10),
+                List.of(),
+                List.of(new DecisionPayload.QualityRow("P", invest)),
+                ZERO, false);
     }
 
     private static Scenario.ProjectSpec project(boolean partialBenefit, String curve,
@@ -301,6 +363,7 @@ class ScoringEngineTest {
                 List.of(),
                 new DecisionPayload.ManpowerRow(10),
                 List.of(new DecisionPayload.RndRow("PRJ", invest)),
+                List.of(),
                 ZERO, false);
     }
 

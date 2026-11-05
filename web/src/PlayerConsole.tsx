@@ -38,6 +38,8 @@ interface Draft {
   price: Record<string, number>;
   marketing: Record<string, number>;
   rnd: Record<string, number>;
+  /** D15: money per product spent raising its quality level this month. */
+  quality: Record<string, number>;
   manpower: number;
   capacity: number;
   marketReport: boolean;
@@ -75,11 +77,18 @@ function draftFrom(context: DecisionFormContext): Draft {
     rnd[project.code] = hit ? Number(hit.invest) : 0;
   }
 
+  const quality: Record<string, number> = {};
+  for (const product of context.products) {
+    const hit = (saved?.quality ?? []).find((r) => r.product === product.code);
+    quality[product.code] = hit ? Number(hit.invest) : 0;
+  }
+
   return {
     production,
     price,
     marketing,
     rnd,
+    quality,
     manpower: saved?.manpower?.production ?? context.staff.PRODUCTION ?? 0,
     capacity: saved?.capacityPurchase ?? 0,
     marketReport: saved?.marketReport ?? false,
@@ -98,6 +107,11 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
       project: r.code,
       invest: r.status === "ACTIVE" ? (draft.rnd[r.code] ?? 0) : 0,
     })),
+    // Sent only when the template sells the mechanic: a template that does not would refuse the
+    // money with quality.disabled (D15).
+    quality: context.qualityUpgrade
+      ? context.products.map((p) => ({ product: p.code, invest: draft.quality[p.code] ?? 0 }))
+      : [],
     capacityPurchase: draft.capacity,
     marketReport: draft.marketReport,
   };
@@ -194,15 +208,18 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     if (!context || !draft) return 0;
     const marketing = context.channels.reduce((sum, c) => sum + (draft.marketing[c.code] ?? 0), 0);
     const rnd = context.rndProjects.reduce((sum, r) => sum + (draft.rnd[r.code] ?? 0), 0);
+    const quality = context.qualityUpgrade
+      ? context.products.reduce((sum, p) => sum + (draft.quality[p.code] ?? 0), 0)
+      : 0;
     const machines = draft.capacity * context.machineCostPerWorker;
     const review = draft.marketReport ? context.marketReportCost : 0;
-    return marketing + rnd + machines + review;
+    return marketing + rnd + quality + machines + review;
   }, [context, draft]);
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => (current ? { ...current, [key]: value } : current));
 
-  const setIn = (group: "production" | "price" | "marketing" | "rnd", code: string, value: number) =>
+  const setIn = (group: "production" | "price" | "marketing" | "rnd" | "quality", code: string, value: number) =>
     setDraft((current) =>
       current ? { ...current, [group]: { ...current[group], [code]: value } } : current,
     );
@@ -489,6 +506,49 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {overCapacity ? " — hire production staff or buy machines, the round will be refused otherwise." : "."}
         </p>
       </section>
+
+      {context.qualityUpgrade && (
+        <section className="card">
+          <h2>{t("player.quality")}</h2>
+          <p className="muted">{t("player.qualityHint", { cost: money(context.qualityCostPerPoint) })}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>{t("player.product")}</th>
+                <th className="num">{t("player.qualityLevel")}</th>
+                <th className="num">{t("player.qualityInvest")}</th>
+                <th className="num">{t("player.qualityGain")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {context.products.map((product) => {
+                const invest = draft.quality[product.code] ?? 0;
+                const gain =
+                  context.qualityCostPerPoint > 0 ? invest / context.qualityCostPerPoint : 0;
+                return (
+                  <tr key={product.code}>
+                    <td>
+                      {product.name} <small className="muted">{product.code}</small>
+                    </td>
+                    <td className="num">{plain(product.quality)}</td>
+                    <td className="num">
+                      <input
+                        className="num"
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={invest}
+                        onChange={(e) => setIn("quality", product.code, Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="num">+{gain.toFixed(2)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
 
       <section className="card">
         <h2>{t("player.marketing")}</h2>

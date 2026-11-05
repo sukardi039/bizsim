@@ -54,6 +54,33 @@ export function eventStreamUrl(runId: number, ticket: string): string {
   return `${BASE}/runs/${runId}/events?ticket=${encodeURIComponent(ticket)}`;
 }
 
+/**
+ * Fetches the debrief file and hands it to the browser as a download. The token travels in the
+ * header, so a plain anchor would not be authenticated; the blob URL is revoked immediately after.
+ */
+export async function downloadDebrief(
+  runId: number,
+  round: number,
+  format: "pdf" | "xlsx",
+): Promise<void> {
+  const token = getToken();
+  const response = await fetch(`${BASE}/runs/${runId}/debrief/export?round=${round}&format=${format}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.json().catch(() => null));
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `bizsim-debrief-run${runId}-round${round}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function getToken(): string {
   return localStorage.getItem(STORAGE) ?? "";
 }
@@ -115,6 +142,11 @@ export interface Run {
   currentRound: number;
   /** True while a round is open to decide: the run page's single button computes, else opens (D38). */
   roundOpen: boolean;
+  /** The open round's deadline and clock state (D12); all three are meaningless when nothing is open. */
+  closesAt?: string | null;
+  clockPaused?: boolean;
+  /** Seconds left, already frozen while paused; -1 for an untimed round. */
+  clockRemainingSeconds?: number;
   scenarioKey: string;
   rounds: number;
   cycles: number;
@@ -134,6 +166,8 @@ export interface ProductStat {
   lost: number;
   price: number;
   unitCost: number;
+  /** D15: the level the line carried through this round, after any purchase or R&D. */
+  quality?: number;
   revenue: number;
   cogs: number;
 }
@@ -150,6 +184,8 @@ export interface StatementRow {
   hiring_cost: number;
   capacity_cost: number;
   report_cost: number;
+  /** D15: money spent raising product quality this month (0 on templates that do not offer it). */
+  quality_cost: number;
   /** Cash held before the round was computed; cash_after - opening_cash is the movement. */
   opening_cash: number;
   profit: number;
@@ -171,6 +207,13 @@ export interface ScoreRow {
   market_share: number;
   stock: number;
   brand?: number;
+  /** The rest of the D13 KPI set; the endpoint returns them, the scoreboard table shows a subset. */
+  revenue?: number;
+  cumulative_profit?: number;
+  lost_sales?: number;
+  capacity_utilisation?: number;
+  rnd_completed?: number;
+  status?: string;
 }
 
 export interface ContextProduct {
@@ -215,6 +258,8 @@ export interface DecisionInput {
   marketing: { channel: string; spend: number }[];
   manpower: { production: number };
   rnd: { project: string; invest: number }[];
+  /** D15: money per product for a quality upgrade; empty when the template does not offer it. */
+  quality: { product: string; invest: number }[];
   capacityPurchase: number;
   marketReport: boolean;
 }
@@ -380,10 +425,45 @@ export interface DecisionFormContext {
     events: unknown[];
   };
   marketReportCost: number;
+  /** D15: whether this template sells quality upgrades, and at what price per point. */
+  qualityUpgrade: boolean;
+  qualityCostPerPoint: number;
   /** True when this company already has a decision stored for the open round. */
   submitted: boolean;
   /** The stored decision, so the form can reopen on it instead of an empty month. */
   decision?: DecisionInput | null;
+}
+
+export interface ClockState {
+  round: number;
+  /** Null for an untimed round. */
+  closesAt: string | null;
+  paused: boolean;
+  /** Frozen while paused; -1 when the round has no clock. */
+  remainingSeconds: number;
+}
+
+/** One company's month as the facilitator sees it while the round is open (D12). */
+export interface SubmissionRow {
+  teamId: number;
+  companyName: string;
+  submitted: boolean;
+  submittedAt: string | null;
+  submittedBy: string | null;
+  decision: DecisionInput | null;
+}
+
+/** One hand laid on the session, with the reason and the person (D12/Q-G). */
+export interface AuditRow {
+  id: number;
+  round: number | null;
+  teamId: number | null;
+  companyName: string | null;
+  action: string;
+  amount: number | null;
+  reason: string | null;
+  actor: string;
+  at: string;
 }
 
 export const api = {
@@ -420,6 +500,34 @@ export const api = {
     }),
   nextRound: (runId: number) => request<{ number: number }>(`/runs/${runId}/rounds/next`, { method: "POST" }),
   closeRound: (runId: number) => request<unknown>(`/runs/${runId}/rounds/close`, { method: "POST" }),
+  /** D12: stop and restart the round clock, and give the class more time. */
+  pauseClock: (runId: number) =>
+    request<ClockState>(`/runs/${runId}/rounds/clock/pause`, { method: "POST" }),
+  resumeClock: (runId: number) =>
+    request<ClockState>(`/runs/${runId}/rounds/clock/resume`, { method: "POST" }),
+  extendClock: (runId: number, minutes: number) =>
+    request<ClockState>(`/runs/${runId}/rounds/clock/extend`, {
+      method: "POST",
+      body: JSON.stringify({ minutes }),
+    }),
+  /** D12: every company's submitted month, so the facilitator can see who is still deciding. */
+  submissions: (runId: number, round?: number) =>
+    request<{ round: number; companies: SubmissionRow[] }>(
+      `/runs/${runId}/decisions${round ? `?round=${round}` : ""}`,
+    ),
+  /** D12/Q-G: cash moved by hand, always with a reason on the record. */
+  adjustCash: (runId: number, teamId: number, delta: number, reason: string) =>
+    request<{ teamId: number; cash: number; delta: number }>(`/runs/${runId}/teams/${teamId}/cash`, {
+      method: "POST",
+      body: JSON.stringify({ delta, reason }),
+    }),
+  /** Undo the last computed round: restored state, deleted results, the month open again. */
+  voidLastRound: (runId: number, reason: string) =>
+    request<{ round: number; status: string }>(`/runs/${runId}/rounds/void`, {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    }),
+  audit: (runId: number) => request<AuditRow[]>(`/runs/${runId}/audit`),
   /** Deletes the simulation and everything played in it. Owner or admin only; not undoable. */
   deleteRun: (runId: number) => request<unknown>(`/runs/${runId}`, { method: "DELETE" }),
   statements: (runId: number, teamId: number) =>

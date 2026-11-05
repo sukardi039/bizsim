@@ -21,6 +21,7 @@ export default function StatementDetail({ row, share }: { row: StatementRow; sha
     ["holding_cost", "debrief.holding"],
     ["hiring_cost", "debrief.hiring"],
     ["capacity_cost", "debrief.capacityCost"],
+    ["quality_cost", "debrief.qualityCost"],
     ["report_cost", "debrief.report"],
   ] as const;
 

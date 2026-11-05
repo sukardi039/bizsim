@@ -1,6 +1,7 @@
 package com.bizsim.sim;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,8 @@ import java.util.Optional;
 @Repository
 public class RoundRepository {
 
-    public record RoundRow(long id, long runId, int number, String status, java.time.Instant closesAt) {
+    public record RoundRow(long id, long runId, int number, String status, java.time.Instant closesAt,
+                           java.time.Instant pausedAt) {
     }
 
     public record TeamState(long id, String name, String companyName, String status, BigDecimal cash,
@@ -35,11 +37,12 @@ public class RoundRepository {
 
     public Optional<RoundRow> openRound(long runId) {
         return jdbc.query("""
-                select id, run_id, number, status, closes_at from round
+                select id, run_id, number, status, closes_at, paused_at from round
                 where run_id = ? and status = 'OPEN'
                 """, (rs, i) -> new RoundRow(rs.getLong("id"), rs.getLong("run_id"), rs.getInt("number"),
                 rs.getString("status"), rs.getTimestamp("closes_at") == null ? null
-                : rs.getTimestamp("closes_at").toInstant()), runId).stream().findFirst();
+                : rs.getTimestamp("closes_at").toInstant(), rs.getTimestamp("paused_at") == null ? null
+                : rs.getTimestamp("paused_at").toInstant()), runId).stream().findFirst();
     }
 
     /** D12: the round carries its own deadline; null minutes means a facilitator-only round. */
@@ -65,12 +68,223 @@ public class RoundRepository {
         jdbc.update("update round set status = 'COMPUTED' where id = ?", roundId);
     }
 
-    /** Rounds whose clock has run out, for the scheduler. */
+    /** Rounds whose clock has run out, for the scheduler. A paused clock never runs out (D12). */
     public List<long[]> dueRounds() {
         return jdbc.query("""
                 select r.run_id, u.tenant_id from round r join run u on u.id = r.run_id
-                where r.status = 'OPEN' and r.closes_at is not null and r.closes_at <= now()
+                where r.status = 'OPEN' and r.paused_at is null
+                  and r.closes_at is not null and r.closes_at <= now()
                 """, (rs, i) -> new long[]{rs.getLong("run_id"), rs.getLong("tenant_id")});
+    }
+
+    // ------------------------------------------------------------------ facilitator powers
+
+    /** Freezes the deadline. The remaining time is what `closes_at` still says. */
+    public boolean pauseClock(long roundId) {
+        return jdbc.update("""
+                update round set paused_at = now()
+                where id = ? and status = 'OPEN' and paused_at is null
+                """, roundId) == 1;
+    }
+
+    /** Unfreezes it and pushes the deadline out by exactly the time the clock was stopped. */
+    public boolean resumeClock(long roundId) {
+        return jdbc.update("""
+                update round
+                set closes_at = case when closes_at is null then null
+                                     else closes_at + (now() - paused_at) end,
+                    paused_at = null
+                where id = ? and paused_at is not null
+                """, roundId) == 1;
+    }
+
+    /**
+     * Adds minutes to the deadline. An untimed round (no `round_minutes`) gains a deadline here,
+     * which is the useful reading of "extend": the class asked for time, so now it has some.
+     */
+    public boolean extendClock(long roundId, int minutes) {
+        return jdbc.update("""
+                update round set closes_at = coalesce(closes_at, now()) + (? * interval '1 minute')
+                where id = ? and status = 'OPEN'
+                """, minutes, roundId) == 1;
+    }
+
+    /** The most recent round that was computed: the only one a void may touch. */
+    public Optional<RoundRow> lastComputed(long runId) {
+        return jdbc.query("""
+                select id, run_id, number, status, closes_at, paused_at from round
+                where run_id = ? and status = 'COMPUTED' order by number desc limit 1
+                """, (rs, i) -> new RoundRow(rs.getLong("id"), rs.getLong("run_id"), rs.getInt("number"),
+                rs.getString("status"), rs.getTimestamp("closes_at") == null ? null
+                : rs.getTimestamp("closes_at").toInstant(), rs.getTimestamp("paused_at") == null ? null
+                : rs.getTimestamp("paused_at").toInstant()), runId).stream().findFirst();
+    }
+
+    /**
+     * Records every company's state as the round opens its books. One SQL statement, so the snapshot
+     * cannot disagree with the rows it copies: products, staff and the R&D slate are all taken at the
+     * same instant.
+     */
+    public void writeSnapshots(long roundId, long runId) {
+        jdbc.update("""
+                insert into round_snapshot (round_id, team_id, state)
+                select ?, t.id, jsonb_build_object(
+                    'cash', t.cash, 'brand', t.brand_score, 'status', t.status,
+                    'machineWorkers', t.machine_workers,
+                    'cumulativeRevenue', t.cumulative_revenue,
+                    'cumulativeProfit', t.cumulative_profit,
+                    'lostSalesTotal', t.lost_sales_total,
+                    'products', coalesce((select jsonb_agg(jsonb_build_object(
+                            'product', cp.product_code, 'price', cp.unit_price,
+                            'quality', cp.quality_level, 'unitCost', cp.unit_cost,
+                            'stock', cp.stock))
+                        from company_product cp where cp.team_id = t.id), '[]'::jsonb),
+                    'staff', coalesce((select jsonb_object_agg(cs.function, cs.headcount)
+                        from company_staff cs where cs.team_id = t.id), '{}'::jsonb),
+                    'rnd', coalesce((select jsonb_agg(jsonb_build_object(
+                            'project', cr.project_code, 'invested', cr.invested,
+                            'monthsInvested', cr.months_invested, 'startedRound', cr.started_round,
+                            'status', cr.status, 'benefitFactor', cr.benefit_factor,
+                            'completedRound', cr.completed_round))
+                        from company_rnd cr where cr.team_id = t.id), '[]'::jsonb))
+                from team t where t.run_id = ?
+                on conflict (round_id, team_id) do nothing
+                """, roundId, runId);
+    }
+
+    public int snapshotTeams(long roundId) {
+        Integer n = jdbc.queryForObject(
+                "select count(*) from round_snapshot where round_id = ?", Integer.class, roundId);
+        return n == null ? 0 : n;
+    }
+
+    /** Puts every company back to the state recorded when the round was computed. */
+    public void restoreSnapshots(long roundId) {
+        jdbc.query("select team_id, state::text as state_text from round_snapshot where round_id = ?",
+                rs -> {
+                    long teamId = rs.getLong("team_id");
+                    JsonNode state = readTree(rs.getString("state_text"));
+                    restoreTeam(teamId, state);
+                }, roundId);
+    }
+
+    private void restoreTeam(long teamId, JsonNode state) {
+        String status = state.path("status").asText();
+        if (!"ACTIVE".equals(status) && !"INSOLVENT".equals(status)) {
+            // A snapshot that cannot name the company's state is corrupt; refusing beats writing a
+            // status the table's check constraint will reject half-way through the restore.
+            throw new IllegalStateException("round_snapshot for team " + teamId + " is unreadable");
+        }
+        jdbc.update("""
+                update team set cash = ?, brand_score = ?, status = ?, machine_workers = ?,
+                                cumulative_revenue = ?, cumulative_profit = ?, lost_sales_total = ?
+                where id = ?
+                """, dec(state, "cash"), dec(state, "brand"), status,
+                dec(state, "machineWorkers"), dec(state, "cumulativeRevenue"),
+                dec(state, "cumulativeProfit"), dec(state, "lostSalesTotal"), teamId);
+
+        for (JsonNode product : state.path("products")) {
+            jdbc.update("""
+                    update company_product set unit_price = ?, quality_level = ?, unit_cost = ?, stock = ?
+                    where team_id = ? and product_code = ?
+                    """, dec(product, "price"), dec(product, "quality"), dec(product, "unitCost"),
+                    dec(product, "stock"), teamId, product.path("product").asText());
+        }
+        state.path("staff").fields().forEachRemaining(entry -> jdbc.update("""
+                insert into company_staff (team_id, function, headcount) values (?, ?, ?)
+                on conflict (team_id, function) do update set headcount = excluded.headcount
+                """, teamId, entry.getKey(), entry.getValue().asInt()));
+        for (JsonNode rnd : state.path("rnd")) {
+            jdbc.update("""
+                    update company_rnd
+                    set invested = ?, months_invested = ?, started_round = ?, status = ?,
+                        benefit_factor = ?, completed_round = ?
+                    where team_id = ? and project_code = ?
+                    """, dec(rnd, "invested"), rnd.path("monthsInvested").asInt(),
+                    rnd.path("startedRound").isNull() ? null : rnd.path("startedRound").asInt(),
+                    rnd.path("status").asText(), dec(rnd, "benefitFactor"),
+                    rnd.path("completedRound").isNull() ? null : rnd.path("completedRound").asInt(),
+                    teamId, rnd.path("project").asText());
+        }
+    }
+
+    /**
+     * Deletes a round's results and reopens it. The decisions survive on purpose: the class is
+     * correcting a month, not retyping it, and a player may still overwrite their saved decision
+     * while the reopened round is open.
+     */
+    public boolean reopenVoidedRound(long roundId, Integer minutes) {
+        jdbc.update("delete from round_result where round_id = ?", roundId);
+        jdbc.update("delete from round_statement where round_id = ?", roundId);
+        jdbc.update("delete from round_snapshot where round_id = ?", roundId);
+        return jdbc.update("""
+                update round
+                set status = 'OPEN', closed_at = null, paused_at = null,
+                    closes_at = case when ? > 0 then now() + (? * interval '1 minute') else null end
+                where id = ? and status = 'COMPUTED'
+                """, minutes == null ? 0 : minutes, minutes == null ? 0 : minutes, roundId) == 1;
+    }
+
+    // ------------------------------------------------------------------ decisions as seen by staff
+
+    /** Every company and what it sent for one round, submitted or not. */
+    public List<Map<String, Object>> decisionsOfRound(long runId, int roundNumber) {
+        return jdbc.query("""
+                select t.id as team_id, t.company_name, d.submitted_at, d.payload::text as payload,
+                       u.display_name
+                from team t
+                left join round r on r.run_id = t.run_id and r.number = ?
+                left join decision d on d.round_id = r.id and d.team_id = t.id
+                left join app_user u on u.id = d.submitted_by
+                where t.run_id = ?
+                order by t.id
+                """, (rs, i) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("teamId", rs.getLong("team_id"));
+            row.put("companyName", rs.getString("company_name"));
+            row.put("submitted", rs.getTimestamp("submitted_at") != null);
+            row.put("submittedAt", rs.getTimestamp("submitted_at") == null ? null
+                    : rs.getTimestamp("submitted_at").toInstant());
+            row.put("submittedBy", rs.getString("display_name"));
+            String payload = rs.getString("payload");
+            row.put("decision", payload == null ? null : readTree(payload));
+            return row;
+        }, roundNumber, runId);
+    }
+
+    // ------------------------------------------------------------------ audit trail
+
+    public void audit(long tenantId, long runId, Integer roundNumber, Long teamId, String action,
+                      BigDecimal amount, String reason, long actorId) {
+        jdbc.update("""
+                insert into facilitator_action
+                    (tenant_id, run_id, round_number, team_id, action, amount, reason, actor_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?)
+                """, tenantId, runId, roundNumber, teamId, action, amount, reason, actorId);
+    }
+
+    public List<Map<String, Object>> auditOf(long runId) {
+        return jdbc.query("""
+                select a.id, a.round_number, a.team_id, t.company_name, a.action, a.amount, a.reason,
+                       u.display_name, a.created_at
+                from facilitator_action a
+                left join team t on t.id = a.team_id
+                join app_user u on u.id = a.actor_id
+                where a.run_id = ?
+                order by a.id
+                """, (rs, i) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", rs.getLong("id"));
+            row.put("round", (Integer) rs.getObject("round_number"));
+            row.put("teamId", rs.getObject("team_id"));
+            row.put("companyName", rs.getString("company_name"));
+            row.put("action", rs.getString("action"));
+            row.put("amount", rs.getBigDecimal("amount"));
+            row.put("reason", rs.getString("reason"));
+            row.put("actor", rs.getString("display_name"));
+            row.put("at", rs.getTimestamp("created_at").toInstant());
+            return row;
+        }, runId);
     }
 
     // ------------------------------------------------------------------ company state
@@ -179,8 +393,11 @@ public class RoundRepository {
                 cumulativeRevenue, cumulativeProfit, lostSalesTotal, outcome.teamId());
 
         for (ScoringEngine.ProductLine line : outcome.lines()) {
-            jdbc.update("update company_product set unit_price = ?, stock = ? where team_id = ? and product_code = ?",
-                    line.price(), line.closingStock(), outcome.teamId(), line.product());
+            jdbc.update("""
+                    update company_product set unit_price = ?, quality_level = ?, stock = ?
+                    where team_id = ? and product_code = ?
+                    """, line.price(), line.quality(), line.closingStock(), outcome.teamId(),
+                    line.product());
         }
         for (Map.Entry<String, Integer> entry : outcome.staff().entrySet()) {
             jdbc.update("""
@@ -203,13 +420,14 @@ public class RoundRepository {
         jdbc.update("""
                 insert into round_statement (round_id, team_id, revenue, cogs, payroll, marketing,
                     rnd_spend, fixed_cost, holding_cost, hiring_cost, capacity_cost, report_cost,
-                    opening_cash, profit, cash_after, brand_after, lost_sales, capacity_used,
-                    capacity_available, detail)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                    quality_cost, opening_cash, profit, cash_after, brand_after, lost_sales,
+                    capacity_used, capacity_available, detail)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                 on conflict (round_id, team_id) do nothing
                 """, roundId, outcome.teamId(), outcome.revenue(), outcome.cogs(), outcome.payroll(),
                 outcome.marketing(), outcome.rndSpend(), outcome.fixedCost(), outcome.holdingCost(),
                 outcome.hiringCost(), outcome.capacityCost(), outcome.reportCost(),
+                outcome.qualitySpend(),
                 outcome.openingCash(), outcome.profit(), outcome.cash(), outcome.brand(),
                 outcome.lostSales(), outcome.capacityUsed(), outcome.capacityAvailable(),
                 detailJson(outcome));
@@ -243,6 +461,12 @@ public class RoundRepository {
                 on conflict (round_id, team_id) do update
                    set payload = excluded.payload, submitted_at = now(), submitted_by = excluded.submitted_by
                 """, roundId, teamId, toJson(payload), submittedBy);
+    }
+
+    /** Moves one company's balance by hand and returns what it became. */
+    public BigDecimal adjustCash(long teamId, BigDecimal delta) {
+        return jdbc.queryForObject("update team set cash = cash + ? where id = ? returning cash",
+                BigDecimal.class, delta, teamId);
     }
 
     public boolean teamBelongsToRun(long teamId, long runId) {
@@ -293,8 +517,8 @@ public class RoundRepository {
         return jdbc.query("""
                 select r.number as round, s.revenue, s.cogs, s.payroll, s.marketing, s.rnd_spend,
                        s.fixed_cost, s.holding_cost, s.hiring_cost, s.capacity_cost, s.report_cost,
-                       s.opening_cash, s.profit, s.cash_after, s.brand_after, s.lost_sales,
-                       s.capacity_used,
+                       s.quality_cost, s.opening_cash, s.profit, s.cash_after, s.brand_after,
+                       s.lost_sales, s.capacity_used,
                        s.capacity_available, s.detail as detail
                 from round_statement s
                 join round r on r.id = s.round_id
@@ -304,7 +528,7 @@ public class RoundRepository {
             Map<String, Object> row = new LinkedHashMap<>();
             for (String money : List.of("revenue", "cogs", "payroll", "marketing", "rnd_spend",
                     "fixed_cost", "holding_cost", "hiring_cost", "capacity_cost", "report_cost",
-                    "opening_cash", "profit", "cash_after")) {
+                    "quality_cost", "opening_cash", "profit", "cash_after")) {
                 row.put(money, rs.getBigDecimal(money));
             }
             row.put("round", rs.getInt("round"));
@@ -327,6 +551,19 @@ public class RoundRepository {
             // A statement that cannot be read is a stored-data fault, not a client error.
             throw new IllegalStateException("round_statement.detail is not valid json", e);
         }
+    }
+
+    private JsonNode readTree(String text) {
+        try {
+            return json.readTree(text);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("stored json is not valid", e);
+        }
+    }
+
+    private static BigDecimal dec(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNull() || value.isMissingNode() ? BigDecimal.ZERO : value.decimalValue();
     }
 
     // ------------------------------------------------------------------ json

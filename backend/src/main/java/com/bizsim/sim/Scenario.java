@@ -53,7 +53,9 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          Map<String, BigDecimal> salaries, Map<String, Integer> startingStaff,
                          BigDecimal marketReportCost, int forecastHorizon, BigDecimal forecastBand,
                          int cycles, int cycleLength, BigDecimal cycleDemandDrift,
-                         BigDecimal cycleCostDrift) {
+                         BigDecimal cycleCostDrift,
+                         /** D15: off unless the template turns it on, so a copy keeps its behaviour. */
+                         boolean qualityUpgrade, BigDecimal qualityCostPerPoint) {
     }
 
     /** The economy for one cycle position. Missing positions fall back to neutral (1.0). */

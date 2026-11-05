@@ -18,6 +18,7 @@ public record DecisionPayload(List<ProductRow> production,
                               List<ChannelRow> marketing,
                               ManpowerRow manpower,
                               List<RndRow> rnd,
+                              List<QualityRow> quality,
                               BigDecimal capacityPurchase,
                               Boolean marketReport) {
 
@@ -37,8 +38,13 @@ public record DecisionPayload(List<ProductRow> production,
     public record RndRow(String project, BigDecimal invest) {
     }
 
+    /** D15: money spent raising one product's quality level this month. */
+    public record QualityRow(String product, BigDecimal invest) {
+    }
+
     public static DecisionPayload none() {
-        return new DecisionPayload(List.of(), List.of(), List.of(), null, List.of(), null, null);
+        return new DecisionPayload(List.of(), List.of(), List.of(), null, List.of(), List.of(),
+                null, null);
     }
 
     public boolean marketReportRequested() {
@@ -78,6 +84,18 @@ public record DecisionPayload(List<ProductRow> production,
     public BigDecimal rndTotal() {
         return rnd == null ? BigDecimal.ZERO
                 : rnd.stream().map(r -> zeroIfNull(r.invest())).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    /** Money the company wants to spend raising one product's quality (D15). */
+    public BigDecimal qualityInvest(String product) {
+        return quality == null ? BigDecimal.ZERO : quality.stream()
+                .filter(r -> product.equals(r.product()))
+                .map(r -> zeroIfNull(r.invest())).findFirst().orElse(BigDecimal.ZERO);
+    }
+
+    public BigDecimal qualityTotal() {
+        return quality == null ? BigDecimal.ZERO
+                : quality.stream().map(r -> zeroIfNull(r.invest())).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public BigDecimal capacityPurchaseOrZero() {

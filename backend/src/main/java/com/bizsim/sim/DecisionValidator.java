@@ -147,6 +147,35 @@ public class DecisionValidator {
             }
         }
 
+        if (payload.quality() != null) {
+            boolean enabled = scenario.params().qualityUpgrade();
+            Set<String> seen = new HashSet<>();
+            for (DecisionPayload.QualityRow row : payload.quality()) {
+                if (row.product() == null || !productCodes.contains(row.product())) {
+                    problems.add(ApiProblem.of("quality.unknown_product",
+                            "quality: unknown product " + row.product(),
+                            "product", nullToDash(row.product())));
+                    continue;
+                }
+                if (!seen.add(row.product())) {
+                    problems.add(ApiProblem.of("quality.duplicate_product",
+                            "quality: product " + row.product() + " appears more than once",
+                            "product", row.product()));
+                }
+                if (row.invest() == null || row.invest().signum() < 0) {
+                    problems.add(ApiProblem.of("quality.invest_negative",
+                            "quality." + row.product() + ": invest must be >= 0",
+                            "product", row.product()));
+                } else if (row.invest().signum() > 0 && !enabled) {
+                    // D15: the mechanic is a per-template switch. Money sent to a template that does
+                    // not sell it is a client bug, not a silent donation.
+                    problems.add(ApiProblem.of("quality.disabled",
+                            "quality: this template does not offer quality upgrades",
+                            "product", row.product()));
+                }
+            }
+        }
+
         return problems;
     }
 

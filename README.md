@@ -148,6 +148,14 @@ GET  /api/runs/{id}/teams/{tid}/context     form data; R&D shows a cost band, ne
 GET  /api/runs/{id}/teams/{tid}/statements  line-item statements, one per round
 GET  /api/runs/{id}/teams/{tid}/market-report    paid forecast; 402 until bought (D18)
 GET  /api/runs/{id}/scoreboard              KPIs per company per round
+POST /api/runs/{id}/rounds/clock/pause      facilitator: stop the round clock (D12)
+POST /api/runs/{id}/rounds/clock/resume     facilitator: restart it, returning the stopped time
+POST /api/runs/{id}/rounds/clock/extend     facilitator: {minutes} added to the deadline
+GET  /api/runs/{id}/decisions               facilitator: every company's submission, or not
+POST /api/runs/{id}/teams/{tid}/cash        facilitator: {delta, reason}; audited (D12)
+POST /api/runs/{id}/rounds/void             facilitator: {reason}; undo the last computed round
+GET  /api/runs/{id}/audit                   facilitator: the session's hand-changes, in order
+GET  /api/runs/{id}/debrief/export          facilitator: ?round=&format=pdf|xlsx (D13)
 ```
 
 Every other path returns 401 without a valid token — including unknown paths, so an unauthenticated
@@ -213,4 +221,15 @@ Packages: retired packages that never ran a session, removable with a confirmati
   tick companies, tick trainees → the run is created with those companies carrying their own product
   lines and the trainees already seated. Validation happens before anything is written, so a mismatch
   is a refusal rather than a half-built session.
+
+**D39/D40/D41 complete (5 Nov 2026): the class day, and the room after it.** The facilitator's four
+missing powers are built: the round clock can be paused, resumed and extended (a paused clock never
+closes the round; resuming returns exactly the stopped time); every company's submission is readable
+while the round is open; a company's cash can be moved by hand with a mandatory, audited reason; and
+the last computed round can be **voided** — every company restored from a snapshot written at compute
+time, that round's results deleted, the round reopened, the run un-finished. Everything lands in
+`facilitator_action`, so a class can ask why a number changed and get an answer. **Quality upgrade**
+(D15) is now a playable mechanic, priced per point and switched on per template. The debrief leaves
+the screen: **Present** for the projector (six KPIs, then the explanation), **Download PDF** (an
+embedded CJK font, so authored Chinese names render) and **Download Excel**.
 

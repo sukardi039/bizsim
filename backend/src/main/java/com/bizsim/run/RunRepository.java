@@ -217,4 +217,9 @@ public class RunRepository {
                 where id = ?
                 """, runId);
     }
+
+    /** A voided final round puts the session back in flight, so the D21 guard counts it again. */
+    public void reopenRun(long runId) {
+        jdbc.update("update run set status = 'OPEN', finished_at = null where id = ?", runId);
+    }
 }

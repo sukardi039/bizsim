@@ -114,6 +114,7 @@ class ScenarioCalibrationTest extends PostgresTestBase {
         return new DecisionPayload(productionRows, priceRows, channelRows,
                 new DecisionPayload.ManpowerRow(production),
                 List.of(new DecisionPayload.RndRow("RND-P1-COST", BigDecimal.valueOf(rnd))),
+                List.of(),
                 BigDecimal.ZERO, false);
     }
 }

@@ -23,9 +23,11 @@ import java.util.Optional;
 public class SimulationController {
 
     private final RoundService rounds;
+    private final DebriefExportService debrief;
 
-    public SimulationController(RoundService rounds) {
+    public SimulationController(RoundService rounds, DebriefExportService debrief) {
         this.rounds = rounds;
+        this.debrief = debrief;
     }
 
     @PostMapping("/teams/{teamId}/decisions")
@@ -72,6 +74,94 @@ public class SimulationController {
         TenantContext.Principal me = requireFacilitator();
         Optional<ScoringEngine.RoundResult> result = rounds.closeAndCompute(me.tenantId(), runId);
         return result.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    // ------------------------------------------------------------------ facilitator powers (D12)
+
+    public record ExtendClockRequest(Integer minutes) {
+    }
+
+    public record CashAdjustRequest(java.math.BigDecimal delta, String reason) {
+    }
+
+    public record VoidRoundRequest(String reason) {
+    }
+
+    /** Stop the round clock: the deadline is frozen and the sweep skips the round. */
+    @PostMapping("/rounds/clock/pause")
+    public RoundService.ClockState pauseClock(@PathVariable long runId) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.pauseClock(me.tenantId(), runId, me.userId());
+    }
+
+    @PostMapping("/rounds/clock/resume")
+    public RoundService.ClockState resumeClock(@PathVariable long runId) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.resumeClock(me.tenantId(), runId, me.userId());
+    }
+
+    @PostMapping("/rounds/clock/extend")
+    public RoundService.ClockState extendClock(@PathVariable long runId,
+                                               @RequestBody ExtendClockRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        int minutes = request.minutes() == null ? 0 : request.minutes();
+        return rounds.extendClock(me.tenantId(), runId, me.userId(), minutes);
+    }
+
+    /** Moves one company's cash by hand; the reason is mandatory and lands in the audit trail. */
+    @PostMapping("/teams/{teamId}/cash")
+    public Map<String, Object> adjustCash(@PathVariable long runId, @PathVariable long teamId,
+                                          @RequestBody CashAdjustRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.adjustCash(me.tenantId(), runId, me.userId(), teamId,
+                request.delta(), request.reason());
+    }
+
+    /** Undo the last computed round: restore every company and reopen the month. */
+    @PostMapping("/rounds/void")
+    public Map<String, Object> voidLastRound(@PathVariable long runId,
+                                             @RequestBody(required = false) VoidRoundRequest request) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.voidLastRound(me.tenantId(), runId, me.userId(),
+                request == null ? null : request.reason());
+    }
+
+    /** What every company sent this round — submitted or not. Facilitator only (D12). */
+    @GetMapping("/decisions")
+    public Map<String, Object> submissions(@PathVariable long runId,
+                                           @RequestParam(required = false) Integer round) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.submissions(me.tenantId(), runId, round);
+    }
+
+    /** Everything done to this session by hand, in order. */
+    @GetMapping("/audit")
+    public List<Map<String, Object>> audit(@PathVariable long runId) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.audit(me.tenantId(), runId);
+    }
+
+    /**
+     * The classroom debrief as a file (D13): `format=pdf` for projecting and printing, `format=xlsx`
+     * for the cohort to keep. Both read the stored results, never a recomputation.
+     */
+    @GetMapping("/debrief/export")
+    public ResponseEntity<byte[]> exportDebrief(@PathVariable long runId,
+                                                @RequestParam(required = false) Integer round,
+                                                @RequestParam(defaultValue = "pdf") String format) {
+        TenantContext.Principal me = requireFacilitator();
+        DebriefExportService.Report report = debrief.load(me.tenantId(), runId, round);
+        boolean excel = "xlsx".equalsIgnoreCase(format) || "excel".equalsIgnoreCase(format);
+        byte[] body = excel ? debrief.xlsx(report) : debrief.pdf(report);
+        String extension = excel ? "xlsx" : "pdf";
+        String mediaType = excel
+                ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                : "application/pdf";
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType(mediaType))
+                .header("Content-Disposition", "attachment; filename=\"bizsim-debrief-run" + runId
+                        + "-round" + report.round() + "." + extension + "\"")
+                .body(body);
     }
 
     private static TenantContext.Principal requireFacilitator() {

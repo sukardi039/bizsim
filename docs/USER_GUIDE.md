@@ -88,7 +88,13 @@ confirms *"Saved. New simulations from this template use these values."*
 | information | market review price, forecast horizon, forecast band |
 | research | min R&D benefit ratio |
 | dynamics | cycle demand drift, cycle cost drift |
+| quality (D40) | **Offer quality upgrades to the class** (checkbox, off by default), quality cost per point |
 | **Per function** (table) | salary and **starting headcount** for Production, Sales, R&D, Admin |
+
+The quality switch is a per-template mechanic: **off means the trainee form has no quality card and
+any money sent to it is refused**. On, each company may buy quality points for a product at the price
+you set, and the level persists across rounds up to 100. A template written before this feature has
+no switch and therefore behaves exactly as it did.
 
 **Environment** — the round-by-round timeline. One row per round: *demand index*, *cost index*,
 *wage index* (1.00 = normal), *trend strength*, *trend label* (free text, shown to trainees), *note*.
@@ -238,6 +244,35 @@ then **Open round N+1**. **Delete run** removes the session and everything playe
 You can only have **one session in progress at a time**. To run two cohorts in parallel you need two
 facilitator accounts.
 
+### 7.2.1 The round clock, the submissions and the audit trail
+
+Under the header there is a **Round clock** card. It is the clock that closes the round automatically
+when the time you set in the template runs out (D12):
+
+| Button | What it does |
+|---|---|
+| **Pause clock** | stops time. The remaining time stops counting, nothing computes, and trainees can still submit. Use it for a discussion in the middle of a round. |
+| **Resume clock** | starts it again and gives back exactly the time it was stopped — a clock paused for six minutes runs six minutes longer. |
+| **Add 5 minutes** | moves the deadline out by five minutes (works while paused, and on a round that had no clock). |
+
+**Void round N** appears when nothing is open and at least one round has been computed. It undoes the
+last computed round: every company goes back to the state it had before that month, that round's
+results and statements are deleted, and the round opens again so the class can correct the decision
+and you can compute it again. The decisions themselves are kept — the class corrects a month, it does
+not retype it. You are asked for a reason, which is kept in the audit trail. Rounds computed before
+this feature existed carry no snapshot and are refused with *"cannot be restored"* rather than
+half-undone.
+
+**Submissions** lists every company with *submitted* or *not yet*, who sent it, and **show the month**
+expands exactly what they asked for (volumes and prices, marketing, R&D, quality, staff, machines).
+**Adjust cash** on the same row moves one company's balance by hand: type the amount (**negative to
+fine, positive to lend or compensate**) and a reason of at least three characters, then **Apply**. The
+change is immediate and lands in the audit trail; the class can see it.
+
+**Audit trail** is the session's log of every hand laid on it — clock paused/resumed/extended, cash
+adjusted, round voided — with the round, the company, the amount, the reason, who did it and when.
+When a class asks "why did our cash jump?", this table is the answer.
+
 ### 7.3 Scoreboard
 
 One row per company for the latest computed round: profit, cash, share, stock. Empty until you
@@ -275,7 +310,21 @@ Under the scoreboard, for any computed round:
 Every number comes from that round's statements — the debrief cannot disagree with what the engine
 charged.
 
-### 7.5 Live
+### 7.5 Presenting and exporting the debrief
+
+Three buttons sit next to the round selector:
+
+| Button | What you get |
+|---|---|
+| **Present** | a full-screen classroom view of the selected round. Page 1 is the six numbers you read out — profit, cumulative profit, market share, cash, brand, stock — one card per company, labelled with the trainee. Page 2 is the explanation: lost sales, capacity used, R&D completed, status. **← →** change page, **↑ ↓** change round, **Esc** closes. |
+| **Download PDF** | an A4 landscape report: page 1 the class and its KPIs, page 2 the explanation and every cost line. Company and trainee names are rendered as authored, including Chinese. |
+| **Download Excel** | the same numbers as a workbook: one sheet for the round (all fourteen columns), one for the cost lines. |
+
+Both files are built from the stored results, never a recomputation, so a downloaded report matches
+what the class saw on screen. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
+hides the console and keeps the cards.
+
+### 7.6 Live
 
 A feed of what has happened in the session (`round.opened`, `decision.submitted`, `round.closed`).
 
@@ -306,6 +355,10 @@ package's class list and publishes a new package; the facilitator cannot seat yo
    - **Research and development** — investment per project, *this month*. A project that has
      already finished (**COMPLETED** or **FAILED**) shows a closed field and *"No further
      investment"*: the money cannot be spent again, and leaving it at 0 does not block the round.
+   - **Quality upgrade** — only when your template offers it (D40). One line per product: the level
+     the product carries now, how much you spend this month, and the points that money buys. The
+     level stays for every later round and stops at 100; money beyond that is not charged. The spend
+     is a cost of the month, like R&D, so it lowers profit and cash by the same amount.
    - **Market review** — optional paid report; the cost is deducted from the result
 4. **Submit round n**. Submitting again replaces the decision until the round is computed.
 5. **Your results** — once a round is computed, the trainee gets the same summary and detail the

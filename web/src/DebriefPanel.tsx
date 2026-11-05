@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type RunPlayer, type ScoreRow, type StatementRow, type Team } from "./api";
+import { api, downloadDebrief, type RunPlayer, type ScoreRow, type StatementRow, type Team } from "./api";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
+import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
 /**
@@ -31,6 +32,8 @@ export default function DebriefPanel({
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
+  const [slides, setSlides] = useState(false);
+  const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
 
   const load = useCallback(async () => {
     setProblem(null);
@@ -97,6 +100,41 @@ export default function DebriefPanel({
             ))}
           </select>
         </label>
+        <div className="buttons">
+          <button onClick={() => setSlides(true)}>{t("debrief.present")}</button>
+          <button
+            onClick={async () => {
+              setProblem(null);
+              setDownloading("pdf");
+              try {
+                await downloadDebrief(runId, round, "pdf");
+              } catch (error) {
+                setProblem(describeError(error, t));
+              } finally {
+                setDownloading(null);
+              }
+            }}
+            disabled={downloading !== null}
+          >
+            {downloading === "pdf" ? t("debrief.exporting") : t("debrief.pdf")}
+          </button>
+          <button
+            onClick={async () => {
+              setProblem(null);
+              setDownloading("xlsx");
+              try {
+                await downloadDebrief(runId, round, "xlsx");
+              } catch (error) {
+                setProblem(describeError(error, t));
+              } finally {
+                setDownloading(null);
+              }
+            }}
+            disabled={downloading !== null}
+          >
+            {downloading === "xlsx" ? t("debrief.exporting") : t("debrief.excel")}
+          </button>
+        </div>
       </div>
       <p className="muted">{t("debrief.hint")}</p>
       {problem && <p className="error">{problem}</p>}
@@ -193,6 +231,18 @@ export default function DebriefPanel({
       <p className="muted">
         {t("debrief.companies", { count: teams.length, round })}
       </p>
+
+      {slides && (
+        <DebriefSlides
+          board={board}
+          statements={statements}
+          players={players}
+          round={round}
+          rounds={Math.max(rounds, currentRound)}
+          onRoundChange={setRound}
+          onClose={() => setSlides(false)}
+        />
+      )}
     </section>
   );
 }

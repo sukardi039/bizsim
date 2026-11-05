@@ -687,6 +687,14 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     @Test
     void three_months_in_sequence_accumulate_state_without_drift() throws Exception {
+        // This test guards the BASE economy, so it plays a calm one: the event deck is drawn once per
+        // run from the run's id (D18), and a cost shock (x1.12 for two months) can legitimately turn a
+        // thin but healthy month into a small loss -- a fixed cash threshold would then depend on how
+        // many runs earlier test classes happened to create. The deck's own behaviour is covered by
+        // EnvironmentTest. The schedule is written when the run is created, so clearing it here is the
+        // whole mute.
+        jdbc.update("delete from run_environment_event where run_id = ?", runId);
+
         // RND-P1-COST costs 300M over 3 months: 100M a month must complete it exactly at month 3.
         openRound();
         for (int month = 1; month <= 3; month++) {

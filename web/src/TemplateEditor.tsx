@@ -32,6 +32,8 @@ const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
   { field: "minRndBenefitRatio", kind: "decimal" },
   { field: "cycleDemandDrift", kind: "decimal" },
   { field: "cycleCostDrift", kind: "decimal" },
+  // D15: the price of one quality point, when the switch below is on.
+  { field: "qualityCostPerPoint", kind: "money" },
 ];
 
 /** Per-function numbers: salaries and starting headcount. Four functions, same keys in every template. */
@@ -52,6 +54,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     "settings" | "environment" | "events" | "products" | "channels" | "projects"
   >("settings");
   const [settings, setSettings] = useState<Record<string, string>>({});
+  /** D15: a mechanic is a switch on the template, not a code path every class must live with. */
+  const [qualityOn, setQualityOn] = useState(false);
   const [rounds, setRounds] = useState<TemplateRound[]>([]);
   const [products, setProducts] = useState<TemplateProduct[]>([]);
   const [channels, setChannels] = useState<TemplateChannel[]>([]);
@@ -70,7 +74,10 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
       const value = next.settings[field];
       if (value !== undefined && value !== null) flat[field] = String(value);
     }
+    // Show the loader's default rate so the builder sees what "on" would cost per point.
+    if (flat.qualityCostPerPoint === undefined) flat.qualityCostPerPoint = "60000000";
     setSettings(flat);
+    setQualityOn(Boolean(next.settings.qualityUpgrade));
     const pay = (next.settings.salaries ?? {}) as Record<string, number>;
     const headcount = (next.settings.startingStaff ?? {}) as Record<string, number>;
     setSalaries(Object.fromEntries(FUNCTIONS.map((f) => [f, String(pay[f] ?? "")])));
@@ -109,6 +116,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
         if (raw === undefined || raw === "") continue;
         payload[field] = kind === "int" ? Number.parseInt(raw, 10) : Number(raw);
       }
+      payload.qualityUpgrade = qualityOn;
       // The per-function maps go in as objects; a blank cell is simply not sent, so the stored value
       // survives rather than being zeroed by a form the builder never touched.
       const payMap: Record<string, number> = {};
@@ -261,6 +269,16 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 </label>
               ))}
             </div>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={qualityOn}
+                disabled={locked}
+                onChange={(e) => setQualityOn(e.target.checked)}
+              />
+              {t("editor.qualityUpgrade")}
+            </label>
+            <p className="muted">{t("editor.qualityHint")}</p>
             <h3 className="pick-head">{t("editor.perFunction")}</h3>
             <table>
               <thead>
