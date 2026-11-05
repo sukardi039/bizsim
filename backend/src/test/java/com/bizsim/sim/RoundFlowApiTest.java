@@ -817,7 +817,12 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat(roundNine).isEqualByComparingTo("1.040");
 
         // Past the eight-round default: every round must still open, and the thirteenth must not.
-        for (int i = 1; i <= 12; i++) {
+        // D57: each later round needs the previous one computed first.
+        mvc.perform(post("/api/runs/" + newRun + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        for (int i = 2; i <= 12; i++) {
+            mvc.perform(post("/api/runs/" + newRun + "/rounds/close")
+                    .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
             mvc.perform(post("/api/runs/" + newRun + "/rounds/next")
                     .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
         }
@@ -871,7 +876,10 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     // ------------------------------------------------------------------ helpers
 
+    /** What the console does between rounds: compute the open one, then open the next (D57). */
     private void advance() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
         mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                 .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
     }

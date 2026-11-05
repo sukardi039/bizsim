@@ -519,7 +519,8 @@ accounts are never rewritten by this; remove the variables once you have signed 
 **On the day (facilitator)**
 
 5. Sign in → **Sessions** → **Start a session** → pick the package → tick trainees → **Start session**.
-6. **Open next round** → trainees decide and submit → **Compute round**.
+6. **Open next round** → trainees decide and submit → **Compute round**. *Open next round* only opens;
+   if a round is still open it refuses and tells you to compute first.
 7. Repeat for each round; watch the **Live** feed.
 8. **Debrief** → pick the round → walk the class through revenue, cost and profit, expand **Detail**.
 

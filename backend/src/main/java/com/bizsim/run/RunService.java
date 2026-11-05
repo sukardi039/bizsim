@@ -319,11 +319,16 @@ public class RunService {
                     "rounds", maxRounds);
         }
 
-        // Advancing closes whatever is open and computes it. Closing an already-computed round is a
-        // no-op by design, so a facilitator who clicks twice does not get two rounds of results.
-        // D56: "open next round" computes the previous one, so opponents get their turn first.
-        bots.decideBeforeClose(tenantId, runId);
-        rounds.closeAndCompute(tenantId, runId);
+        // D57: opening the next round never computes the previous one. A facilitator who presses it
+        // while a round is open is told to compute first — a silent compute here would publish results
+        // the class never saw being closed, and would make the "compute" action two different things
+        // depending on which button was pressed.
+        Optional<Integer> stillOpen = runs.openRoundNumber(runId);
+        if (stillOpen.isPresent()) {
+            throw ProblemException.conflict("round.still_open",
+                    "round " + stillOpen.get() + " is still open: compute it, then open the next one",
+                    "round", stillOpen.get());
+        }
         rounds.openRound(runId, next);
         runs.setCurrentRound(runId, next);
 

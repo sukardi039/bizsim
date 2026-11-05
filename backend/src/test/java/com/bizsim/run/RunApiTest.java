@@ -149,7 +149,7 @@ class RunApiTest extends PostgresTestBase {
     }
 
     @Test
-    void advancing_closes_the_previous_round_and_opens_the_next() throws Exception {
+    void advancing_opens_the_next_round_and_refuses_while_one_is_open() throws Exception {
         long runId = createRun(acmeFacilitator);
 
         // D38: the console shows one button, so the run itself has to say whether a round is open.
@@ -166,6 +166,12 @@ class RunApiTest extends PostgresTestBase {
         mvc.perform(get("/api/runs/" + runId).header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(jsonPath("$.currentRound").value(1))
                 .andExpect(jsonPath("$.roundOpen").value(true));
+
+        // D57: "open next round" never computes. While round 1 is open it refuses and says which.
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("round.still_open"));
 
         // Computing the round leaves it closed and no round open: the button flips to "open round 2".
         mvc.perform(post("/api/runs/" + runId + "/rounds/close")
@@ -195,7 +201,14 @@ class RunApiTest extends PostgresTestBase {
         int rounds = jdbc.queryForObject(
                 "select (definition->>'rounds')::int from scenario where key = 'standard-v1'",
                 Integer.class);
-        for (int i = 1; i <= rounds; i++) {
+        // Round 1 is opened, then each later round needs the previous one computed first (D57).
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+        for (int i = 2; i <= rounds; i++) {
+            mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                            .header("Authorization", "Bearer " + facilitatorToken))
+                    .andExpect(status().isOk());
             mvc.perform(post("/api/runs/" + runId + "/rounds/next")
                             .header("Authorization", "Bearer " + facilitatorToken))
                     .andExpect(status().isOk());
