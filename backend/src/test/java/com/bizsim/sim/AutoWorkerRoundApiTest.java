@@ -203,6 +203,12 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                 .doesNotContain("stock").doesNotContain("share");
         assertThat(body).contains("\"own\":true");
 
+        // The facilitator reads the same table: it is a view of the round, not a trainee privilege.
+        mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
         // A trainee who is not seated in this session sees no table at all.
         user("stranger@acme.test", "PLAYER");
         mvc.perform(get("/api/runs/" + runId + "/standings")
