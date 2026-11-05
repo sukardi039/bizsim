@@ -64,6 +64,9 @@ public class PackageController {
     /** Publishing is a builder's act. A facilitator consumes packages; they do not mint them. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    // One unit of work: the frozen copy, the package row and the frozen mark either all exist or none
+    // does. Without this the repository calls commit one by one and a later failure orphans a copy.
+    @org.springframework.transaction.annotation.Transactional
     public PackageRepository.PackageRow publish(@RequestBody PublishRequest request) {
         TenantContext.Principal me = requireBuilder();
         if (request == null || request.name() == null || request.name().isBlank()) {
@@ -88,11 +91,6 @@ public class PackageController {
                             "no such company profile in this tenant"));
         }
 
-        // Freeze first: the package must point at a row that nothing can edit afterwards. The draft
-        // stays a working document; this copy is what the class will actually play.
-        String frozenKey = frozenKey(me.tenantCode());
-        templates.freeze(template.key(), me.tenantId(), frozenKey,
-                request.name().trim() + " (v" + template.version() + ")");
         List<Long> seats = request.traineeIds() == null ? List.of() : request.traineeIds();
         if (!seats.isEmpty() && seats.size() != profileIds.size()) {
             throw ProblemException.badRequest("package.seats_mismatch",
@@ -121,6 +119,14 @@ public class PackageController {
                     "the class language must be en or zh", "field", "locale");
         }
 
+
+        // Freeze last, once nothing can refuse: a frozen copy is a row in `scenario`, and a publish
+        // that failed after freezing used to leave one behind — visible in the template library and
+        // attached to no package (D54). The draft stays a working document; this copy is what the
+        // class will actually play.
+        String frozenKey = frozenKey(me.tenantCode());
+        templates.freeze(template.key(), me.tenantId(), frozenKey,
+                request.name().trim() + " (v" + template.version() + ")");
         long id = packages.insert(me.tenantId(), request.name().trim(), frozenKey, template.key(),
                 template.version(), profileIds, seats, locale, me.userId());
         templates.markFrozen(frozenKey, id);

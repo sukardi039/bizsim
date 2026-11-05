@@ -151,6 +151,31 @@ class PackageApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_publish_that_is_refused_leaves_no_template_behind() throws Exception {
+        int before = jdbc.queryForObject("select count(*) from scenario", Integer.class);
+        long beta = jdbc.queryForObject("""
+                insert into company_profile (tenant_id, name, company_name, products)
+                values (?, 'Beta Corp', 'Beta Corp', '[]'::jsonb) returning id
+                """, Long.class, acme);
+
+        // Two companies, one seat: refused after the point where the old code had already frozen a
+        // template copy, which then showed up in the template library attached to nothing (D54).
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Broken", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId, beta),
+                                "traineeIds", List.of(1L)))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.seats_mismatch"));
+
+        assertThat(jdbc.queryForObject("select count(*) from scenario", Integer.class)).isEqualTo(before);
+        assertThat(jdbc.queryForList("select key from scenario where key like 'pkg-%'", String.class))
+                .isEmpty();
+    }
+
+    @Test
     void the_class_list_is_prepared_with_the_package() throws Exception {
         long beta = jdbc.queryForObject("""
                 insert into company_profile (tenant_id, name, company_name, products)
