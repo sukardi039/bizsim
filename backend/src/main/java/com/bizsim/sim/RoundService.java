@@ -389,6 +389,32 @@ public class RoundService {
         return rounds.scoreboard(runId, round);
     }
 
+    /**
+     * The standings a trainee may read (D51): rank, company, this round's profit. Staff see the same
+     * table; a person who is not seated in the session sees nothing at all.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> standings(long tenantId, long userId, String role, long runId,
+                                               Integer round) {
+        runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        boolean staff = List.of("FACILITATOR", "ADMIN", "BUILDER").contains(role);
+        if (!staff && !rounds.userInRun(userId, runId)) {
+            throw ProblemException.forbidden("team.not_yours", "you are not seated in this session");
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> row : rounds.standings(runId, round)) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("rank", ((Number) row.get("rank")).intValue());
+            view.put("teamId", ((Number) row.get("team_id")).longValue());
+            view.put("company", row.get("company_name"));
+            view.put("profit", row.get("profit"));
+            view.put("own", rounds.userOwnsTeam(userId, ((Number) row.get("team_id")).longValue()));
+            rows.add(view);
+        }
+        return rows;
+    }
+
     @Transactional(readOnly = true)
     public List<Map<String, Object>> statements(long tenantId, long userId, String role,
                                              long runId, long teamId) {

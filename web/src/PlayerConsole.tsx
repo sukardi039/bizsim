@@ -10,6 +10,7 @@ import {
   type DecisionInput,
   type MarketForecast,
   type Run,
+  type StandingsRow,
   type StatementRow,
   type Team,
 } from "./api";
@@ -133,6 +134,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const [report, setReport] = useState<{ forecast: MarketForecast[] } | null>(null);
   /** The trainee's own computed rounds: same statements the facilitator's debrief reads. */
   const [statements, setStatements] = useState<StatementRow[]>([]);
+  /** The class table: rank, company and profit — the only competitor figures a trainee may see (D51). */
+  const [standings, setStandings] = useState<StandingsRow[]>([]);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
   const [resultRound, setResultRound] = useState<number | null>(null);
   const roundRef = useRef<number | null>(null);
@@ -169,6 +172,11 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       } catch {
         // Results are a convenience: a trainee must still be able to decide if this call fails.
         setStatements([]);
+      }
+      try {
+        setStandings(await api.standings(active.id));
+      } catch {
+        setStandings([]);
       }
       // A new round must reset the form; a poll inside the same round must not wipe edits.
       if (roundRef.current !== next.round) {
@@ -311,6 +319,30 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {/* No round dropdown: the summary rows below are the selector (click a round to open it). */}
         <h2>{t("player.results")}</h2>
         <p className="muted">{t("player.resultsHint")}</p>
+        {standings.length > 0 && (
+          <>
+            <h3>{t("player.standings")}</h3>
+            <p className="muted">{t("player.standingsHint")}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th className="num">{t("player.rank")}</th>
+                  <th>{t("debrief.company")}</th>
+                  <th className="num">{t("debrief.profit")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {standings.map((row) => (
+                  <tr key={row.teamId} className={row.own ? "own-row" : undefined}>
+                    <td className="num">{row.rank}</td>
+                    <td>{row.company}</td>
+                    <td className="num">{money(Number(row.profit ?? 0))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
         <div className="buttons">
           <button onClick={() => void download("pdf")} disabled={downloading !== null}>
             {downloading === "pdf" ? t("debrief.exporting") : t("player.downloadPdf")}

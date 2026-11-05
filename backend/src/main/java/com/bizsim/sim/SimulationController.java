@@ -71,6 +71,17 @@ public class SimulationController {
         return rounds.scoreboard(me.tenantId(), runId, round);
     }
 
+    /**
+     * The standings a trainee may read (D51): rank, company, this round's profit. Anything wider —
+     * share, cash, stock, another company's statement — stays on the facilitator's screen.
+     */
+    @GetMapping("/standings")
+    public List<Map<String, Object>> standings(@PathVariable long runId,
+                                               @RequestParam(required = false) Integer round) {
+        TenantContext.Principal me = TenantContext.require();
+        return rounds.standings(me.tenantId(), me.userId(), me.role(), runId, round);
+    }
+
     /** Facilitator power "close a round" without opening the next one (D12). */
     @PostMapping("/rounds/close")
     public ResponseEntity<ScoringEngine.RoundResult> close(@PathVariable long runId) {

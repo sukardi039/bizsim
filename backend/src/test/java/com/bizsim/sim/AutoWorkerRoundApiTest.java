@@ -159,6 +159,58 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_trainee_sees_the_class_ranked_by_profit_and_nothing_more() throws Exception {
+        long playerTeam = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        seat(playerTeam, otherPlayer("one@acme.test"));
+
+        openRound();
+        mvc.perform(post("/api/runs/" + runId + "/bots/decide")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        // The person submits too, so the table has two real rows.
+        mvc.perform(post("/api/runs/" + runId + "/teams/" + playerTeam + "/decisions")
+                        .header("Authorization", "Bearer " + login("one@acme.test"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "production", List.of(
+                                        Map.of("product", "P1", "units", 600),
+                                        Map.of("product", "P2", "units", 150),
+                                        Map.of("product", "P3", "units", 30)),
+                                "price", List.of(
+                                        Map.of("product", "P1", "unitPrice", 1_000_000),
+                                        Map.of("product", "P2", "unitPrice", 2_500_000),
+                                        Map.of("product", "P3", "unitPrice", 5_000_000)),
+                                "marketing", List.of(Map.of("channel", "DIGITAL", "spend", 1_000_000)),
+                                "manpower", Map.of("production", 30),
+                                "capacityPurchase", 0,
+                                "marketReport", false))))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + login("one@acme.test")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].rank").value(1))
+                .andExpect(jsonPath("$[0].company").isString())
+                .andExpect(jsonPath("$[0].profit").isNumber())
+                .andReturn();
+
+        // D21 stays true for everything else: no share, no cash, no statement in the payload.
+        String body = result.getResponse().getContentAsString();
+        assertThat(body).doesNotContain("marketShare").doesNotContain("cash")
+                .doesNotContain("stock").doesNotContain("share");
+        assertThat(body).contains("\"own\":true");
+
+        // A trainee who is not seated in this session sees no table at all.
+        user("stranger@acme.test", "PLAYER");
+        mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + login("stranger@acme.test")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void a_template_without_the_switch_cannot_acquire_an_opponent() throws Exception {
         setAutoWorkers(false);
         // One facilitator may hold only one session in progress, so this needs a second one.
@@ -215,6 +267,19 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                 insert into app_user (tenant_id, email, password_hash, display_name, role)
                 values (?, ?, ?, ?, ?)
                 """, tenantId, email, encoder.encode("pw-" + email), email, role);
+    }
+
+    private long otherPlayer(String email) {
+        if (!tableHas(email)) {
+            user(email, "PLAYER");
+        }
+        return idOf(email);
+    }
+
+    private boolean tableHas(String email) {
+        Integer count = jdbc.queryForObject("select count(*) from app_user where email = ?",
+                Integer.class, email);
+        return count != null && count > 0;
     }
 
     private long idOf(String email) {

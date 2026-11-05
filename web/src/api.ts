@@ -485,6 +485,15 @@ export interface BotRow {
   userId: number | null;
 }
 
+/** A row of the class table a trainee may see (D51): rank, company, this round's profit. */
+export interface StandingsRow {
+  rank: number;
+  teamId: number;
+  company: string;
+  profit: number;
+  own: boolean;
+}
+
 export interface BotTraceRow {
   round: number;
   teamId: number;
@@ -595,6 +604,8 @@ export const api = {
   retireBot: (id: number) => request<unknown>(`/bots/${id}/retire`, { method: "POST" }),
   /** What the opponents did: profile version, how they were called, and the one-line reason. */
   botTrace: (runId: number) => request<BotTraceRow[]>(`/runs/${runId}/bots`),
+  standings: (runId: number, round?: number) =>
+    request<StandingsRow[]>(`/runs/${runId}/standings${round ? `?round=${round}` : ""}`),
   askBots: (runId: number) =>
     request<{ decided: number }>(`/runs/${runId}/bots/decide`, { method: "POST" }),
   replayBot: (runId: number, teamId: number, round: number) =>

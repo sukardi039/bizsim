@@ -406,7 +406,10 @@ package's class list and publishes a new package; the facilitator cannot seat yo
    **Competitors' figures and the market share stay on the facilitator's screen**; the trainee sees
    only their own company. Everything comes from the same statement rows the debrief reads.
 
-6. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
+6. **Class standings** — above your results, when at least one round has been computed: rank,
+   company and that round's profit for every company in the class, with your own line highlighted.
+   That is all a trainee sees of anyone else — no market share, no cash, no statements.
+7. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
    round**: that month's summary, then what they sent, then the cost lines — their company only, no
    market share, no competitor line. A trainee who has not been seated in the session gets a
    refusal, not an empty file.

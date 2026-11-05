@@ -507,6 +507,38 @@ public class RoundRepository {
 
     // ------------------------------------------------------------------ reading results
 
+    /**
+     * The class as a table a trainee may see (D51): rank, company and this round's profit — and
+     * nothing else. Deliberately its own query rather than a projection of the scoreboard, so widening
+     * this view later is a decision, not an accident.
+     */
+    public List<Map<String, Object>> standings(long runId, Integer round) {
+        return jdbc.queryForList("""
+                with latest as (
+                    select coalesce(?::int, (select max(number) from round
+                                             where run_id = ? and status = 'COMPUTED')) as number
+                )
+                select row_number() over (order by (rr.score->>'profit')::numeric desc, t.id) as rank,
+                       rr.team_id, t.company_name,
+                       (rr.score->>'profit')::numeric as profit
+                from round r
+                join latest on latest.number = r.number
+                join round_result rr on rr.round_id = r.id
+                join team t on t.id = rr.team_id
+                where r.run_id = ? and r.status = 'COMPUTED'
+                order by rank
+                """, round, runId, runId);
+    }
+
+    /** Is this person seated in this session at all? The gate on anything a trainee may read. */
+    public boolean userInRun(long userId, long runId) {
+        Boolean seated = jdbc.queryForObject("""
+                select exists (select 1 from player p join team t on t.id = p.team_id
+                               where p.user_id = ? and t.run_id = ?)
+                """, Boolean.class, userId, runId);
+        return Boolean.TRUE.equals(seated);
+    }
+
     public List<Map<String, Object>> scoreboard(long runId, Integer round) {
         // Columns are extracted from the jsonb on purpose: returning a raw jsonb to Jackson yields a
         // PGobject, and the scoreboard contract should be stable fields, not whatever is in the blob.

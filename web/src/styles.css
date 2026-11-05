@@ -341,3 +341,6 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 /* Inside the submissions table the same block is a preview, not a section: tighter and quieter. */
 .submission.compact { font-size: .84rem; }
 .submission.compact table { margin: .2rem 0 .3rem; }
+
+/* The trainee's own line in the class standings (D51). */
+.own-row td { font-weight: 600; background: rgba(255, 255, 255, 0.04); }
