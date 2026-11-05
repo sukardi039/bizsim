@@ -1,15 +1,26 @@
 import { useI18n } from "./i18n";
-import type { StatementRow } from "./api";
+import type { DecisionInput, StatementRow } from "./api";
+import DecisionSummary from "./DecisionSummary";
 
 /**
- * One company's round, grouped as Revenue · Cost · Result.
+ * One company's round, grouped as Submission · Revenue · Cost · Result.
  *
  * Shared by the facilitator's debrief and the trainee's own results, so a trainee reading their round
  * sees exactly the figures the class debrief shows for that company — same source (`round_statement`),
  * same layout. The only thing the caller may add is the market share, which is competition data and
- * belongs to the facilitator's screen.
+ * belongs to the facilitator's screen, and the stored decision, which the facilitator's screen also
+ * carries (D42): what the company sent is the first half of "why did this happen".
  */
-export default function StatementDetail({ row, share }: { row: StatementRow; share?: number }) {
+export default function StatementDetail({
+  row,
+  share,
+  decision,
+}: {
+  row: StatementRow;
+  share?: number;
+  /** The month the company sent, when the caller has it. Omitted by the trainee's own view. */
+  decision?: DecisionInput | null;
+}) {
   const { t, money, number } = useI18n();
 
   const lines = [
@@ -45,6 +56,13 @@ export default function StatementDetail({ row, share }: { row: StatementRow; sha
 
   return (
     <>
+      {decision !== undefined && (
+        <section className="detail-section">
+          <h4>{t("submission.title", { round: row.round })}</h4>
+          <DecisionSummary decision={decision} />
+        </section>
+      )}
+
       <div className="detail-grid">
       <div>
         <h4>{t("debrief.groupRevenue")}</h4>

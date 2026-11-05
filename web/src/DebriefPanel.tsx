@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, downloadDebrief, type RunPlayer, type ScoreRow, type StatementRow, type Team } from "./api";
+import {
+  api,
+  downloadDebrief,
+  type DecisionInput,
+  type RunPlayer,
+  type ScoreRow,
+  type StatementRow,
+  type Team,
+} from "./api";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import DebriefSlides from "./DebriefSlides";
@@ -30,6 +38,8 @@ export default function DebriefPanel({
   const [round, setRound] = useState(Math.max(1, currentRound || 1));
   const [board, setBoard] = useState<ScoreRow[]>([]);
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
+  /** What each company sent for the selected round, so the detail can show cause before result (D42). */
+  const [decisions, setDecisions] = useState<Record<number, DecisionInput | null>>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [slides, setSlides] = useState(false);
@@ -44,6 +54,16 @@ export default function DebriefPanel({
         rows.map(async (row) => [row.team_id, await api.statements(runId, row.team_id)] as const),
       );
       setStatements(Object.fromEntries(perTeam));
+      // A separate call on purpose: the statements are the result and must still render if the
+      // decisions cannot be read.
+      try {
+        const submissions = await api.submissions(runId, round);
+        setDecisions(
+          Object.fromEntries(submissions.companies.map((entry) => [entry.teamId, entry.decision])),
+        );
+      } catch {
+        setDecisions({});
+      }
     } catch (error) {
       setProblem(describeError(error, t));
       setBoard([]);
@@ -216,7 +236,13 @@ export default function DebriefPanel({
                         if (!statement) {
                           return <p className="muted">{t("debrief.noStatement")}</p>;
                         }
-                        return <StatementDetail row={statement} share={row.market_share} />;
+                        return (
+                          <StatementDetail
+                            row={statement}
+                            share={row.market_share}
+                            decision={decisions[row.team_id]}
+                          />
+                        );
                       })()}
                     </td>
                   </tr>

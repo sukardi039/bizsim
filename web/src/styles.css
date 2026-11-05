@@ -332,3 +332,12 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   .slides-nav, .slides-foot { display: none; }
   .kpi-grid dt { color: #555; }
 }
+
+/* ---------------------------------------------------------------- submission in the detail (D42) */
+.detail-section { margin-bottom: .8rem; }
+.detail-section > h4 { margin: .1rem 0 .35rem; }
+.submission table { margin: .15rem 0 .45rem; }
+.submission .lines > div { padding: .12rem 0; }
+/* Inside the submissions table the same block is a preview, not a section: tighter and quieter. */
+.submission.compact { font-size: .84rem; }
+.submission.compact table { margin: .2rem 0 .3rem; }

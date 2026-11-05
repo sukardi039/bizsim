@@ -284,7 +284,11 @@ Under the scoreboard, for any computed round:
 
 1. Pick the **Round** in the selector.
 2. Read across: revenue, cost, profit, cash, share, lost sales, capacity used/available.
-3. **Detail** on a company expands a three-column breakdown, so the arithmetic reads left to right:
+3. **Detail** on a company expands its month, in reading order:
+   - **Submission · round N** — what the company asked for: units, price and quality spend per
+     product, marketing per channel, R&D per project, production staff and machines, and whether the
+     market review was bought. A company that sent nothing says so.
+   - then a three-column breakdown, so the arithmetic reads left to right:
    - **Revenue** — revenue for the round, and units lost to stock-outs
    - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
      hiring/firing, capacity, market review, then **Total cost**

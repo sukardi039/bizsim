@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
 import { api, type AuditRow, type Run, type SubmissionRow } from "./api";
+import DecisionSummary from "./DecisionSummary";
 
 /**
  * The four facilitator powers of D12/Q-G, on the run page:
@@ -200,7 +201,7 @@ export default function SessionTools({
                     {row.decision ? (
                       <details>
                         <summary>{t("tools.showDecision")}</summary>
-                        <DecisionSummary decision={row.decision} t={t} />
+                        <DecisionSummary decision={row.decision} compact />
                       </details>
                     ) : (
                       <span className="muted">—</span>
@@ -286,57 +287,6 @@ export default function SessionTools({
         )}
       </section>
     </>
-  );
-}
-
-/** What one company sent, in the same shape the form uses — readable without opening the form. */
-function DecisionSummary({
-  decision,
-  t,
-}: {
-  decision: NonNullable<SubmissionRow["decision"]>;
-  t: (key: string, params?: Record<string, string | number>) => string;
-}) {
-  const marketing = (decision.marketing ?? []).filter((row) => Number(row.spend) > 0);
-  const rnd = (decision.rnd ?? []).filter((row) => Number(row.invest) > 0);
-  const quality = (decision.quality ?? []).filter((row) => Number(row.invest) > 0);
-  return (
-    <ul className="decision-summary">
-      {(decision.production ?? []).map((row) => (
-        <li key={`p-${row.product}`}>
-          <strong>{row.product}</strong>{" "}
-          {t("tools.lineUnits", {
-            units: row.units,
-            price:
-              (decision.price ?? []).find((p) => p.product === row.product)?.unitPrice ?? "—",
-          })}
-        </li>
-      ))}
-      {marketing.length > 0 && (
-        <li>
-          {t("tools.lineMarketing")}:{" "}
-          {marketing.map((row) => `${row.channel} ${moneyText(Number(row.spend))}`).join(" · ")}
-        </li>
-      )}
-      {rnd.length > 0 && (
-        <li>
-          {t("tools.lineRnd")}:{" "}
-          {rnd.map((row) => `${row.project} ${moneyText(Number(row.invest))}`).join(" · ")}
-        </li>
-      )}
-      {quality.length > 0 && (
-        <li>
-          {t("tools.lineQuality")}:{" "}
-          {quality.map((row) => `${row.product} ${moneyText(Number(row.invest))}`).join(" · ")}
-        </li>
-      )}
-      <li>
-        {t("tools.lineStaff", {
-          staff: decision.manpower?.production ?? 0,
-          capacity: moneyText(Number(decision.capacityPurchase ?? 0)),
-        })}
-      </li>
-    </ul>
   );
 }
 
