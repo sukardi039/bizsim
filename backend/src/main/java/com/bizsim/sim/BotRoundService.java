@@ -55,9 +55,14 @@ public class BotRoundService {
     /** Every five seconds: whoever is due to move, moves. Failures are logged per seat. */
     @Scheduled(fixedDelay = 5000L, initialDelay = 20_000L)
     public void tick() {
+        Map<String, Integer> minutesByTemplate = new java.util.HashMap<>();
         for (BotRepository.Due due : bots.due(null, null)) {
             try {
-                if (Instant.now().isBefore(submitAt(due))) {
+                int minutes = minutesByTemplate.computeIfAbsent(due.scenarioKey(),
+                        key -> scenarios.load(key).params().roundMinutes());
+                // The window is a share of the real round length: a template with five-minute rounds
+                // must not have its opponents submitting after the round has already closed.
+                if (Instant.now().isBefore(submitAt(due, minutes))) {
                     continue;
                 }
                 decideOne(due, "SCHEDULED");
@@ -170,11 +175,11 @@ public class BotRoundService {
     }
 
     /** Seeded submit time: 20–70% into the round, so the class cannot read the opponent early. */
-    private Instant submitAt(BotRepository.Due due) {
+    private Instant submitAt(BotRepository.Due due, int roundMinutes) {
         if (due.openedAt() == null) {
             return Instant.now();
         }
-        int minutes = due.roundMinutes() == null || due.roundMinutes() <= 0 ? 20 : due.roundMinutes();
+        int minutes = roundMinutes <= 0 ? 20 : roundMinutes;
         BigDecimal fraction = new BigDecimal("0.2").add(Seed.uniform(
                 due.runId() + ":bot-at:" + due.roundNumber() + ":" + due.teamId())
                 .multiply(new BigDecimal("0.5")));

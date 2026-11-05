@@ -382,6 +382,10 @@ A feed of what has happened in the session (`round.opened`, `decision.submitted`
 If you see **"No simulation yet"**, you are not on any class list: the builder seats you in the
 package's class list and publishes a new package; the facilitator cannot seat you during a session.
 
+The **round clock** is on your screen while a round is open: *12:34 left in this round*, turning red
+under a minute, and *Paused at 12:34* while your facilitator has stopped time. It counts down on its
+own — you do not need to reload.
+
 | What it means | Who fixes it |
 |---|---|
 | you are not seated in any session | builder: seat you in the package class list (People → then Packages) |

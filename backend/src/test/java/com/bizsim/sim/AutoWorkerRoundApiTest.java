@@ -37,6 +37,8 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     private JdbcTemplate jdbc;
     @Autowired
     private ObjectMapper json;
+    @Autowired
+    private BotRoundService botRound;
 
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
@@ -156,6 +158,24 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of("tenantCode", "acme",
                                 "email", "market-1-high@bots.invalid", "password", "x"))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void the_worker_submits_by_itself_without_the_facilitator() throws Exception {
+        openRound();
+        // Move the clock as if the seeded moment inside the round had passed: the sweep, not a button,
+        // must be what makes the opponent play.
+        jdbc.update("update round set opened_at = now() - interval '3 hours' where run_id = ?", runId);
+
+        botRound.tick();
+
+        Integer submitted = jdbc.queryForObject("""
+                select count(*) from decision d join round r on r.id = d.round_id
+                where r.run_id = ? and d.team_id = ?
+                """, Integer.class, runId, botTeamId);
+        assertThat(submitted).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select mode from bot_decision where team_id = ?",
+                String.class, botTeamId)).isEqualTo("SCHEDULED");
     }
 
     @Test

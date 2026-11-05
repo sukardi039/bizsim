@@ -344,3 +344,7 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 
 /* The trainee's own line in the class standings (D51). */
 .own-row td { font-weight: 600; background: rgba(255, 255, 255, 0.04); }
+
+/* The round countdown, on both consoles (D53). */
+.clock-badge { margin: .25rem 0 .5rem; font-variant-numeric: tabular-nums; }
+.clock-badge.negative { color: #ff8a8a; font-weight: 600; }

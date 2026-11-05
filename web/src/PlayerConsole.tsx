@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
+import ClockBadge from "./ClockBadge";
 import {
   api,
   ApiError,
@@ -416,6 +417,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {signOut}
         <div className="card">
           <h2>{team.companyName}</h2>
+          <ClockBadge run={run} />
           <p className="muted">
             {run.currentRound === 0 ? t("player.waitingRound1") : t("player.loadingForm")}
           </p>
@@ -434,6 +436,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {signOut}
         <div className="card">
           <h2>{team.companyName}</h2>
+          <ClockBadge run={run} />
           <p className="muted">
             {finished
               ? t("player.sessionFinished")
@@ -472,6 +475,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
               {t("player.round", { round: context.round, total: run.rounds })} · {context.market.outlook} ·{" "}
               {context.market.trendLabel}
             </p>
+            <ClockBadge run={run} />
           </div>
           <div className="stats">
             <span>
