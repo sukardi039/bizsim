@@ -174,10 +174,14 @@ public class RunService {
             if (traineeId == null) {
                 continue; // a company left open for a walk-in
             }
+            // A seat holds a person or an opponent (D47/D54a); staff run the class, they do not
+            // compete in it, so they are refused here rather than seated by accident.
             users.findInTenant(tenantId, traineeId)
-                    .filter(user -> "PLAYER".equals(user.role()) && user.active())
+                    .filter(user -> List.of("PLAYER", "AUTO_WORKER").contains(user.role())
+                            && user.active())
                     .orElseThrow(() -> ProblemException.badRequest("user.not_found",
-                            "no active trainee with id " + traineeId + " in this tenant"));
+                            "no active trainee or auto worker with id " + traineeId
+                                    + " in this tenant"));
         }
 
         List<TeamSpec> teams = new ArrayList<>();

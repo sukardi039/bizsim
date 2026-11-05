@@ -54,9 +54,14 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     void seed() throws Exception {
         for (String table : List.of("bot_decision", "facilitator_action", "round_snapshot",
                 "round_statement", "round_result", "decision", "round", "player", "company_product",
-                "company_staff", "company_rnd", "team", "run", "simulation")) {
+                "company_staff", "company_rnd", "team", "run", "simulation", "simulation_package_seat",
+                "company_profile")) {
             jdbc.update("delete from " + table);
         }
+        // scenario <-> package is a two-way reference: break it, then remove both sides.
+        jdbc.update("update scenario set frozen_for_package = null where frozen_for_package is not null");
+        jdbc.update("delete from simulation_package");
+        jdbc.update("delete from scenario where key like 'pkg-%'");
         jdbc.update("update app_user set bot_profile_id = null");
         jdbc.update("delete from bot_profile");
         jdbc.update("delete from app_user");
@@ -158,6 +163,60 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of("tenantCode", "acme",
                                 "email", "market-1-high@bots.invalid", "password", "x"))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void a_package_can_seat_an_opponent_beside_a_person() throws Exception {
+        long alpha = profile("Alpha");
+        long market = profile("Market 1_high");
+
+        MvcResult published = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "With an opponent", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(alpha, market),
+                                "traineeIds", java.util.Arrays.asList(null, botUserId)))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.seats.length()").value(1))
+                .andExpect(jsonPath("$.seats[0].position").value(1))
+                .andReturn();
+        long packageId = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
+
+        // The session started from that package seats the opponent like anyone else. A facilitator
+        // may hold only one session in progress, and the seed already has one.
+        user("trainer3@acme.test", "FACILITATOR");
+        String thirdFacilitator = login("trainer3@acme.test");
+        MvcResult session = mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + thirdFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Autumn")))
+                ).andExpect(status().isCreated()).andReturn();
+        long newRun = json.readTree(session.getResponse().getContentAsString()).get("id").asLong();
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from player where run_id = ? and bot_profile_id is not null",
+                Integer.class, newRun)).isEqualTo(1);
+    }
+
+    @Test
+    void an_opponent_cannot_be_seated_by_a_template_that_does_not_offer_them() throws Exception {
+        setAutoWorkers(false);
+        int before = jdbc.queryForObject("select count(*) from scenario", Integer.class);
+        long alpha = profile("Alpha");
+        long market = profile("Market 1_high");
+
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "No opponents", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(alpha, market),
+                                "traineeIds", java.util.Arrays.asList(null, botUserId)))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("bot.switch_off"));
+
+        assertThat(jdbc.queryForObject("select count(*) from scenario", Integer.class)).isEqualTo(before);
     }
 
     @Test
@@ -297,6 +356,13 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private long profile(String companyName) {
+        return jdbc.queryForObject("""
+                insert into company_profile (tenant_id, name, company_name, products)
+                values (?, ?, ?, '[]'::jsonb) returning id
+                """, Long.class, tenantId, companyName, companyName);
+    }
 
     private void setAutoWorkers(boolean on) {
         jdbc.update("update scenario set definition = jsonb_set(definition, '{autoWorkers}', ?::jsonb) "

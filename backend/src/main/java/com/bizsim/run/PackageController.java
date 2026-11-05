@@ -97,6 +97,7 @@ public class PackageController {
                     "give one trainee per company, or none", "companies", profileIds.size(),
                     "trainees", seats.size());
         }
+        boolean seatsOpponent = false;
         java.util.Set<Long> seen = new java.util.HashSet<>();
         for (Long traineeId : seats) {
             if (traineeId == null) {
@@ -107,7 +108,17 @@ public class PackageController {
                         "the same person cannot sit in two companies of one package",
                         "userId", traineeId);
             }
-            profilesOf(me.tenantId(), traineeId);
+            if ("AUTO_WORKER".equals(seatable(me.tenantId(), traineeId).role())) {
+                seatsOpponent = true;
+            }
+        }
+
+        // D48: an opponent is a template mechanic. A package built from a template that never turned it
+        // on must not quietly acquire one, so this refuses before the freeze rather than at round close.
+        if (seatsOpponent && !templates.load(template.key()).params().autoWorkers()) {
+            throw ProblemException.conflict("bot.switch_off",
+                    "this template does not offer auto workers; enable the switch on the template and "
+                            + "publish again", "template", template.key());
         }
 
         // The class language travels with the package: a trainee seated from it reads the interface in
@@ -193,11 +204,23 @@ public class PackageController {
 
     private final com.bizsim.user.UserRepository users;
 
-    private void profilesOf(long tenantId, long userId) {
-        users.findInTenant(tenantId, userId)
-                .filter(user -> "PLAYER".equals(user.role()) && user.active())
+    /**
+     * A seat holds a person or an opponent (D47/D54a). An auto worker is a seatable identity with a
+     * brain attached; anything else — staff — is refused, because staff run the class, they do not
+     * compete in it.
+     */
+    private com.bizsim.user.UserRepository.AppUser seatable(long tenantId, long userId) {
+        com.bizsim.user.UserRepository.AppUser user = users.findInTenant(tenantId, userId)
+                .filter(candidate -> java.util.List.of("PLAYER", "AUTO_WORKER")
+                        .contains(candidate.role()) && candidate.active())
                 .orElseThrow(() -> ProblemException.badRequest("user.not_found",
-                        "no active trainee with id " + userId + " in this tenant", "userId", userId));
+                        "no active trainee or auto worker with id " + userId + " in this tenant",
+                        "userId", userId));
+        return user;
+    }
+
+    private void profilesOf(long tenantId, long userId) {
+        seatable(tenantId, userId);
     }
 
     /** `pkg-<tenant>-<8 hex>`: recognisable in logs, never colliding with a builder's own keys. */
