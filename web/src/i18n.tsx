@@ -379,6 +379,8 @@ const en: Dict = {
     "The event deck. Each event is drawn once per run from a seed, so it is unpredictable to the class but replayable for you. Leave it empty for a calm economy.",
   "editor.perFunction": "Per function",
   "editor.qualityUpgrade": "Offer quality upgrades to the class",
+  "editor.autoWorkers": "Offer auto workers to the class",
+  "editor.autoWorkersHint": "Lets a package seat an auto-played company. Off means the class list offers people only — and publishing a package with an opponent is refused.",
   "editor.qualityHint":
     "Off by default, so a copy keeps behaving like the template it came from. On, each company may spend money in the monthly form to raise one product's quality level; the level persists, stops at 100, and the spend is a cost of that month.",
   "editor.function": "Function",
@@ -904,6 +906,8 @@ const zh: Dict = {
   "editor.qualityUpgrade": "向班级开放质量升级",
   "editor.qualityHint":
     "默认关闭，副本会保持与原模板一致。开启后，各公司可在月度决策中投入资金提升某个产品的质量等级；等级会持续保留，最高 100，投入计入当月成本。",
+  "editor.autoWorkers": "允许自动玩家参与课堂",
+  "editor.autoWorkersHint": "开启后，模拟包的班级名单可以安排自动玩家；关闭时名单只提供真人，发布包含自动玩家的模拟包会被拒绝。",
   "editor.function": "职能",
   "fn.PRODUCTION": "生产",
   "fn.SALES": "销售",

@@ -56,6 +56,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
   const [settings, setSettings] = useState<Record<string, string>>({});
   /** D15: a mechanic is a switch on the template, not a code path every class must live with. */
   const [qualityOn, setQualityOn] = useState(false);
+  /** D48: opponents are a mechanic too — a template that never turns this on seats no auto worker. */
+  const [autoWorkersOn, setAutoWorkersOn] = useState(false);
   const [rounds, setRounds] = useState<TemplateRound[]>([]);
   const [products, setProducts] = useState<TemplateProduct[]>([]);
   const [channels, setChannels] = useState<TemplateChannel[]>([]);
@@ -78,6 +80,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     if (flat.qualityCostPerPoint === undefined) flat.qualityCostPerPoint = "60000000";
     setSettings(flat);
     setQualityOn(Boolean(next.settings.qualityUpgrade));
+    setAutoWorkersOn(Boolean(next.settings.autoWorkers));
     const pay = (next.settings.salaries ?? {}) as Record<string, number>;
     const headcount = (next.settings.startingStaff ?? {}) as Record<string, number>;
     setSalaries(Object.fromEntries(FUNCTIONS.map((f) => [f, String(pay[f] ?? "")])));
@@ -117,6 +120,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
         payload[field] = kind === "int" ? Number.parseInt(raw, 10) : Number(raw);
       }
       payload.qualityUpgrade = qualityOn;
+      payload.autoWorkers = autoWorkersOn;
       // The per-function maps go in as objects; a blank cell is simply not sent, so the stored value
       // survives rather than being zeroed by a form the builder never touched.
       const payMap: Record<string, number> = {};
@@ -279,6 +283,16 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               {t("editor.qualityUpgrade")}
             </label>
             <p className="muted">{t("editor.qualityHint")}</p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={autoWorkersOn}
+                disabled={locked}
+                onChange={(e) => setAutoWorkersOn(e.target.checked)}
+              />
+              {t("editor.autoWorkers")}
+            </label>
+            <p className="muted">{t("editor.autoWorkersHint")}</p>
             <h3 className="pick-head">{t("editor.perFunction")}</h3>
             <table>
               <thead>

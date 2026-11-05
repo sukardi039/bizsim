@@ -134,8 +134,11 @@ that can be seated like a person — but can never sign in.
 
 To put one in a class:
 
-1. Turn on **Offer auto workers to the class** in the template's settings (machine mechanics → quality
-   sits next to it). Template copies built before this switch existed keep playing without opponents.
+1. Open the template you will publish from — **Templates → the template's name → Settings** — and tick
+   **Offer auto workers to the class**, then **Save**. It sits directly under the quality switch, at the
+   end of the settings grid. Templates written before this switch existed keep playing without
+   opponents until it is ticked; the global `standard-v1` is read-only, so duplicate it first if you
+   need to change it.
 2. In **Packages**, pick the template and the companies; the class list now offers the auto workers
    beside the trainees, labelled `· auto`.
 3. Publish and start the session as usual. The opponent plays every round by itself, under the same
