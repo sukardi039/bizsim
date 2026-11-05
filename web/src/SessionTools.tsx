@@ -27,6 +27,7 @@ export default function SessionTools({
   const [problem, setProblem] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [cash, setCash] = useState<Record<number, { delta: string; reason: string }>>({});
+  const [resetNote, setResetNote] = useState<string | null>(null);
 
   const paused = Boolean(run.clockPaused);
   const untimed = (run.clockRemainingSeconds ?? -1) < 0;
@@ -125,8 +126,37 @@ export default function SessionTools({
     [submissions],
   );
 
+  const resetSession = async () => {
+    if (!window.confirm(t("tools.resetConfirm"))) {
+      return;
+    }
+    setBusy(true);
+    setProblem(null);
+    setResetNote(null);
+    try {
+      const result = await api.resetRun(run.id);
+      setResetNote(t("tools.resetDone", { rounds: result.roundsRemoved, companies: result.companiesRestored }));
+      onChanged();
+    } catch (error) {
+      setProblem(describeError(error, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
+      <section className="card">
+        <h2>{t("tools.reset")}</h2>
+        <p className="muted">{t("tools.resetHint")}</p>
+        {resetNote && <p className="notice">{resetNote}</p>}
+        <div className="buttons">
+          <button className="ghost danger" onClick={() => void resetSession()} disabled={busy}>
+            {t("tools.reset")}
+          </button>
+        </div>
+      </section>
+
       <section className="card">
         <h2>{t("tools.clock")}</h2>
         {problem && <p className="error">{problem}</p>}

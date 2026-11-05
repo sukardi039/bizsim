@@ -310,6 +310,16 @@ the switch that decides whether they may read it. It starts **hidden**: press **
 reading the debrief, and every computed round is then visible to the trainees; **Hide from the class**
 takes it away again. Both moments are in the audit trail.
 
+### 7.2.4 Starting over
+
+**Reset the session** puts the run back to its pre-start condition: every company returns to the cash,
+brand, stock, staff and R&D it opened with, and every round — with its decisions, results and
+statements — is deleted. The class begins again from month 1 with the same people seated; nothing has
+to be re-registered.
+
+It asks for confirmation first, and it is recorded in the audit trail. Use it for a botched setup or a
+demonstration that has to be repeated, not to correct one month — for that, **void the last round**.
+
 ### 7.3 Scoreboard
 
 One row per company for the latest computed round: profit, cash, share, stock. Empty until you

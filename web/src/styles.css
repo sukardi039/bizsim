@@ -348,3 +348,7 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 /* The round countdown, on both consoles (D53). */
 .clock-badge { margin: .25rem 0 .5rem; font-variant-numeric: tabular-nums; }
 .clock-badge.negative { color: #ff8a8a; font-weight: 600; }
+
+/* Destructive session controls (D58): a reset is never a primary action. */
+button.danger { border-color: rgba(255, 120, 120, .5); color: #ff9d9d; }
+button.danger:hover { background: rgba(255, 120, 120, .12); }

@@ -83,6 +83,18 @@ public class SimulationController {
     }
 
     /**
+     * D58: put the session back to its pre-start condition — same companies, same seats, month 0, no
+     * rounds. The confirm lives in the console; the API does what it says.
+     */
+    @PostMapping("/reset")
+    public Map<String, Object> reset(@PathVariable long runId,
+                                     @RequestBody(required = false) Map<String, Object> body) {
+        TenantContext.Principal me = requireFacilitator();
+        String reason = body == null || body.get("reason") == null ? null : String.valueOf(body.get("reason"));
+        return rounds.resetRun(me.tenantId(), runId, me.userId(), reason);
+    }
+
+    /**
      * D52: show the class table to trainees, or hide it again. Audited as a session control.
      */
     @PostMapping("/standings")

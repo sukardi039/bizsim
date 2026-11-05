@@ -102,6 +102,11 @@ const en: Dict = {
     "Delete run {id} and everything played in it?\n\nRounds, decisions, results and the seats go with it. Accounts stay. This cannot be undone.",
   "run.select": "Select a run, or create one.",
 
+  "tools.reset": "Reset the session",
+  "tools.resetHint": "Puts every company back to its starting state and removes all rounds, so the class begins again from month 0. Seats and companies stay; the reset is recorded in the audit trail.",
+  "tools.resetConfirm": "Reset this session to its starting condition? Every round, decision and result is deleted and every company goes back to its opening cash, brand and stock. This cannot be undone.",
+  "tools.resetDone": "Session reset: {rounds} round(s) removed, {companies} companies restored.",
+  "tools.resetFailed": "The session could not be reset.",
   "tools.clock": "Round clock",
   "tools.clockLeft": "Time left: {time}",
   "tools.clockPaused": "Paused at {time} — the clock is stopped",
@@ -639,6 +644,11 @@ const zh: Dict = {
     "删除模拟 {id} 及其全部数据进行记录？\n\n轮次、决策、结果与席位将一并删除，账号保留。此操作无法撤销。",
   "run.select": "选择一个模拟，或新建一个。",
 
+  "tools.reset": "重置本场模拟",
+  "tools.resetHint": "把所有公司恢复到初始状态并删除所有轮次，课堂从第 0 个月重新开始。席位和公司保留；重置会记录在审计日志中。",
+  "tools.resetConfirm": "确定把本场模拟重置到初始状态？所有轮次、决策和结果都会被删除，各公司回到期初的现金、品牌和库存。此操作无法撤销。",
+  "tools.resetDone": "已重置：删除 {rounds} 轮，恢复 {companies} 家公司。",
+  "tools.resetFailed": "本场模拟无法重置。",
   "tools.clock": "本轮计时",
   "tools.clockLeft": "剩余时间：{time}",
   "tools.clockPaused": "已暂停，停在 {time} — 计时已停止",

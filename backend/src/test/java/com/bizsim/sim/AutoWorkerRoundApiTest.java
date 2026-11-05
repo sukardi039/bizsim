@@ -166,6 +166,39 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_reset_puts_the_session_back_to_month_zero() throws Exception {
+        long teamOne = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        java.math.BigDecimal opening = jdbc.queryForObject(
+                "select cash from team where id = ?", java.math.BigDecimal.class, teamOne);
+        openRound();
+        mvc.perform(post("/api/runs/" + runId + "/bots/decide")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select current_round from run where id = ?", Integer.class, runId))
+                .isEqualTo(1);
+
+        mvc.perform(post("/api/runs/" + runId + "/reset")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.roundsRemoved").value(1))
+                .andExpect(jsonPath("$.companiesRestored").value(2));
+
+        assertThat(jdbc.queryForObject("select current_round from run where id = ?", Integer.class, runId))
+                .isEqualTo(0);
+        assertThat(jdbc.queryForObject("select count(*) from round where run_id = ?", Integer.class, runId))
+                .isZero();
+        assertThat(jdbc.queryForObject("select count(*) from decision", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from bot_decision", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from round_statement", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("select cash from team where id = ?",
+                java.math.BigDecimal.class, teamOne)).isEqualByComparingTo(opening);
+        assertThat(jdbc.queryForList("select action from facilitator_action where action = 'RUN_RESET'",
+                String.class)).hasSize(1);
+    }
+
+    @Test
     void computing_early_lets_the_opponent_play_instead_of_skipping_the_month() throws Exception {
         openRound();
         // Straight to compute, before the seeded moment: this is what a facilitator does in a workshop.

@@ -608,6 +608,12 @@ export const api = {
   botTrace: (runId: number) => request<BotTraceRow[]>(`/runs/${runId}/bots`),
   standings: (runId: number, round?: number) =>
     request<StandingsRow[]>(`/runs/${runId}/standings${round ? `?round=${round}` : ""}`),
+  /** D58: back to the pre-start condition — same companies and seats, month 0, no rounds. */
+  resetRun: (runId: number, reason?: string) =>
+    request<{ roundsRemoved: number; companiesRestored: number }>(`/runs/${runId}/reset`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason ?? "" }),
+    }),
   setStandingsVisible: (runId: number, visible: boolean) =>
     request<{ visible: boolean }>(`/runs/${runId}/standings`, {
       method: "POST",

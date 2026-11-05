@@ -186,6 +186,18 @@ public class RunRepository {
         return Boolean.TRUE.equals(auto);
     }
 
+    /**
+     * Back to the moment the session was created (D58): month 0, open, not finished, standings hidden
+     * again. Teams and their seats are untouched — the class stays, the months do not.
+     */
+    public void resetToStart(long runId) {
+        jdbc.update("""
+                update run set current_round = 0, status = 'OPEN', finished_at = null,
+                               standings_visible = false
+                where id = ?
+                """, runId);
+    }
+
     /** D52: the facilitator shows or hides the class table; the moment is audited. */
     public void setStandingsVisible(long runId, boolean visible) {
         jdbc.update("update run set standings_visible = ? where id = ?", visible, runId);

@@ -152,6 +152,39 @@ public class RoundRepository {
                 """, roundId, runId);
     }
 
+    /** Round 1's snapshot is the state the session started from: the target of a full reset (D58). */
+    public java.util.Optional<RoundRow> earliest(long runId) {
+        return jdbc.query("""
+                select id, run_id, number, status, closes_at, paused_at from round
+                where run_id = ? order by number limit 1
+                """, (rs, i) -> new RoundRow(rs.getLong("id"), rs.getLong("run_id"), rs.getInt("number"),
+                rs.getString("status"), rs.getTimestamp("closes_at") == null ? null
+                : rs.getTimestamp("closes_at").toInstant(), rs.getTimestamp("paused_at") == null ? null
+                : rs.getTimestamp("paused_at").toInstant()), runId).stream().findFirst();
+    }
+
+    /**
+     * Deletes every round of a run, children first. Decisions and bot traces go too: a reset that left
+     * them behind would let a stale submission be reused for month 1 under a new clock.
+     */
+    public void deleteRounds(long runId) {
+        jdbc.update("""
+                delete from bot_decision bd using round r
+                where bd.round_id = r.id and r.run_id = ?
+                """, runId);
+        jdbc.update("delete from decision d using round r where d.round_id = r.id and r.run_id = ?",
+                runId);
+        jdbc.update("""
+                delete from round_statement st using round r
+                where st.round_id = r.id and r.run_id = ?
+                """, runId);
+        jdbc.update("delete from round_result rr using round r where rr.round_id = r.id and r.run_id = ?",
+                runId);
+        jdbc.update("delete from round_snapshot rs using round r where rs.round_id = r.id and r.run_id = ?",
+                runId);
+        jdbc.update("delete from round where run_id = ?", runId);
+    }
+
     public int snapshotTeams(long roundId) {
         Integer n = jdbc.queryForObject(
                 "select count(*) from round_snapshot where round_id = ?", Integer.class, roundId);

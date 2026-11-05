@@ -314,6 +314,51 @@ public class RoundService {
         return Map.of("round", round.number(), "status", "OPEN");
     }
 
+    /**
+     * Put the session back to its pre-start condition (D58): every company at the state recorded when
+     * the books opened, every round gone, month 0, standings hidden. Teams and seats survive, so the
+     * class does not have to be re-registered — this is "start the month again", not "new session".
+     *
+     * <p>Rounds computed before snapshots existed cannot be rewound; a run with no computed round has
+     * nothing to rewind and only loses its decisions.
+     */
+    @Transactional
+    public Map<String, Object> resetRun(long tenantId, long runId, long userId, String reason) {
+        RunRepository.RunRow run = runs.findForUpdate(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+
+        int companies = rounds.teams(runId).size();
+        int restored = 0;
+        java.util.Optional<RoundRepository.RoundRow> first = rounds.earliest(runId);
+        if (first.isPresent()) {
+            if ("COMPUTED".equals(first.get().status())
+                    && rounds.snapshotTeams(first.get().id()) < companies) {
+                throw ProblemException.conflict("round.no_snapshot",
+                        "round 1 was computed before resets existed, so the starting state cannot be "
+                                + "restored", "round", first.get().number());
+            }
+            if ("COMPUTED".equals(first.get().status())) {
+                // Round 1's snapshot is the state the session started from.
+                rounds.restoreSnapshots(first.get().id());
+            }
+            restored = companies;
+        }
+
+        Integer openedRounds = jdbc.queryForObject("select count(*) from round where run_id = ?",
+                Integer.class, runId);
+        rounds.deleteRounds(runId);
+        runs.resetToStart(runId);
+        rounds.audit(tenantId, runId, null, null, "RUN_RESET", null,
+                reason == null || reason.isBlank() ? null : reason.trim(), userId);
+        events.publishAfterCommit(runId, "run.reset",
+                Map.of("rounds", openedRounds == null ? 0 : openedRounds, "companies", restored));
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("roundsRemoved", openedRounds == null ? 0 : openedRounds);
+        body.put("companiesRestored", restored);
+        return body;
+    }
+
     /** Every company's submission for one round — or for the open one — as the facilitator sees it. */
     @Transactional(readOnly = true)
     public Map<String, Object> submissions(long tenantId, long runId, Integer roundNumber) {
