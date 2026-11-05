@@ -110,13 +110,17 @@ class DebriefExportApiTest extends PostgresTestBase {
         assertThat(result.getResponse().getHeader("Content-Disposition"))
                 .contains("bizsim-debrief-run" + runId + ".pdf");
 
-        String text = new PdfTextExtractor(new PdfReader(body)).getTextFromPage(1);
+        String text = allText(body);
         assertThat(text).contains("阿尔法制造");
         assertThat(text).contains("Beta Corp");
+        // The facilitator's two summaries (D46): by trainee, and by month.
+        assertThat(text).contains("Summary by trainee");
+        assertThat(text).contains("Comparison by month");
+        assertThat(text).contains("Total");
         // Each round carries three blocks (D43): the plan, the money, the cost lines.
         assertThat(text).contains("Round 1");
         assertThat(text).contains("What each company sent");
-        assertThat(text).contains("What the month produced");
+        assertThat(text).contains("Comparison by month");
         assertThat(text).contains("Cost lines");
         assertThat(text).contains("Revenue").contains("Profit").contains("Cash");
     }
@@ -142,6 +146,7 @@ class DebriefExportApiTest extends PostgresTestBase {
             // Two companies, one computed round.
             assertThat(results.getLastRowNum()).isEqualTo(2);
 
+            assertThat(workbook.getSheet("By trainee")).isNotNull();
             Sheet submissions = workbook.getSheet("Submissions");
             assertThat(submissions.getRow(0).getCell(2).getStringCellValue()).isEqualTo("Trainee");
             assertThat(workbook.getSheet("Cost lines")).isNotNull();
@@ -170,8 +175,7 @@ class DebriefExportApiTest extends PostgresTestBase {
             assertThat(workbook.getSheet("Submissions").getLastRowNum()).isEqualTo(4);
         }
 
-        String text = new PdfTextExtractor(new PdfReader(resultPdf(facilitatorToken)))
-                .getTextFromPage(2);
+        String text = allText(resultPdf(facilitatorToken));
         assertThat(text).contains("Round 2");
     }
 
@@ -191,12 +195,20 @@ class DebriefExportApiTest extends PostgresTestBase {
         assertThat(result.getResponse().getHeader("Content-Disposition"))
                 .contains("bizsim-results-run" + runId + ".pdf");
 
-        PdfReader reader = new PdfReader(result.getResponse().getContentAsByteArray());
-        String text = new PdfTextExtractor(reader).getTextFromPage(1);
+        byte[] body = result.getResponse().getContentAsByteArray();
+        String text = allText(body);
         assertThat(text).contains("阿尔法制造");
         // D21: no competitor, and no market share, reaches a trainee.
         assertThat(text).doesNotContain("Beta Corp");
         assertThat(text).doesNotContain("Share");
+        // One page per round, each opening with that month's summary (D46).
+        PdfReader reader = new PdfReader(body);
+        assertThat(reader.getNumberOfPages()).isEqualTo(2);
+        String firstPage = new PdfTextExtractor(reader).getTextFromPage(1);
+        assertThat(firstPage).contains("Round 1").contains("The month's summary")
+                .contains("What you sent").contains("Cost lines");
+        assertThat(new PdfTextExtractor(reader).getTextFromPage(2))
+                .contains("Round 2").contains("The month's summary");
 
         MvcResult workbookResult = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
                         .param("format", "xlsx")
@@ -223,12 +235,11 @@ class DebriefExportApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isOk())
                 .andReturn();
-        String chinese = new PdfTextExtractor(
-                new PdfReader(zh.getResponse().getContentAsByteArray())).getTextFromPage(1);
+        String chinese = allText(zh.getResponse().getContentAsByteArray());
         assertThat(chinese).contains("全班复盘");
         assertThat(chinese).contains("第 1 轮");
         assertThat(chinese).contains("各家提交");
-        assertThat(chinese).contains("本月结果");
+        assertThat(chinese).contains("按月度对比");
         assertThat(chinese).contains("成本明细");
         assertThat(chinese).contains("收入");
         // Authored content is untouched: the company name is the same in either language.
@@ -249,8 +260,7 @@ class DebriefExportApiTest extends PostgresTestBase {
         }
 
         // No locale asked for: English, as before.
-        String english = new PdfTextExtractor(new PdfReader(resultPdf(facilitatorToken)))
-                .getTextFromPage(1);
+        String english = allText(resultPdf(facilitatorToken));
         assertThat(english).contains("What each company sent");
     }
 
@@ -263,6 +273,16 @@ class DebriefExportApiTest extends PostgresTestBase {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** Every page's text, because the report now spreads its sections across pages (D46). */
+    private static String allText(byte[] pdf) throws Exception {
+        PdfReader reader = new PdfReader(pdf);
+        StringBuilder text = new StringBuilder();
+        for (int page = 1; page <= reader.getNumberOfPages(); page++) {
+            text.append(new PdfTextExtractor(reader).getTextFromPage(page)).append('\n');
+        }
+        return text.toString();
+    }
 
     private byte[] resultPdf(String token) throws Exception {
         return mvc.perform(get("/api/runs/" + runId + "/debrief/export")

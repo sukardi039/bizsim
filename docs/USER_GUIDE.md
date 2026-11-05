@@ -321,8 +321,8 @@ Three buttons sit next to the round selector:
 | Button | What you get |
 |---|---|
 | **Present** | a full-screen classroom view of the selected round. Page 1 is the six numbers you read out — profit, cumulative profit, market share, cash, brand, stock — one card per company, labelled with the trainee. Page 2 is the explanation: lost sales, capacity used, R&D completed, status. **← →** change page, **↑ ↓** change round, **Esc** closes. |
-| **Download PDF** | an A4 landscape report of **every computed round**: one page per round with what each company sent, what the month produced, and every cost line. Company and trainee names are rendered as authored, including Chinese. |
-| **Download Excel** | the same numbers as a workbook: **Results** (one row per company per round), **Submissions** (the plan per company per round) and **Cost lines**, each with a Round column so the whole term can be filtered or pivoted. |
+| **Download PDF** | an A4 landscape report of the whole term. It opens with **two summaries** — *Summary by trainee* (one page per company: its rounds, then a Total line) and *Comparison by month* (one page per round, every company side by side) — and then gives the detail behind each month: what each company sent and every cost line. Company and trainee names are rendered as authored, including Chinese. |
+| **Download Excel** | the same numbers as a workbook: **By trainee** (one row per company across the term: rounds, totals, final cash, average share), **Results** (one row per company per round), **Submissions** (the plan per company per round) and **Cost lines**, each with a Round column so the whole term can be filtered or pivoted. |
 
 Both files are built from the stored results, never a recomputation, so a downloaded report matches
 what the class saw on screen. **The document is written in the language you are using** — switch the
@@ -379,9 +379,10 @@ package's class list and publishes a new package; the facilitator cannot seat yo
    **Competitors' figures and the market share stay on the facilitator's screen**; the trainee sees
    only their own company. Everything comes from the same statement rows the debrief reads.
 
-6. **My results (PDF / Excel)** in the same card gives the trainee their own report: every computed
-   round, what they sent and what it produced — their company only, no market share, no competitor
-   line. A trainee who has not been seated in the session gets a refusal, not an empty file.
+6. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
+   round**: that month's summary, then what they sent, then the cost lines — their company only, no
+   market share, no competitor line. A trainee who has not been seated in the session gets a
+   refusal, not an empty file.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."*

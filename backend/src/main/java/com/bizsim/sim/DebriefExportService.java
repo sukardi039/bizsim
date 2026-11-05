@@ -62,6 +62,8 @@ public class DebriefExportService {
                          String marketing, String rnd, String staff, String machines, String review,
                          String bought, String notBought, String noDecision,
                          String roundColumn, String submitted, String yes, String noAnswer,
+                         String byTraineeTitle, String byMonthTitle, String totalWord,
+                         String roundSummary, String sentByYou, String byTraineeSheet, String roundsWord, String avgShare,
                          String revenue, String cost, String profit, String cumulative, String cash,
                          String share, String brand, String stock, String lostSales, String capacity,
                          String capacityAvailable, String rndCompleted, String status,
@@ -82,6 +84,8 @@ public class DebriefExportService {
                 "Company", "Trainee", "units", "price", "quality", "Marketing", "R&D", "Staff",
                 "Machines", "Review", "bought", "no", "no decision submitted",
                 "Round", "Submitted", "yes", "no",
+                "Summary by trainee", "Comparison by month", "Total",
+                "The month's summary", "What you sent", "By trainee", "Rounds", "Avg share %",
                 "Revenue", "Cost", "Profit", "Cumulative", "Cash", "Share %", "Brand", "Stock",
                 "Lost sales", "Capacity", "Capacity available", "R&D completed", "Status",
                 "Results", "Submissions", "Cost lines",
@@ -95,6 +99,8 @@ public class DebriefExportService {
                 "公司", "学员", "数量", "单价", "质量", "营销", "研发", "生产人员",
                 "设备", "市场报告", "已购买", "未购买", "未提交决策",
                 "轮次", "已提交", "是", "否",
+                "按学员汇总", "按月度对比", "合计",
+                "本月汇总", "你的提交", "按学员", "轮次数", "平均份额",
                 "收入", "成本", "利润", "累计利润", "现金", "市场份额", "品牌", "库存",
                 "损失销量", "产能", "可用产能", "完成研发数", "状态",
                 "结果", "提交", "成本明细",
@@ -292,6 +298,19 @@ public class DebriefExportService {
 
     // ------------------------------------------------------------------ PDF
 
+    private record Fonts(Font title, Font subtitle, Font roundHead, Font blockHead, Font head, Font body) {
+    }
+
+    /**
+     * The document, structured by who reads it (D46).
+     *
+     * <p><b>A trainee</b> gets one page per round: the month's summary, what they sent, and the cost
+     * lines — a term that can be read one month at a time.
+     *
+     * <p><b>The facilitator</b> gets two summaries before the detail: <b>by trainee</b> (one page per
+     * company, its rounds in sequence) and <b>by month</b> (one page per round, every company side by
+     * side) — the two ways a class reviews a term.
+     */
     public byte[] pdf(Report report, Labels labels) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.A4.rotate(), 30, 30, 28, 28);
@@ -299,40 +318,27 @@ public class DebriefExportService {
             document.open();
 
             BaseFont face = embedded();
-            Font title = new Font(face, 17);
-            Font subtitle = new Font(face, 9);
-            Font roundHead = new Font(face, 13);
-            Font blockHead = new Font(face, 10);
-            Font head = new Font(face, 8);
-            Font body = new Font(face, 8);
+            Fonts fonts = new Fonts(new Font(face, 18), new Font(face, 9), new Font(face, 14),
+                    new Font(face, 10), new Font(face, 8), new Font(face, 8));
 
-            document.add(new Paragraph(report.title(), title));
+            document.add(new Paragraph(report.title(), fonts.title()));
             document.add(new Paragraph(String.format(labels.runLine(), report.runId(),
                     report.scenarioKey(), report.rounds().get(0).round(),
-                    report.rounds().get(report.rounds().size() - 1).round()), subtitle));
+                    report.rounds().get(report.rounds().size() - 1).round()), fonts.subtitle()));
             document.add(new Paragraph(report.classScope() ? labels.classReport()
-                    : labels.companyReport(), subtitle));
+                    : labels.companyReport(), fonts.subtitle()));
 
-            boolean first = true;
-            for (RoundReport round : report.rounds()) {
-                // The title and round 1 share the first page; every later round starts its own.
-                if (!first) {
-                    document.newPage();
+            // The title shares the first page with the first section; nothing is spent on a cover.
+            boolean[] first = {true};
+            if (report.classScope()) {
+                byTraineePages(document, report, labels, fonts, first);
+                for (RoundReport round : report.rounds()) {
+                    monthPage(document, report, round, labels, fonts, first);
                 }
-                first = false;
-                document.add(new Paragraph(String.format(labels.roundWord(), round.round()), roundHead));
-                if (round.computedAt() != null) {
-                    document.add(new Paragraph(labels.computedWord() + " " + round.computedAt(), subtitle));
+            } else {
+                for (RoundReport round : report.rounds()) {
+                    traineePage(document, report, round, labels, fonts, first);
                 }
-
-                document.add(new Paragraph(labels.sentBlock(), blockHead));
-                document.add(submissionTable(report, round, labels, head, body));
-
-                document.add(new Paragraph(labels.producedBlock(), blockHead));
-                document.add(resultTable(report, round, labels, head, body));
-
-                document.add(new Paragraph(labels.costBlock(), blockHead));
-                document.add(costTable(round, labels, head, body));
             }
 
             document.close();
@@ -340,6 +346,117 @@ public class DebriefExportService {
         } catch (Exception e) {
             throw new IllegalStateException("cannot build the debrief PDF", e);
         }
+    }
+
+    /** One page per company: its rounds in sequence, then the term's totals. */
+    private record Dated(int round, Row row) {
+    }
+
+    private void byTraineePages(Document document, Report report, Labels labels, Fonts fonts,
+                                boolean[] first) {
+        Map<Long, List<Dated>> byTeam = new LinkedHashMap<>();
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                byTeam.computeIfAbsent(row.teamId(), key -> new ArrayList<>())
+                        .add(new Dated(round.round(), row));
+            }
+        }
+        for (List<Dated> rows : byTeam.values()) {
+            Row head = rows.get(0).row();
+            pageHead(document, head.company()
+                            + (head.trainees().isEmpty() ? "" : " · " + head.trainees()),
+                    labels.byTraineeTitle(), fonts, first);
+            document.add(new Paragraph(" ", fonts.subtitle()));
+            document.add(traineeRoundTable(rows, labels, fonts));
+        }
+    }
+
+    /** One page per round: every company on the same lines, then the detail behind those numbers. */
+    private void monthPage(Document document, Report report, RoundReport round, Labels labels,
+                           Fonts fonts, boolean[] first) {
+        pageHead(document, String.format(labels.roundWord(), round.round()), "", fonts, first);
+        document.add(new Paragraph(labels.byMonthTitle(), fonts.blockHead()));
+        document.add(resultTable(report, round, labels, fonts.head, fonts.body));
+        document.add(new Paragraph(labels.sentBlock(), fonts.blockHead()));
+        document.add(submissionTable(report, round, labels, fonts.head, fonts.body));
+        document.add(new Paragraph(labels.costBlock(), fonts.blockHead()));
+        document.add(costTable(round, labels, fonts.head, fonts.body));
+    }
+
+    /** One page per round for one company: the summary first, then what produced it. */
+    private void traineePage(Document document, Report report, RoundReport round, Labels labels,
+                             Fonts fonts, boolean[] first) {
+        pageHead(document, String.format(labels.roundWord(), round.round()), "", fonts, first);
+        document.add(new Paragraph(labels.roundSummary(), fonts.blockHead()));
+        document.add(resultTable(report, round, labels, fonts.head, fonts.body));
+        document.add(new Paragraph(labels.sentByYou(), fonts.blockHead()));
+        document.add(submissionTable(report, round, labels, fonts.head, fonts.body));
+        document.add(new Paragraph(labels.costBlock(), fonts.blockHead()));
+        document.add(costTable(round, labels, fonts.head, fonts.body));
+    }
+
+    private void pageHead(Document document, String heading, String subheading, Fonts fonts,
+                          boolean[] first) {
+        if (!first[0]) {
+            document.newPage();
+        }
+        first[0] = false;
+        document.add(new Paragraph(heading, fonts.roundHead()));
+        if (subheading != null && !subheading.isEmpty()) {
+            document.add(new Paragraph(subheading, fonts.subtitle()));
+        }
+    }
+
+    /** A company's rounds, one line each, with the term's totals underneath. */
+    private PdfPTable traineeRoundTable(List<Dated> rows, Labels labels, Fonts fonts) {
+        List<String> columns = new ArrayList<>(List.of(labels.roundColumn(), labels.revenue(),
+                labels.cost(), labels.profit(), labels.cumulative(), labels.cash(), labels.share(),
+                labels.brand(), labels.stock(), labels.lostSales(), labels.capacity()));
+        PdfPTable table = new PdfPTable(columns.size());
+        table.setWidthPercentage(100);
+        table.setHeaderRows(1);
+        List<Float> widths = new ArrayList<>(List.of(1.1f));
+        for (int i = 1; i < columns.size(); i++) {
+            widths.add(2.15f);
+        }
+        setWidths(table, widths);
+        header(table, fonts.head, columns.toArray(new String[0]));
+
+        BigDecimal revenue = BigDecimal.ZERO;
+        BigDecimal cost = BigDecimal.ZERO;
+        BigDecimal profit = BigDecimal.ZERO;
+        BigDecimal lost = BigDecimal.ZERO;
+        Row last = rows.get(rows.size() - 1).row();
+        for (Dated dated : rows) {
+            Row row = dated.row();
+            cell(table, fonts.body, String.valueOf(dated.round()));
+            money(table, fonts.body, row.revenue());
+            money(table, fonts.body, row.cost());
+            money(table, fonts.body, row.profit());
+            money(table, fonts.body, row.cumulativeProfit());
+            money(table, fonts.body, row.cash());
+            cell(table, fonts.body, plain(row.share()));
+            cell(table, fonts.body, plain(row.brand()));
+            cell(table, fonts.body, plain(row.stock()));
+            cell(table, fonts.body, plain(row.lostSales()));
+            cell(table, fonts.body, plain(row.capacityUsed()) + " / " + plain(row.capacityAvailable()));
+            revenue = revenue.add(row.revenue());
+            cost = cost.add(row.cost());
+            profit = profit.add(row.profit());
+            lost = lost.add(row.lostSales());
+        }
+        cell(table, fonts.body, labels.totalWord());
+        money(table, fonts.body, revenue);
+        money(table, fonts.body, cost);
+        money(table, fonts.body, profit);
+        money(table, fonts.body, last.cumulativeProfit());
+        money(table, fonts.body, last.cash());
+        cell(table, fonts.body, plain(last.share()));
+        cell(table, fonts.body, plain(last.brand()));
+        cell(table, fonts.body, plain(last.stock()));
+        cell(table, fonts.body, plain(lost));
+        cell(table, fonts.body, plain(last.capacityUsed()) + " / " + plain(last.capacityAvailable()));
+        return table;
     }
 
     /** One row per company: per-product plan, then the money the plan commits. */
@@ -511,6 +628,9 @@ public class DebriefExportService {
             head.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             head.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
+            if (report.classScope()) {
+                byTraineeSheet(workbook, report, labels, head);
+            }
             summarySheet(workbook, report, labels, head);
             submissionSheet(workbook, report, labels, head);
             costSheet(workbook, report, labels, head);
@@ -520,6 +640,56 @@ public class DebriefExportService {
         } catch (Exception e) {
             throw new IllegalStateException("cannot build the debrief workbook", e);
         }
+    }
+
+    /** One row per company over the whole term: the workbook's answer to "how did each trainee do?". */
+    private void byTraineeSheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
+        Sheet sheet = workbook.createSheet(labels.byTraineeSheet());
+        List<String> columns = new ArrayList<>(List.of(labels.company(), labels.trainee(),
+                labels.roundsWord(), labels.revenue(), labels.cost(), labels.profit(),
+                labels.cumulative(), labels.cash(), labels.avgShare(), labels.brand(), labels.stock(),
+                labels.lostSales()));
+        writeHeader(sheet, head, columns.toArray(new String[0]));
+
+        Map<Long, List<Row>> byTeam = new LinkedHashMap<>();
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                byTeam.computeIfAbsent(row.teamId(), key -> new ArrayList<>()).add(row);
+            }
+        }
+        int index = 1;
+        for (List<Row> rows : byTeam.values()) {
+            Row last = rows.get(rows.size() - 1);
+            org.apache.poi.ss.usermodel.Row line = sheet.createRow(index++);
+            int c = 0;
+            line.createCell(c++).setCellValue(last.company());
+            line.createCell(c++).setCellValue(last.trainees());
+            line.createCell(c++).setCellValue(rows.size());
+            c = number(line, c, sum(rows, Row::revenue));
+            c = number(line, c, sum(rows, Row::cost));
+            c = number(line, c, sum(rows, Row::profit));
+            c = number(line, c, last.cumulativeProfit());
+            c = number(line, c, last.cash());
+            c = number(line, c, average(rows, Row::share));
+            c = number(line, c, last.brand());
+            c = number(line, c, last.stock());
+            c = number(line, c, sum(rows, Row::lostSales));
+        }
+        sizes(sheet, columns.size());
+        sheet.setColumnWidth(0, 26 * 256);
+        sheet.setColumnWidth(1, 26 * 256);
+    }
+
+    private static BigDecimal sum(List<Row> rows, java.util.function.Function<Row, BigDecimal> field) {
+        return rows.stream().map(field).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal average(List<Row> rows,
+                                      java.util.function.Function<Row, BigDecimal> field) {
+        if (rows.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return sum(rows, field).divide(BigDecimal.valueOf(rows.size()), 2, RoundingMode.HALF_UP);
     }
 
     private void summarySheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
