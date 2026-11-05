@@ -88,8 +88,9 @@ public class UserController {
         // ADMIN is creatable too: the "make another admin before demoting the last one" rule needs a
         // way to make one, and a tenant with a single admin is one forgotten password from stuck.
         if (!List.of("PLAYER", "FACILITATOR", "BUILDER", "ADMIN").contains(role)) {
-            throw ProblemException.badRequest("user.role_invalid",
-                    "role must be PLAYER, FACILITATOR, BUILDER or ADMIN");
+            throw ProblemException.badRequest("user.role_invalid", role.equals("AUTO_WORKER")
+                    ? "an auto worker is created from the auto-worker library, not as a person"
+                    : "role must be PLAYER, FACILITATOR, BUILDER or ADMIN");
         }
         // D21: a second facilitator is how two cohorts run at once, but that is an admin's call --
         // a facilitator adding another facilitator could quietly take over the next class's account.
@@ -101,7 +102,7 @@ public class UserController {
             throw ProblemException.forbidden("user.facilitator_needs_admin",
                     "only an admin may create a staff account");
         }
-        if (request.password().length() < MIN_LENGTH) {
+        if (request.password() == null || request.password().length() < MIN_LENGTH) {
             throw ProblemException.badRequest("user.password_too_short",
                     "the initial password must be at least " + MIN_LENGTH + " characters",
                     "min", MIN_LENGTH);

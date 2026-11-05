@@ -222,6 +222,14 @@ Packages: retired packages that never ran a session, removable with a confirmati
   lines and the trainees already seated. Validation happens before anything is written, so a mismatch
   is a refusal rather than a half-built session.
 
+**D47–D50 in progress (5 Nov 2026): auto workers.** A company can be played by a policy instead of
+a person — an identity (`AUTO_WORKER`), a versioned brain (`bot_profile`: level × personality) and a
+seat (`player.bot_profile_id`), all behind a per-template switch that is off by default. The policy
+runs through the same submission path as a trainee and can only see what a trainee sees; the
+self-play harness proves `high > mid > low` and reproduces a run exactly. Slices 4–5 (library UI,
+in-round worker, trace/replay) are not built yet, so nothing in production seats a bot. Design:
+[docs/AUTOWORKER.md](docs/AUTOWORKER.md).
+
 **D39/D40/D41 complete (5 Nov 2026): the class day, and the room after it.** The facilitator's four
 missing powers are built: the round clock can be paused, resumed and extended (a paused clock never
 closes the round; resuming returns exactly the stopped time); every company's submission is readable

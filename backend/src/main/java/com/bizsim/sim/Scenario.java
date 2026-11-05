@@ -55,7 +55,9 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          int cycles, int cycleLength, BigDecimal cycleDemandDrift,
                          BigDecimal cycleCostDrift,
                          /** D15: off unless the template turns it on, so a copy keeps its behaviour. */
-                         boolean qualityUpgrade, BigDecimal qualityCostPerPoint) {
+                         boolean qualityUpgrade, BigDecimal qualityCostPerPoint,
+                         /** D48: auto workers are a per-template mechanic, off unless turned on. */
+                         boolean autoWorkers) {
     }
 
     /** The economy for one cycle position. Missing positions fall back to neutral (1.0). */

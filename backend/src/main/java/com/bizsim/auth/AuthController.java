@@ -43,6 +43,10 @@ public class AuthController {
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         UserRepository.AppUser user = users
                 .findByTenantCodeAndEmail(request.tenantCode(), request.email())
+                // An auto worker is an identity for a company, not a person: it has no credentials
+                // and never signs in (D47). Same answer as a wrong password, so the role is not
+                // discoverable from the login form.
+                .filter(u -> !"AUTO_WORKER".equals(u.role()))
                 .filter(u -> encoder.matches(request.password(), u.passwordHash()))
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "invalid credentials"));

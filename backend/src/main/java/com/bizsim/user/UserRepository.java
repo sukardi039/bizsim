@@ -179,6 +179,31 @@ public class UserRepository {
     }
 
     /** Creates an account inside the caller's tenant. The tenant never comes from the request body. */
+    /** The person row that carries a brain, so a package can seat it (D47). */
+    public java.util.Optional<Long> botPersonFor(long tenantId, long botProfileId) {
+        return jdbc.query("select id from app_user where tenant_id = ? and bot_profile_id = ?",
+                (rs, i) -> rs.getLong(1), tenantId, botProfileId).stream().findFirst();
+    }
+
+    /** A profile's name carries its level suffix; renaming one renames its person (D47). */
+    public void renameBotPerson(long tenantId, long botProfileId, String displayName) {
+        jdbc.update("update app_user set display_name = ? where tenant_id = ? and bot_profile_id = ?",
+                displayName, tenantId, botProfileId);
+    }
+
+    /**
+     * An auto worker's identity (D47): the role is fixed, a profile is attached, and the password is
+     * an unguessable string nobody is ever shown — login refuses the role outright.
+     */
+    public AppUser insertBot(long tenantId, String email, String displayName, String passwordHash,
+                             long botProfileId) {
+        return jdbc.queryForObject("""
+                insert into app_user (tenant_id, email, password_hash, display_name, role, bot_profile_id)
+                values (?, ?, ?, ?, 'AUTO_WORKER', ?)
+                returning *
+                """, MAPPER, tenantId, email, passwordHash, displayName, botProfileId);
+    }
+
     public AppUser insert(long tenantId, String email, String displayName, String passwordHash,
                           String role) {
         return jdbc.queryForObject("""

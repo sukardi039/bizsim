@@ -94,7 +94,9 @@ public class ScenarioRepository {
                 // A template that turns the switch on without naming a price would sell quality for
                 // nothing; the loader supplies the shipped rate instead of failing at round close.
                 dec(d.path("qualityCostPerPoint")).signum() > 0
-                        ? dec(d.path("qualityCostPerPoint")) : new BigDecimal("60000000"));
+                        ? dec(d.path("qualityCostPerPoint")) : new BigDecimal("60000000"),
+                // D48: absent means off, so an existing package seats the same companies it always did.
+                d.path("autoWorkers").asBoolean(false));
 
 
         List<Scenario.ProductSpec> products = jdbc.query("""
@@ -333,7 +335,7 @@ public class ScenarioRepository {
             "forecastHorizon", "forecastBand", "cycles", "cycleLength", "cycleDemandDrift",
             "cycleCostDrift", "salaries", "startingStaff",
             // D15/D26: the quality mechanic is a per-template switch; the price is a builder number.
-            "qualityUpgrade", "qualityCostPerPoint");
+            "qualityUpgrade", "qualityCostPerPoint", "autoWorkers");
 
     /** The editable part of the definition document, as stored. */
     public Map<String, Object> settings(String key) {
