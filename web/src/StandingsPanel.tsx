@@ -10,7 +10,17 @@ import { describeError } from "./errors";
  * they may read them. The switch is a session control, so the audit trail records when the ranking
  * was shown or hidden.
  */
-export default function StandingsPanel({ run, onChanged }: { run: Run; onChanged: () => void }) {
+export default function StandingsPanel({
+  run,
+  refreshKey,
+  onChanged,
+}: {
+  run: Run;
+  /** Bumped by the run stream: computing a round does not change the round number, so the table has
+      to be told that a round closed or it keeps showing the previous one (D60). */
+  refreshKey?: number;
+  onChanged: () => void;
+}) {
   const { t, money } = useI18n();
   const [rows, setRows] = useState<StandingsRow[]>([]);
   const [visible, setVisible] = useState<boolean>(Boolean(run.standingsVisible));
@@ -34,7 +44,7 @@ export default function StandingsPanel({ run, onChanged }: { run: Run; onChanged
     return () => {
       live = false;
     };
-  }, [run.id, run.currentRound]);
+  }, [run.id, run.currentRound, run.roundOpen, refreshKey]);
 
   const toggle = async () => {
     setBusy(true);

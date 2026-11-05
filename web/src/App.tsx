@@ -481,6 +481,7 @@ export default function App() {
 
             <StandingsPanel
               run={selected}
+              refreshKey={feed.length}
               onChanged={() => {
                 void refreshRuns();
                 if (selectedId !== null) void refreshBoard(selectedId);
