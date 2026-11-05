@@ -264,6 +264,28 @@ public class RunService {
         if (!runs.userBelongsToTenant(userId, tenantId)) {
             throw ProblemException.notFound("user.not_found", "no such user in this tenant");
         }
+        // One company, one kind of player: a policy and a person in the same seat would both submit
+        // for the same company and the second would overwrite the first (D49).
+        boolean joiningBot = runs.isAutoWorker(userId);
+        if (joiningBot) {
+            // D48: the mechanic is a template switch. A package built from a template that never
+            // turned it on must not quietly acquire an opponent.
+            String scenarioKey = runs.findForUpdate(runId, tenantId)
+                    .map(RunRepository.RunRow::scenarioKey).orElseThrow(() -> ProblemException
+                            .notFound("run.not_found", "no such run"));
+            if (!scenarios.load(scenarioKey).params().autoWorkers()) {
+                throw ProblemException.conflict("bot.switch_off",
+                        "this template does not offer auto workers; enable the switch on the template "
+                                + "and publish a new package", "template", scenarioKey);
+            }
+        }
+        boolean mixed = runs.players(runId).stream()
+                .anyMatch(p -> p.teamId() == teamId && p.auto() != joiningBot);
+        if (mixed) {
+            throw ProblemException.conflict("team.mixed_seat",
+                    joiningBot ? "this company is already run by a person"
+                            : "this company is already run by an auto worker");
+        }
         runs.insertPlayer(runId, teamId, userId, blankToNull(roleKey, "roleKey"));
         return runs.players(runId).stream()
                 .filter(p -> p.userId() == userId)

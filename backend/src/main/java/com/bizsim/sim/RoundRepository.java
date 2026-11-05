@@ -483,6 +483,21 @@ public class RoundRepository {
         return Boolean.TRUE.equals(ok);
     }
 
+    /** The stored decision for a company in a round, as JSON: what a replay is compared against. */
+    public java.util.Optional<String> decisionPayload(long runId, int roundNumber, long teamId) {
+        return jdbc.query("""
+                select d.payload::text from decision d
+                join round r on r.id = d.round_id
+                where r.run_id = ? and r.number = ? and d.team_id = ?
+                """, (rs, i) -> rs.getString(1), runId, roundNumber, teamId).stream().findFirst();
+    }
+
+    /** The template a run plays, which is what a replay must load. */
+    public java.util.Optional<String> scenarioKeyOfRun(long tenantId, long runId) {
+        return jdbc.query("select scenario_key from run where id = ? and tenant_id = ?",
+                (rs, i) -> rs.getString(1), runId, tenantId).stream().findFirst();
+    }
+
     public boolean userOwnsTeam(long userId, long teamId) {
         Boolean ok = jdbc.queryForObject(
                 "select exists (select 1 from player where user_id = ? and team_id = ?)",

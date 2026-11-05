@@ -472,6 +472,44 @@ export interface AuditRow {
   at: string;
 }
 
+/** A reusable brain: level (how well it plays) × personality (what it wants). */
+export interface BotRow {
+  id: number;
+  key: string;
+  name: string;
+  level: "LOW" | "MID" | "HIGH";
+  personality: "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
+  version: number;
+  active: boolean;
+  /** The person that carries this brain; null when it has not been created yet. */
+  userId: number | null;
+}
+
+export interface BotTraceRow {
+  round: number;
+  teamId: number;
+  company: string;
+  profileKey: string;
+  profileVersion: number;
+  level: string;
+  personality: string;
+  mode: "SCHEDULED" | "MANUAL" | "NONE";
+  decidedAt: string | null;
+  rationale: string | null;
+}
+
+export interface BotReplay {
+  round: number;
+  teamId: number;
+  level: string;
+  personality: string;
+  contextDigest: string;
+  rationale: string;
+  storedPayload: string | null;
+  replayedPayload: string;
+  identical: boolean;
+}
+
 export const api = {
   login: (tenantCode: string, email: string, password: string) =>
     request<{ token: string }>("/auth/login", {
@@ -548,6 +586,19 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, displayName, password, role }),
     }),
+  // ---------------------------------------------------------------- auto workers (D47–D50)
+  bots: () => request<BotRow[]>("/bots"),
+  createBot: (body: { name: string; level: string; personality: string }) =>
+    request<BotRow>("/bots", { method: "POST", body: JSON.stringify(body) }),
+  updateBot: (id: number, body: { name: string; level: string; personality: string }) =>
+    request<BotRow>(`/bots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  retireBot: (id: number) => request<unknown>(`/bots/${id}/retire`, { method: "POST" }),
+  /** What the opponents did: profile version, how they were called, and the one-line reason. */
+  botTrace: (runId: number) => request<BotTraceRow[]>(`/runs/${runId}/bots`),
+  askBots: (runId: number) =>
+    request<{ decided: number }>(`/runs/${runId}/bots/decide`, { method: "POST" }),
+  replayBot: (runId: number, teamId: number, round: number) =>
+    request<BotReplay>(`/runs/${runId}/bots/${teamId}/replay?round=${round}`, { method: "POST" }),
   templates: () => request<TemplateRow[]>("/templates"),
   copyTemplate: (key: string, name?: string) =>
     request<TemplateRow>(`/templates/${encodeURIComponent(key)}/copy`, {

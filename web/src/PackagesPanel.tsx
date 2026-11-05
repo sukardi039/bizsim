@@ -23,6 +23,8 @@ export default function PackagesPanel() {
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   const [trainees, setTrainees] = useState<UserRow[]>([]);
+  /** Opponents are seatable like people: same picker, labelled so a trainer knows what they seat. */
+  const [bots, setBots] = useState<Array<{ id: number; name: string; userId: number | null; active: boolean }>>([]);
   /** company id -> trainee id: the class list is part of the package, so it is chosen here. */
   const [seats, setSeats] = useState<Record<number, string>>({});
   const [draft, setDraft] = useState({
@@ -53,6 +55,7 @@ export default function PackagesPanel() {
       settle(t("nav.packages"), api.packages(), setPackages),
       settle(t("start.companies"), api.companies(), setCompanies),
       settle(t("start.trainees"), api.trainees(), setTrainees),
+      settle(t("nav.bots"), api.bots(), setBots),
       settle(t("packages.tidy"), api.tidyPreview(), setTidy),
       settle(t("start.template"), api.templates(), (list) => {
         templateList = list;
@@ -319,16 +322,27 @@ export default function PackagesPanel() {
                           onChange={(e) => setSeats((c) => ({ ...c, [id]: e.target.value }))}
                         >
                           <option value="">{t("packages.seatOpen")}</option>
-                          {trainees
-                            .filter((trainee) =>
+                          {[
+                            ...trainees.map((trainee) => ({
+                              id: trainee.id,
+                              label: `${trainee.displayName} · ${trainee.email}`,
+                            })),
+                            ...bots
+                              .filter((bot) => bot.active && bot.userId !== null)
+                              .map((bot) => ({
+                                id: bot.userId as number,
+                                label: `${bot.name} · ${t("bots.autoLabel")}`,
+                              })),
+                          ]
+                            .filter((candidate) =>
                               Object.entries(seats).every(
                                 ([companyId, picked]) =>
-                                  Number(companyId) === id || picked !== String(trainee.id),
+                                  Number(companyId) === id || picked !== String(candidate.id),
                               ),
                             )
-                            .map((trainee) => (
-                              <option key={trainee.id} value={trainee.id}>
-                                {trainee.displayName} · {trainee.email}
+                            .map((candidate) => (
+                              <option key={candidate.id} value={candidate.id}>
+                                {candidate.label}
                               </option>
                             ))}
                         </select>

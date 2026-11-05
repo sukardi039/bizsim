@@ -125,6 +125,22 @@ worker, income elasticity (how much a downturn hits this line), trend affinity.
 trainees), duration in months, benefit curve (`LINEAR`, `POWER`, `CHANCE`), over-funding handling
 (`REFUND`, `LOST`).
 
+### 3.5 Auto workers
+
+**Auto workers** is a library of reusable opponents. Each has a **level** (Low / Mid / High — how well
+it plays) and a **personality** (Cautious / Balanced / Aggressive — what it wants). Creating one stores
+its name with the level as a suffix, so a scoreboard reads `Market 1_high`, and gives it an identity
+that can be seated like a person — but can never sign in.
+
+To put one in a class:
+
+1. Turn on **Offer auto workers to the class** in the template's settings (machine mechanics → quality
+   sits next to it). Template copies built before this switch existed keep playing without opponents.
+2. In **Packages**, pick the template and the companies; the class list now offers the auto workers
+   beside the trainees, labelled `· auto`.
+3. Publish and start the session as usual. The opponent plays every round by itself, under the same
+   submission rules, the same clock and the same validation as a trainee.
+
 **Note:** the product, channel and R&D catalogue **locks once a session has used this template** —
 those codes are stored in every decision, so rewriting them would strand a live class. Settings,
 environment and events stay editable (each run freezes its own copy of them).
@@ -272,6 +288,17 @@ change is immediate and lands in the audit trail; the class can see it.
 **Audit trail** is the session's log of every hand laid on it — clock paused/resumed/extended, cash
 adjusted, round voided — with the round, the company, the amount, the reason, who did it and when.
 When a class asks "why did our cash jump?", this table is the answer.
+
+### 7.2.2 The opponents
+
+When a session has auto-played companies, **Auto workers this session** lists one row per opponent per
+round: the brain and its version, how it was called (**scheduled**, **by hand**, or **missed**), and its
+one-line reason. **Replay** re-runs the same input and compares — *"the same input produces the same
+decision"* means the trace can be trusted in front of the class; a difference means the brain was
+edited after that round.
+
+**Ask them to move now** makes the opponents submit immediately instead of waiting for their moment.
+It is recorded as *by hand*, so the log stays honest.
 
 ### 7.3 Scoreboard
 

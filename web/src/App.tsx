@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import PlayerConsole from "./PlayerConsole";
 import TemplatesPanel from "./TemplatesPanel";
 import PeoplePanel from "./PeoplePanel";
+import AutoWorkersPanel from "./AutoWorkersPanel";
+import BotPanel from "./BotPanel";
 import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
@@ -144,7 +146,7 @@ export default function App() {
   const [identity, setIdentity] = useState<{ userId: number; role: string } | null>(null);
   const [identityProblem, setIdentityProblem] = useState<string | null>(null);
   /** Sessions drive a class; Templates is the setup workbench. Same shell, two views. */
-  const [view, setView] = useState<"runs" | "packages" | "templates" | "companies" | "people">("runs");
+  const [view, setView] = useState<"runs" | "packages" | "templates" | "companies" | "people" | "bots">("runs");
   const [runs, setRuns] = useState<Run[]>([]);
   // Only the id is state. The run object is derived, so refreshing the list cannot produce a new
   // object identity and re-trigger the effects that fetch the scoreboard — that was an endless loop.
@@ -354,6 +356,11 @@ export default function App() {
               <button className={view === "people" ? "active" : ""} onClick={() => setView("people")}>
                 {t("nav.people")}
               </button>
+              {/* Opponents are prepared, not added mid-class (D49): the library sits with the rest
+                  of the builder's material. */}
+              <button className={view === "bots" ? "active" : ""} onClick={() => setView("bots")}>
+                {t("nav.bots")}
+              </button>
             </>
           )}
         </nav>
@@ -386,6 +393,8 @@ export default function App() {
           <CompaniesPanel />
         ) : view === "people" && canBuild ? (
           <PeoplePanel />
+        ) : view === "bots" && canBuild ? (
+          <AutoWorkersPanel />
         ) : view === "templates" ? (
           <TemplatesPanel />
         ) : !selected ? (
@@ -468,6 +477,8 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <BotPanel run={selected} />
 
             <SessionTools
               run={selected}

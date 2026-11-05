@@ -107,12 +107,25 @@ a black box.
 | 1 | V20: role, `bot_profile`, `bot_decision`, `player.bot_profile_id`, `Params.autoWorkers` | done |
 | 2 | `AutoWorker` policy: nine profiles, seeded, rationale | done |
 | 3 | Self-play harness: level ordering + determinism + calibration table | done |
-| 4 | Builder UI: auto-worker library, seat a bot in a package | pending |
-| 5 | Worker: submit during the round, trace API + replay, scoreboard label | pending |
-| 6 | User guide section + reviewer notes | pending |
+| 4 | Builder UI: auto-worker library, seat a bot in a package | done — *Auto workers* tab; the package class list offers `Market 1_high · auto` beside the people |
+| 5 | Worker: submit during the round, trace API + replay | done — `BotRoundService` (5s sweep, seeded 20–70% of the round), `GET /runs/{id}/bots`, `POST /runs/{id}/bots/decide`, `POST /runs/{id}/bots/{team}/replay` |
+| 6 | User guide section | done — guide §3.5 and §7.2.2 |
 
-Until slice 5 lands, nothing in production seats a bot: the template switch is off by default and no
-package references a profile. The feature is inert by construction, not by discipline.
+Nothing seats a bot unless a template turns `autoWorkers` on **and** a package's class list names a
+brain: two deliberate switches, so the feature is inert by construction rather than by discipline.
+
+### Running a class with an opponent
+
+1. Builder → **Auto workers** → create `Market 1`, level *High*, personality *Aggressive*. The stored
+   name becomes `Market 1_high`.
+2. Templates → turn **Offer auto workers to the class** on in the template's settings (D48).
+3. Packages → pick that template and the companies → the class list now offers
+   `Market 1_high · auto` beside the trainees → publish.
+4. Facilitator → start the session from the package and open round 1. The opponent submits on its own
+   a little way into the round; **Auto workers this session** shows what it decided, the brain version,
+   the reason, and a **Replay** that must match.
+5. Want it to move sooner? **Ask them to move now** — recorded as `MANUAL`, so the class log never
+   claims it was scheduled when it was not.
 
 ---
 

@@ -24,10 +24,13 @@ public class SimulationController {
 
     private final RoundService rounds;
     private final DebriefExportService debrief;
+    private final BotRoundService bots;
 
-    public SimulationController(RoundService rounds, DebriefExportService debrief) {
+    public SimulationController(RoundService rounds, DebriefExportService debrief,
+                                BotRoundService bots) {
         this.rounds = rounds;
         this.debrief = debrief;
+        this.bots = bots;
     }
 
     @PostMapping("/teams/{teamId}/decisions")
@@ -181,6 +184,46 @@ public class SimulationController {
                 .header("Content-Disposition", "attachment; filename=\"" + name + runId + "."
                         + extension + "\"")
                 .body(body);
+    }
+
+    // ------------------------------------------------------------------ auto workers (D47–D50)
+
+    /**
+     * What the opponents did, round by round: profile version, mode, and the one-line reason. Staff
+     * only — an opponent's reasoning is class material, and a trainee sees nothing of another company.
+     */
+    @GetMapping("/bots")
+    public List<BotRepository.TraceRow> botTrace(@PathVariable long runId) {
+        TenantContext.Principal me = requireStaff();
+        return bots.trace(me.tenantId(), runId);
+    }
+
+    /** Ask every auto worker in this run to decide now, rather than waiting for its seeded moment. */
+    @PostMapping("/bots/decide")
+    public Map<String, Object> askBots(@PathVariable long runId) {
+        TenantContext.Principal me = requireFacilitator();
+        int decided = bots.decideNow(me.tenantId(), runId);
+        return Map.of("decided", decided);
+    }
+
+    /**
+     * Would the same brain make the same decision again? Rebuilds the context from the round's
+     * snapshot and re-runs the policy; `identical=false` means the brain changed since, or the trace
+     * cannot be trusted — either way the facilitator should know before the class asks.
+     */
+    @PostMapping("/bots/{teamId}/replay")
+    public BotRoundService.Replay replayBot(@PathVariable long runId, @PathVariable long teamId,
+                                            @RequestParam int round) {
+        TenantContext.Principal me = requireStaff();
+        return bots.replay(me.tenantId(), runId, round, teamId);
+    }
+
+    private static TenantContext.Principal requireStaff() {
+        TenantContext.Principal me = TenantContext.require();
+        if (!List.of("FACILITATOR", "ADMIN", "BUILDER").contains(me.role())) {
+            throw ProblemException.forbidden("auth.staff_only", "staff only");
+        }
+        return me;
     }
 
     private static TenantContext.Principal requireFacilitator() {

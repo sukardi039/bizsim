@@ -24,7 +24,9 @@ public class RunRepository {
                           BigDecimal brandScore, String status, BigDecimal machineWorkers) {
     }
 
-    public record PlayerRow(long id, long teamId, long userId, String roleKey, String displayName) {
+    /** `auto` is true when the seat carries a brain: the company is played by a policy (D47). */
+    public record PlayerRow(long id, long teamId, long userId, String roleKey, String displayName,
+                            boolean auto) {
     }
 
     private static final RowMapper<RunRow> RUN = (rs, i) -> new RunRow(
@@ -39,7 +41,8 @@ public class RunRepository {
 
     private static final RowMapper<PlayerRow> PLAYER = (rs, i) -> new PlayerRow(
             rs.getLong("id"), rs.getLong("team_id"), rs.getLong("user_id"),
-            rs.getString("role_key"), rs.getString("display_name"));
+            rs.getString("role_key"), rs.getString("display_name"),
+            rs.getObject("bot_profile_id") != null);
 
     private final JdbcTemplate jdbc;
 
@@ -172,6 +175,14 @@ public class RunRepository {
     }
 
     /** The user must belong to the caller's tenant; enforced in SQL, not by the controller. */
+    /** A person that carries a brain, i.e. a company played by a policy (D47). */
+    public boolean isAutoWorker(long userId) {
+        Boolean auto = jdbc.queryForObject(
+                "select exists (select 1 from app_user where id = ? and role = 'AUTO_WORKER')",
+                Boolean.class, userId);
+        return Boolean.TRUE.equals(auto);
+    }
+
     public boolean userBelongsToTenant(long userId, long tenantId) {
         Boolean ok = jdbc.queryForObject(
                 "select exists (select 1 from app_user where id = ? and tenant_id = ? and active)",
@@ -179,10 +190,16 @@ public class RunRepository {
         return Boolean.TRUE.equals(ok);
     }
 
+    /**
+     * A seat inherits the brain from the person (D47): seating an AUTO_WORKER is all it takes to make
+     * a company auto-played, so every seating path — prepared run, package, walk-in — behaves the same.
+     */
     public long insertPlayer(long runId, long teamId, long userId, String roleKey) {
         return jdbc.queryForObject("""
-                insert into player (run_id, team_id, user_id, role_key) values (?, ?, ?, ?) returning id
-                """, Long.class, runId, teamId, userId, roleKey);
+                insert into player (run_id, team_id, user_id, role_key, bot_profile_id)
+                select ?, ?, ?, ?, u.bot_profile_id from app_user u where u.id = ?
+                returning id
+                """, Long.class, runId, teamId, userId, roleKey, userId);
     }
 
     public boolean scenarioExists(String key) {
