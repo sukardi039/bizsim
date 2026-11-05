@@ -288,7 +288,7 @@ Under the scoreboard, for any computed round:
    - **Submission · round N** — what the company asked for: units, price and quality spend per
      product, marketing per channel, R&D per project, production staff and machines, and whether the
      market review was bought. A company that sent nothing says so.
-   - then a three-column breakdown, so the arithmetic reads left to right:
+   - **Results · round N** — then a three-column breakdown, so the arithmetic reads left to right:
    - **Revenue** — revenue for the round, and units lost to stock-outs
    - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
      hiring/firing, capacity, market review, then **Total cost**
@@ -321,8 +321,8 @@ Three buttons sit next to the round selector:
 | Button | What you get |
 |---|---|
 | **Present** | a full-screen classroom view of the selected round. Page 1 is the six numbers you read out — profit, cumulative profit, market share, cash, brand, stock — one card per company, labelled with the trainee. Page 2 is the explanation: lost sales, capacity used, R&D completed, status. **← →** change page, **↑ ↓** change round, **Esc** closes. |
-| **Download PDF** | an A4 landscape report: page 1 the class and its KPIs, page 2 the explanation and every cost line. Company and trainee names are rendered as authored, including Chinese. |
-| **Download Excel** | the same numbers as a workbook: one sheet for the round (all fourteen columns), one for the cost lines. |
+| **Download PDF** | an A4 landscape report of **every computed round**: one page per round with what each company sent, what the month produced, and every cost line. Company and trainee names are rendered as authored, including Chinese. |
+| **Download Excel** | the same numbers as a workbook: **Results** (one row per company per round), **Submissions** (the plan per company per round) and **Cost lines**, each with a Round column so the whole term can be filtered or pivoted. |
 
 Both files are built from the stored results, never a recomputation, so a downloaded report matches
 what the class saw on screen. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
@@ -376,6 +376,10 @@ package's class list and publishes a new package; the facilitator cannot seat yo
 
    **Competitors' figures and the market share stay on the facilitator's screen**; the trainee sees
    only their own company. Everything comes from the same statement rows the debrief reads.
+
+6. **My results (PDF / Excel)** in the same card gives the trainee their own report: every computed
+   round, what they sent and what it produced — their company only, no market share, no competitor
+   line. A trainee who has not been seated in the session gets a refusal, not an empty file.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."*

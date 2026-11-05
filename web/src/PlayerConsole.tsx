@@ -5,6 +5,7 @@ import StatementDetail from "./StatementDetail";
 import {
   api,
   ApiError,
+  downloadDebrief,
   type DecisionFormContext,
   type DecisionInput,
   type MarketForecast,
@@ -132,6 +133,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const [report, setReport] = useState<{ forecast: MarketForecast[] } | null>(null);
   /** The trainee's own computed rounds: same statements the facilitator's debrief reads. */
   const [statements, setStatements] = useState<StatementRow[]>([]);
+  const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
   const [resultRound, setResultRound] = useState<number | null>(null);
   const roundRef = useRef<number | null>(null);
 
@@ -224,6 +226,20 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       current ? { ...current, [group]: { ...current[group], [code]: value } } : current,
     );
 
+  /** The trainee's own report: every computed round, their company only (D43/D21). */
+  const download = async (format: "pdf" | "xlsx") => {
+    if (!run) return;
+    setDownloading(format);
+    setProblem(null);
+    try {
+      await downloadDebrief(run.id, format);
+    } catch (error) {
+      setProblem(errorText(error, t));
+    } finally {
+      setDownloading(null);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!run || !team || !context || !draft) return;
@@ -295,6 +311,15 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {/* No round dropdown: the summary rows below are the selector (click a round to open it). */}
         <h2>{t("player.results")}</h2>
         <p className="muted">{t("player.resultsHint")}</p>
+        <div className="buttons">
+          <button onClick={() => void download("pdf")} disabled={downloading !== null}>
+            {downloading === "pdf" ? t("debrief.exporting") : t("player.downloadPdf")}
+          </button>
+          <button onClick={() => void download("xlsx")} disabled={downloading !== null}>
+            {downloading === "xlsx" ? t("debrief.exporting") : t("player.downloadExcel")}
+          </button>
+        </div>
+        <p className="muted">{t("player.downloadHint")}</p>
 
         {/* The facilitator's debrief, for one company: a summary row per computed round, then the
             chosen round's detail below. Competitors' figures and the market share stay on the

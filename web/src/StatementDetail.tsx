@@ -63,6 +63,8 @@ export default function StatementDetail({
         </section>
       )}
 
+      <section className="detail-section">
+        <h4>{t("submission.resultsTitle", { round: row.round })}</h4>
       <div className="detail-grid">
       <div>
         <h4>{t("debrief.groupRevenue")}</h4>
@@ -199,6 +201,7 @@ export default function StatementDetail({
           </table>
         </div>
       )}
+      </section>
     </>
   );
 }

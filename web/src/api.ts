@@ -60,11 +60,10 @@ export function eventStreamUrl(runId: number, ticket: string): string {
  */
 export async function downloadDebrief(
   runId: number,
-  round: number,
   format: "pdf" | "xlsx",
 ): Promise<void> {
   const token = getToken();
-  const response = await fetch(`${BASE}/runs/${runId}/debrief/export?round=${round}&format=${format}`, {
+  const response = await fetch(`${BASE}/runs/${runId}/debrief/export?format=${format}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
   if (!response.ok) {
@@ -74,7 +73,10 @@ export async function downloadDebrief(
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `bizsim-debrief-run${runId}-round${round}.${format}`;
+  // The server names the file: the class debrief and a trainee's own report are different documents.
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const named = /filename="?([^";]+)"?/.exec(disposition);
+  link.download = named ? named[1] : `bizsim-debrief-run${runId}.${format}`;
   document.body.appendChild(link);
   link.click();
   link.remove();

@@ -105,6 +105,7 @@ const en: Dict = {
   "tools.action.ROUND_VOID": "Round voided",
 
   "submission.title": "Submission · round {round}",
+  "submission.resultsTitle": "Results · round {round}",
   "submission.none": "No decision was submitted for this round — the month ran on the company's standing plan.",
   "submission.units": "Units",
   "submission.price": "Price",
@@ -210,6 +211,9 @@ const en: Dict = {
   "player.marketIndices": "Demand index {demand} · cost index {cost}",
   "player.committedCash": "Committed cash this month (marketing, R&D, machines, review)",
   "player.results": "Your results",
+  "player.downloadPdf": "My results (PDF)",
+  "player.downloadExcel": "My results (Excel)",
+  "player.downloadHint": "Every computed round: what you sent, and what it produced. Your company only.",
   "player.resultsHint":
     "One row per computed round, then the chosen round in detail — the same figures the class debrief shows for this company, including the per-product lines. Competitors' figures stay with the facilitator.",
   "player.resultsRound": "Round {round} in detail",
@@ -587,6 +591,7 @@ const zh: Dict = {
   "tools.action.ROUND_VOID": "作废轮次",
 
   "submission.title": "提交 · 第 {round} 轮",
+  "submission.resultsTitle": "结果 · 第 {round} 轮",
   "submission.none": "本轮没有提交决策——按公司既有计划执行。",
   "submission.units": "数量",
   "submission.price": "单价",

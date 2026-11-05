@@ -1,5 +1,6 @@
 package com.bizsim.sim;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.Font;
@@ -33,17 +34,21 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The classroom debrief as a file (D13): six KPIs on the first page, the two "why" measures on the
- * second, plus the cost lines. It reads the same {@code round_result} and {@code round_statement}
- * rows the screen reads, so the export cannot disagree with the debrief.
+ * The debrief as a file: **every computed round**, each with what the class planned, what it cost and
+ * what it earned (D13/D43).
  *
- * <p>The PDF embeds WenQuanYi Micro Hei: class content is authored (company and product names may be
- * Chinese), and a PDF that renders them as boxes is worse than no PDF.
+ * <p>Two scopes, one report model. The facilitator gets the whole class; a trainee gets their own
+ * company only, without market share or any competitor line (D21). Both read the stored
+ * {@code round_result}, {@code round_statement} and {@code decision} rows, never a recomputation, so
+ * a downloaded report cannot disagree with the screen.
+ *
+ * <p>The PDF embeds WenQuanYi Micro Hei: class content is authored and may be Chinese, and a PDF that
+ * renders names as boxes is worse than no PDF.
  */
 @Service
 public class DebriefExportService {
 
-    /** The named costs a statement carries; the profit line is revenue minus their sum. */
+    /** The named costs a statement carries; profit is revenue minus their sum. */
     private static final List<Map.Entry<String, String>> COST_LINES = List.of(
             Map.entry("cogs", "Cost of goods sold"),
             Map.entry("payroll", "Payroll"),
@@ -57,169 +62,231 @@ public class DebriefExportService {
             Map.entry("report_cost", "Market review"));
 
     private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
 
-    public DebriefExportService(JdbcTemplate jdbc) {
+    public DebriefExportService(JdbcTemplate jdbc, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
-    public record Row(long teamId, String company, String trainees, BigDecimal revenue, BigDecimal cost,
-                      BigDecimal profit, BigDecimal cumulativeProfit, BigDecimal cash,
-                      BigDecimal marketShare, BigDecimal brand, BigDecimal stock, BigDecimal lostSales,
-                      BigDecimal capacityUtilisation, int rndCompleted, String status,
-                      Map<String, BigDecimal> costLines) {
+    public record ProductColumn(String code, String name) {
     }
 
-    public record Report(long runId, String title, String scenarioKey, int round, Instant computedAt,
-                         List<Row> rows) {
+    /** One company in one round: its plan, its money, its position. */
+    public record Row(long teamId, String company, String trainees,
+                      Map<String, BigDecimal> units, Map<String, BigDecimal> prices,
+                      Map<String, BigDecimal> qualitySpend,
+                      BigDecimal marketing, BigDecimal rnd, BigDecimal quality, int staff,
+                      BigDecimal machines, boolean review, boolean planSent,
+                      BigDecimal revenue, BigDecimal cost, BigDecimal profit,
+                      BigDecimal cumulativeProfit, BigDecimal cash, BigDecimal share,
+                      BigDecimal brand, BigDecimal stock, BigDecimal lostSales,
+                      BigDecimal capacityUsed, BigDecimal capacityAvailable, int rndCompleted,
+                      String status, Map<String, BigDecimal> costLines) {
     }
 
-    /** Assembles the report for one round of one run. Read-only. */
-    public Report load(long tenantId, long runId, Integer requestedRound) {
+    public record RoundReport(int round, Instant computedAt, List<Row> rows) {
+    }
+
+    /**
+     * @param classScope true for the facilitator's report; false for one company's own report, which
+     *                   drops market share and the class totals.
+     */
+    public record Report(long runId, String title, String scenarioKey, boolean classScope,
+                         List<ProductColumn> products, List<RoundReport> rounds) {
+    }
+
+    // ------------------------------------------------------------------ loading
+
+    public Report load(long tenantId, long runId, Integer requestedRound, Long teamFilter) {
         List<Map<String, Object>> meta = jdbc.query("""
-                select s.name, r.scenario_key,
-                       coalesce(?, (select max(number) from round
-                                    where run_id = r.id and status = 'COMPUTED')) as round_number
+                select s.name, r.scenario_key
                 from run r join simulation s on s.id = r.simulation_id
                 where r.id = ? and r.tenant_id = ?
                 """, (rs, i) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("name", rs.getString("name"));
             row.put("scenarioKey", rs.getString("scenario_key"));
-            row.put("round", (Integer) rs.getObject("round_number"));
             return row;
-        }, requestedRound, runId, tenantId);
-
+        }, runId, tenantId);
         if (meta.isEmpty()) {
             throw ProblemException.notFound("run.not_found", "no such run");
         }
-        Map<String, Object> head = meta.get(0);
-        Integer round = (Integer) head.get("round");
-        if (round == null) {
-            throw ProblemException.conflict("round.none_computed", "no round has been computed yet");
-        }
+        String scenarioKey = (String) meta.get(0).get("scenarioKey");
 
-        Instant computedAt = jdbc.query("""
-                select max(rr.computed_at) from round_result rr
-                join round r on r.id = rr.round_id where r.run_id = ? and r.number = ?
-                """, (rs, i) -> {
-            Timestamp stamp = rs.getTimestamp(1);
-            return stamp == null ? null : stamp.toInstant();
-        }, runId, round).stream().findFirst().orElse(null);
+        List<ProductColumn> products = jdbc.query(
+                "select code, name from product where scenario_key = ? order by code",
+                (rs, i) -> new ProductColumn(rs.getString("code"), rs.getString("name")), scenarioKey);
 
-        List<Row> rows = new ArrayList<>();
-        jdbc.query("""
-                select t.id as team_id, t.company_name,
+        List<Map<String, Object>> rows = jdbc.query("""
+                select r.number as round_number, rr.computed_at,
+                       t.id as team_id, t.company_name,
                        coalesce((select string_agg(u.display_name, ', ' order by u.display_name)
                                  from player p join app_user u on u.id = p.user_id
                                  where p.team_id = t.id), '') as trainees,
-                       (rr.score->>'revenue')::numeric            as revenue,
-                       (rr.score->>'marketShare')::numeric        as market_share,
-                       (rr.score->>'cumulativeProfit')::numeric   as cumulative_profit,
-                       (rr.score->>'cash')::numeric               as cash,
-                       (rr.score->>'brand')::numeric              as brand,
-                       (rr.score->>'stock')::numeric              as stock,
-                       (rr.score->>'lostSales')::numeric          as lost_sales,
-                       (rr.score->>'capacityUtilisation')::numeric as capacity_utilisation,
-                       (rr.score->>'rndCompleted')::int           as rnd_completed,
-                       rr.score->>'status'                        as status,
+                       (rr.score->>'revenue')::numeric             as revenue,
+                       (rr.score->>'marketShare')::numeric         as market_share,
+                       (rr.score->>'cumulativeProfit')::numeric    as cumulative_profit,
+                       (rr.score->>'cash')::numeric                as cash,
+                       (rr.score->>'brand')::numeric               as brand,
+                       (rr.score->>'stock')::numeric               as stock,
+                       (rr.score->>'lostSales')::numeric           as lost_sales,
+                       (rr.score->>'rndCompleted')::int            as rnd_completed,
+                       rr.score->>'status'                         as status,
                        s.cogs, s.payroll, s.marketing, s.rnd_spend, s.quality_cost, s.fixed_cost,
                        s.holding_cost, s.hiring_cost, s.capacity_cost, s.report_cost,
-                       coalesce(s.profit, (rr.score->>'profit')::numeric) as profit
+                       s.capacity_used, s.capacity_available,
+                       coalesce(s.profit, (rr.score->>'profit')::numeric) as profit,
+                       d.payload::text as payload
                 from round r
                 join round_result rr on rr.round_id = r.id
                 join team t on t.id = rr.team_id
                 left join round_statement s on s.round_id = r.id and s.team_id = t.id
-                where r.run_id = ? and r.number = ?
-                order by rr.total_score desc, t.id
-                """, rs -> {
+                left join decision d on d.round_id = r.id and d.team_id = t.id
+                where r.run_id = ? and r.status = 'COMPUTED'
+                  and (?::int is null or r.number = ?::int)
+                  and (?::bigint is null or t.id = ?::bigint)
+                order by r.number, rr.total_score desc, t.id
+                """, (rs, i) -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("round", rs.getInt("round_number"));
+            row.put("computedAt", rs.getTimestamp("computed_at") == null ? null
+                    : rs.getTimestamp("computed_at").toInstant());
+            row.put("teamId", rs.getLong("team_id"));
+            row.put("company", rs.getString("company_name"));
+            row.put("trainees", rs.getString("trainees"));
+            row.put("revenue", nz(rs.getBigDecimal("revenue")));
+            row.put("share", nz(rs.getBigDecimal("market_share")));
+            row.put("cumulativeProfit", nz(rs.getBigDecimal("cumulative_profit")));
+            row.put("cash", nz(rs.getBigDecimal("cash")));
+            row.put("brand", nz(rs.getBigDecimal("brand")));
+            row.put("stock", nz(rs.getBigDecimal("stock")));
+            row.put("lostSales", nz(rs.getBigDecimal("lost_sales")));
+            row.put("rndCompleted", rs.getInt("rnd_completed"));
+            row.put("status", rs.getString("status"));
+            row.put("profit", nz(rs.getBigDecimal("profit")));
+            row.put("capacityUsed", nz(rs.getBigDecimal("capacity_used")));
+            row.put("capacityAvailable", nz(rs.getBigDecimal("capacity_available")));
             Map<String, BigDecimal> costs = new LinkedHashMap<>();
             for (Map.Entry<String, String> line : COST_LINES) {
                 costs.put(line.getKey(), nz(rs.getBigDecimal(line.getKey())));
             }
-            BigDecimal cost = costs.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-            rows.add(new Row(rs.getLong("team_id"), rs.getString("company_name"),
-                    rs.getString("trainees"), nz(rs.getBigDecimal("revenue")), cost,
-                    nz(rs.getBigDecimal("profit")), nz(rs.getBigDecimal("cumulative_profit")),
-                    nz(rs.getBigDecimal("cash")), nz(rs.getBigDecimal("market_share")),
-                    nz(rs.getBigDecimal("brand")), nz(rs.getBigDecimal("stock")),
-                    nz(rs.getBigDecimal("lost_sales")), nz(rs.getBigDecimal("capacity_utilisation")),
-                    rs.getInt("rnd_completed"), rs.getString("status"), costs));
-        }, runId, round);
+            row.put("costLines", costs);
+            row.put("payload", rs.getString("payload"));
+            return row;
+        }, runId, requestedRound, requestedRound, teamFilter, teamFilter);
 
-        return new Report(runId, (String) head.get("name"), (String) head.get("scenarioKey"), round,
-                computedAt, rows);
+        if (rows.isEmpty()) {
+            throw ProblemException.conflict("round.none_computed", "no round has been computed yet");
+        }
+
+        Map<Integer, List<Row>> byRound = new LinkedHashMap<>();
+        Map<Integer, Instant> computedAt = new LinkedHashMap<>();
+        for (Map<String, Object> raw : rows) {
+            int round = (Integer) raw.get("round");
+            computedAt.putIfAbsent(round, (Instant) raw.get("computedAt"));
+            byRound.computeIfAbsent(round, key -> new ArrayList<>()).add(toRow(raw, products));
+        }
+
+        List<RoundReport> rounds = new ArrayList<>();
+        for (Map.Entry<Integer, List<Row>> entry : byRound.entrySet()) {
+            rounds.add(new RoundReport(entry.getKey(), computedAt.get(entry.getKey()), entry.getValue()));
+        }
+
+        String title = (String) meta.get(0).get("name");
+        if (teamFilter != null) {
+            title = rounds.get(rounds.size() - 1).rows().get(0).company() + " — " + title;
+        }
+        return new Report(runId, title, scenarioKey, teamFilter == null, products, rounds);
+    }
+
+    private Row toRow(Map<String, Object> raw, List<ProductColumn> products) {
+        DecisionPayload decision = parse((String) raw.get("payload"));
+        Map<String, BigDecimal> units = new LinkedHashMap<>();
+        Map<String, BigDecimal> prices = new LinkedHashMap<>();
+        Map<String, BigDecimal> qualitySpend = new LinkedHashMap<>();
+        for (ProductColumn product : products) {
+            units.put(product.code(), decision == null ? BigDecimal.ZERO : decision.units(product.code()));
+            prices.put(product.code(), decision == null ? BigDecimal.ZERO
+                    : nz(decision.priceOf(product.code())));
+            qualitySpend.put(product.code(), decision == null ? BigDecimal.ZERO
+                    : decision.qualityInvest(product.code()));
+        }
+        BigDecimal marketing = decision == null ? BigDecimal.ZERO : decision.marketingTotal();
+        BigDecimal rnd = decision == null ? BigDecimal.ZERO : decision.rndTotal();
+        BigDecimal quality = decision == null ? BigDecimal.ZERO : decision.qualityTotal();
+        int staff = decision == null ? 0 : decision.productionTarget().orElse(0);
+        BigDecimal machines = decision == null ? BigDecimal.ZERO : decision.capacityPurchaseOrZero();
+        boolean review = decision != null && decision.marketReportRequested();
+
+        @SuppressWarnings("unchecked")
+        Map<String, BigDecimal> costs = (Map<String, BigDecimal>) raw.get("costLines");
+        BigDecimal cost = costs.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new Row((Long) raw.get("teamId"), (String) raw.get("company"), (String) raw.get("trainees"),
+                units, prices, qualitySpend, marketing, rnd, quality, staff, machines, review,
+                decision != null, (BigDecimal) raw.get("revenue"), cost, (BigDecimal) raw.get("profit"),
+                (BigDecimal) raw.get("cumulativeProfit"), (BigDecimal) raw.get("cash"),
+                (BigDecimal) raw.get("share"), (BigDecimal) raw.get("brand"),
+                (BigDecimal) raw.get("stock"), (BigDecimal) raw.get("lostSales"),
+                (BigDecimal) raw.get("capacityUsed"), (BigDecimal) raw.get("capacityAvailable"),
+                (Integer) raw.get("rndCompleted"), (String) raw.get("status"), costs);
+    }
+
+    private DecisionPayload parse(String payload) {
+        if (payload == null) {
+            return null;
+        }
+        try {
+            return json.readValue(payload, DecisionPayload.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("stored decision is unreadable", e);
+        }
     }
 
     // ------------------------------------------------------------------ PDF
 
     public byte[] pdf(Report report) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-            Document document = new Document(PageSize.A4.rotate(), 32, 32, 30, 30);
+            Document document = new Document(PageSize.A4.rotate(), 30, 30, 28, 28);
             PdfWriter.getInstance(document, out);
             document.open();
 
-            BaseFont regular = embedded();
-            BaseFont bold = embedded();
-            Font title = new Font(bold, 18);
-            Font subtitle = new Font(regular, 10);
-            Font head = new Font(bold, 9);
-            Font body = new Font(regular, 9);
+            BaseFont face = embedded();
+            Font title = new Font(face, 17);
+            Font subtitle = new Font(face, 9);
+            Font roundHead = new Font(face, 13);
+            Font blockHead = new Font(face, 10);
+            Font head = new Font(face, 8);
+            Font body = new Font(face, 8);
 
             document.add(new Paragraph(report.title(), title));
-            document.add(new Paragraph(
-                    "Run " + report.runId() + " · " + report.scenarioKey() + " · round "
-                            + report.round() + (report.computedAt() == null ? ""
-                            : " · computed " + report.computedAt()), subtitle));
-            document.add(new Paragraph(" ", subtitle));
+            document.add(new Paragraph("Run " + report.runId() + " · " + report.scenarioKey() + " · "
+                    + (report.classScope() ? "class debrief" : "company report") + " · rounds "
+                    + report.rounds().get(0).round() + "–"
+                    + report.rounds().get(report.rounds().size() - 1).round(), subtitle));
 
-            document.add(new Paragraph("1. The class, this round", new Font(bold, 12)));
-            PdfPTable kpi = table(9);
-            header(kpi, head, "Company", "Trainee", "Revenue", "Cost", "Profit", "Cumulative",
-                    "Cash", "Share %", "Brand");
-            for (Row row : report.rows()) {
-                cell(kpi, body, row.company());
-                cell(kpi, body, row.trainees());
-                money(kpi, body, row.revenue());
-                money(kpi, body, row.cost());
-                money(kpi, body, row.profit());
-                money(kpi, body, row.cumulativeProfit());
-                money(kpi, body, row.cash());
-                cell(kpi, body, plain(row.marketShare()));
-                cell(kpi, body, plain(row.brand()));
-            }
-            document.add(kpi);
-
-            document.newPage();
-            document.add(new Paragraph("2. Why the numbers moved", new Font(bold, 12)));
-            PdfPTable why = table(6);
-            header(why, head, "Company", "Stock on hand", "Lost sales", "Capacity used %",
-                    "R&D completed", "Status");
-            for (Row row : report.rows()) {
-                cell(why, body, row.company());
-                cell(why, body, plain(row.stock()));
-                cell(why, body, plain(row.lostSales()));
-                cell(why, body, plain(row.capacityUtilisation()));
-                cell(why, body, String.valueOf(row.rndCompleted()));
-                cell(why, body, row.status());
-            }
-            document.add(why);
-
-            document.add(new Paragraph(" ", subtitle));
-            document.add(new Paragraph("Cost lines", new Font(bold, 12)));
-            PdfPTable costs = table(COST_LINES.size() + 1);
-            List<String> names = new ArrayList<>();
-            names.add("Company");
-            for (Map.Entry<String, String> line : COST_LINES) {
-                names.add(line.getValue());
-            }
-            header(costs, head, names.toArray(new String[0]));
-            for (Row row : report.rows()) {
-                cell(costs, body, row.company());
-                for (Map.Entry<String, String> line : COST_LINES) {
-                    money(costs, body, row.costLines().getOrDefault(line.getKey(), BigDecimal.ZERO));
+            boolean first = true;
+            for (RoundReport round : report.rounds()) {
+                // The title and round 1 share the first page; every later round starts its own.
+                if (!first) {
+                    document.newPage();
                 }
+                first = false;
+                document.add(new Paragraph("Round " + round.round(), roundHead));
+                if (round.computedAt() != null) {
+                    document.add(new Paragraph("computed " + round.computedAt(), subtitle));
+                }
+
+                document.add(new Paragraph("What each company sent", blockHead));
+                document.add(submissionTable(report, round, head, body));
+
+                document.add(new Paragraph("What the month produced", blockHead));
+                document.add(resultTable(report, round, head, body));
+
+                document.add(new Paragraph("Cost lines", blockHead));
+                document.add(costTable(round, head, body));
             }
-            document.add(costs);
 
             document.close();
             return out.toByteArray();
@@ -228,10 +295,101 @@ public class DebriefExportService {
         }
     }
 
-    /**
-     * The bundled CJK face, embedded as a subset. The collection index (`,0`) belongs to the font
-     * name passed to OpenPDF, not to the classpath resource.
-     */
+    /** One row per company: per-product plan, then the money the plan commits. */
+    private PdfPTable submissionTable(Report report, RoundReport round, Font head, Font body) {
+        int productColumns = report.products().size() * 3;
+        PdfPTable table = new PdfPTable(2 + productColumns + 5);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(4);
+
+        List<String> labels = new ArrayList<>(List.of("Company", "Trainee"));
+        for (ProductColumn product : report.products()) {
+            labels.add(product.code() + " units");
+            labels.add(product.code() + " price");
+            labels.add(product.code() + " quality");
+        }
+        labels.addAll(List.of("Marketing", "R&D", "Staff", "Machines", "Review"));
+        header(table, head, labels.toArray(new String[0]));
+
+        for (Row row : round.rows()) {
+            cell(table, body, row.company());
+            cell(table, body, row.trainees());
+            for (ProductColumn product : report.products()) {
+                cell(table, body, row.planSent()
+                        ? plain(row.units().get(product.code())) : "—");
+                cell(table, body, row.planSent()
+                        ? grouped(row.prices().get(product.code())) : "—");
+                cell(table, body, row.planSent()
+                        ? grouped(row.qualitySpend().get(product.code())) : "—");
+            }
+            if (!row.planSent()) {
+                cell(table, body, "no decision submitted");
+                for (int i = 0; i < 4; i++) {
+                    cell(table, body, "—");
+                }
+            } else {
+                money(table, body, row.marketing());
+                money(table, body, row.rnd());
+                cell(table, body, String.valueOf(row.staff()));
+                money(table, body, row.machines());
+                cell(table, body, row.review() ? "bought" : "no");
+            }
+        }
+        return table;
+    }
+
+    private PdfPTable resultTable(Report report, RoundReport round, Font head, Font body) {
+        int columns = report.classScope() ? 11 : 10;
+        PdfPTable table = new PdfPTable(columns);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(4);
+
+        List<String> labels = new ArrayList<>(List.of("Company", "Trainee", "Revenue", "Cost", "Profit",
+                "Cumulative", "Cash"));
+        if (report.classScope()) {
+            labels.add("Share %");
+        }
+        labels.addAll(List.of("Brand", "Stock", "Lost sales", "Capacity"));
+        header(table, head, labels.toArray(new String[0]));
+
+        for (Row row : round.rows()) {
+            cell(table, body, row.company());
+            cell(table, body, row.trainees());
+            money(table, body, row.revenue());
+            money(table, body, row.cost());
+            money(table, body, row.profit());
+            money(table, body, row.cumulativeProfit());
+            money(table, body, row.cash());
+            if (report.classScope()) {
+                cell(table, body, plain(row.share()));
+            }
+            cell(table, body, plain(row.brand()));
+            cell(table, body, plain(row.stock()));
+            cell(table, body, plain(row.lostSales()));
+            cell(table, body, plain(row.capacityUsed()) + " / " + plain(row.capacityAvailable()));
+        }
+        return table;
+    }
+
+    private PdfPTable costTable(RoundReport round, Font head, Font body) {
+        PdfPTable table = new PdfPTable(COST_LINES.size() + 2);
+        table.setWidthPercentage(100);
+        table.setSpacingBefore(4);
+        List<String> labels = new ArrayList<>(List.of("Company", "Trainee"));
+        for (Map.Entry<String, String> line : COST_LINES) {
+            labels.add(line.getValue());
+        }
+        header(table, head, labels.toArray(new String[0]));
+        for (Row row : round.rows()) {
+            cell(table, body, row.company());
+            cell(table, body, row.trainees());
+            for (Map.Entry<String, String> line : COST_LINES) {
+                money(table, body, row.costLines().getOrDefault(line.getKey(), BigDecimal.ZERO));
+            }
+        }
+        return table;
+    }
+
     private static BaseFont embedded() throws Exception {
         try (InputStream in = new ClassPathResource("fonts/wqy-microhei.ttc").getInputStream()) {
             return BaseFont.createFont("wqy-microhei.ttc,0", BaseFont.IDENTITY_H,
@@ -239,32 +397,25 @@ public class DebriefExportService {
         }
     }
 
-    private static PdfPTable table(int columns) {
-        PdfPTable table = new PdfPTable(columns);
-        table.setWidthPercentage(100);
-        table.setSpacingBefore(6);
-        return table;
-    }
-
     private static void header(PdfPTable table, Font font, String... labels) {
         for (String label : labels) {
             PdfPCell cell = new PdfPCell(new Phrase(label, font));
             cell.setBackgroundColor(new java.awt.Color(0xE8, 0xEE, 0xF6));
-            cell.setPadding(4);
+            cell.setPadding(3);
             table.addCell(cell);
         }
     }
 
     private static void cell(PdfPTable table, Font font, String text) {
         PdfPCell cell = new PdfPCell(new Phrase(text == null ? "" : text, font));
-        cell.setPadding(4);
+        cell.setPadding(3);
         table.addCell(cell);
     }
 
     private static void money(PdfPTable table, Font font, BigDecimal value) {
         PdfPCell cell = new PdfPCell(new Phrase(grouped(value), font));
         cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        cell.setPadding(4);
+        cell.setPadding(3);
         table.addCell(cell);
     }
 
@@ -279,54 +430,119 @@ public class DebriefExportService {
             head.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
             head.setFillPattern(FillPatternType.SOLID_FOREGROUND);
 
-            Sheet sheet = workbook.createSheet("Round " + report.round());
-            String[] columns = {"Company", "Trainee", "Revenue", "Cost", "Profit", "Cumulative profit",
-                    "Cash", "Market share %", "Brand", "Stock", "Lost sales", "Capacity used %",
-                    "R&D completed", "Status"};
-            writeHeader(sheet, head, columns);
-            int r = 1;
-            for (Row row : report.rows()) {
-                org.apache.poi.ss.usermodel.Row line = sheet.createRow(r++);
-                line.createCell(0).setCellValue(row.company());
-                line.createCell(1).setCellValue(row.trainees());
-                number(line, 2, row.revenue());
-                number(line, 3, row.cost());
-                number(line, 4, row.profit());
-                number(line, 5, row.cumulativeProfit());
-                number(line, 6, row.cash());
-                number(line, 7, row.marketShare());
-                number(line, 8, row.brand());
-                number(line, 9, row.stock());
-                number(line, 10, row.lostSales());
-                number(line, 11, row.capacityUtilisation());
-                line.createCell(12).setCellValue(row.rndCompleted());
-                line.createCell(13).setCellValue(row.status());
-            }
-            sizes(sheet, columns.length);
-
-            Sheet costs = workbook.createSheet("Cost lines");
-            List<String> names = new ArrayList<>();
-            names.add("Company");
-            for (Map.Entry<String, String> line : COST_LINES) {
-                names.add(line.getValue());
-            }
-            writeHeader(costs, head, names.toArray(new String[0]));
-            r = 1;
-            for (Row row : report.rows()) {
-                org.apache.poi.ss.usermodel.Row line = costs.createRow(r++);
-                line.createCell(0).setCellValue(row.company());
-                int c = 1;
-                for (Map.Entry<String, String> cost : COST_LINES) {
-                    number(line, c++, row.costLines().getOrDefault(cost.getKey(), BigDecimal.ZERO));
-                }
-            }
-            sizes(costs, names.size());
+            summarySheet(workbook, report, head);
+            submissionSheet(workbook, report, head);
+            costSheet(workbook, report, head);
 
             workbook.write(out);
             return out.toByteArray();
         } catch (Exception e) {
             throw new IllegalStateException("cannot build the debrief workbook", e);
         }
+    }
+
+    private void summarySheet(Workbook workbook, Report report, CellStyle head) {
+        Sheet sheet = workbook.createSheet("Results");
+        List<String> columns = new ArrayList<>(List.of("Round", "Company", "Trainee", "Revenue", "Cost",
+                "Profit", "Cumulative profit", "Cash"));
+        if (report.classScope()) {
+            columns.add("Market share %");
+        }
+        columns.addAll(List.of("Brand", "Stock", "Lost sales", "Capacity used", "Capacity available",
+                "R&D completed", "Status"));
+        writeHeader(sheet, head, columns.toArray(new String[0]));
+
+        int index = 1;
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                org.apache.poi.ss.usermodel.Row line = sheet.createRow(index++);
+                int c = 0;
+                line.createCell(c++).setCellValue(round.round());
+                line.createCell(c++).setCellValue(row.company());
+                line.createCell(c++).setCellValue(row.trainees());
+                c = number(line, c, row.revenue());
+                c = number(line, c, row.cost());
+                c = number(line, c, row.profit());
+                c = number(line, c, row.cumulativeProfit());
+                c = number(line, c, row.cash());
+                if (report.classScope()) {
+                    c = number(line, c, row.share());
+                }
+                c = number(line, c, row.brand());
+                c = number(line, c, row.stock());
+                c = number(line, c, row.lostSales());
+                c = number(line, c, row.capacityUsed());
+                c = number(line, c, row.capacityAvailable());
+                line.createCell(c++).setCellValue(row.rndCompleted());
+                line.createCell(c).setCellValue(row.status());
+            }
+        }
+        sizes(sheet, columns.size());
+        sheet.setColumnWidth(1, 26 * 256);
+        sheet.setColumnWidth(2, 26 * 256);
+    }
+
+    private void submissionSheet(Workbook workbook, Report report, CellStyle head) {
+        Sheet sheet = workbook.createSheet("Submissions");
+        List<String> columns = new ArrayList<>(List.of("Round", "Company", "Trainee"));
+        for (ProductColumn product : report.products()) {
+            columns.add(product.code() + " units");
+            columns.add(product.code() + " price");
+            columns.add(product.code() + " quality spend");
+        }
+        columns.addAll(List.of("Marketing", "R&D", "Quality", "Production staff", "Machines",
+                "Market review", "Submitted"));
+        writeHeader(sheet, head, columns.toArray(new String[0]));
+
+        int index = 1;
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                org.apache.poi.ss.usermodel.Row line = sheet.createRow(index++);
+                int c = 0;
+                line.createCell(c++).setCellValue(round.round());
+                line.createCell(c++).setCellValue(row.company());
+                line.createCell(c++).setCellValue(row.trainees());
+                for (ProductColumn product : report.products()) {
+                    c = number(line, c, row.units().get(product.code()));
+                    c = number(line, c, row.prices().get(product.code()));
+                    c = number(line, c, row.qualitySpend().get(product.code()));
+                }
+                c = number(line, c, row.marketing());
+                c = number(line, c, row.rnd());
+                c = number(line, c, row.quality());
+                line.createCell(c++).setCellValue(row.staff());
+                c = number(line, c, row.machines());
+                line.createCell(c++).setCellValue(row.review() ? "bought" : "no");
+                line.createCell(c).setCellValue(row.planSent() ? "yes" : "no");
+            }
+        }
+        sizes(sheet, columns.size());
+        sheet.setColumnWidth(1, 26 * 256);
+        sheet.setColumnWidth(2, 26 * 256);
+    }
+
+    private void costSheet(Workbook workbook, Report report, CellStyle head) {
+        Sheet sheet = workbook.createSheet("Cost lines");
+        List<String> columns = new ArrayList<>(List.of("Round", "Company"));
+        for (Map.Entry<String, String> line : COST_LINES) {
+            columns.add(line.getValue());
+        }
+        writeHeader(sheet, head, columns.toArray(new String[0]));
+
+        int index = 1;
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                org.apache.poi.ss.usermodel.Row line = sheet.createRow(index++);
+                int c = 0;
+                line.createCell(c++).setCellValue(round.round());
+                line.createCell(c++).setCellValue(row.company());
+                for (Map.Entry<String, String> cost : COST_LINES) {
+                    c = number(line, c, row.costLines().getOrDefault(cost.getKey(), BigDecimal.ZERO));
+                }
+            }
+        }
+        sizes(sheet, columns.size());
+        sheet.setColumnWidth(1, 26 * 256);
     }
 
     private static void writeHeader(Sheet sheet, CellStyle style, String[] labels) {
@@ -339,22 +555,21 @@ public class DebriefExportService {
         sheet.createFreezePane(0, 1);
     }
 
-    private static void number(org.apache.poi.ss.usermodel.Row row, int column, BigDecimal value) {
+    private static int number(org.apache.poi.ss.usermodel.Row row, int column, BigDecimal value) {
         row.createCell(column).setCellValue(value == null ? 0d : value.doubleValue());
+        return column + 1;
     }
 
     private static void sizes(Sheet sheet, int columns) {
         for (int i = 0; i < columns; i++) {
-            sheet.setColumnWidth(i, 16 * 256);
+            sheet.setColumnWidth(i, 14 * 256);
         }
-        sheet.setColumnWidth(0, 26 * 256);
-        sheet.setColumnWidth(1, 26 * 256);
     }
 
     // ------------------------------------------------------------------ formatting
 
     private static String grouped(BigDecimal value) {
-        return value == null ? "" : String.format("%,.2f", value.setScale(2, RoundingMode.HALF_UP));
+        return value == null ? "" : String.format("%,.0f", value.setScale(0, RoundingMode.HALF_UP));
     }
 
     private static String plain(BigDecimal value) {

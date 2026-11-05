@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * D13: the debrief leaves the screen. A PDF that renders authored Chinese content (the class may be
- * Chinese) and a workbook the cohort can keep, both read from the stored results.
+ * D13/D43: the debrief leaves the screen — every computed round with its submission, its results and
+ * its cost lines, rendering authored Chinese content, and scoped correctly for a trainee (D21).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -46,6 +46,8 @@ class DebriefExportApiTest extends PostgresTestBase {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     private long runId;
+    private long teamOne;
+    private long teamTwo;
     private String facilitatorToken;
     private String playerToken;
 
@@ -60,12 +62,13 @@ class DebriefExportApiTest extends PostgresTestBase {
                 "insert into tenant (code, name) values ('acme', 'Acme') returning id", Long.class);
         user(tenant, "trainer@acme.test", "FACILITATOR");
         user(tenant, "one@acme.test", "PLAYER");
+        user(tenant, "two@acme.test", "PLAYER");
+        user(tenant, "admin@acme.test", "ADMIN");
         facilitatorToken = login("trainer@acme.test");
         playerToken = login("one@acme.test");
+        String adminToken = login("admin@acme.test");
 
         // A Chinese company name on purpose: the PDF must render authored content, not boxes.
-        user(tenant, "admin@acme.test", "ADMIN");
-        String adminToken = login("admin@acme.test");
         MvcResult run = mvc.perform(post("/api/runs")
                         .param("facilitatorId", String.valueOf(idOf("trainer@acme.test")))
                         .header("Authorization", "Bearer " + adminToken)
@@ -79,12 +82,19 @@ class DebriefExportApiTest extends PostgresTestBase {
                 .andExpect(status().isCreated())
                 .andReturn();
         runId = json.readTree(run.getResponse().getContentAsString()).get("id").asLong();
+        teamOne = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        teamTwo = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id desc limit 1", Long.class, runId);
 
-        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
-                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
-        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
-                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+        addPlayer(teamOne, "one@acme.test");
+
+        openRound();
+        submit(teamOne, payload(600, 150, 30, 20_000_000L, 30)).andExpect(status().isOk());
+        compute();
     }
+
+    // ------------------------------------------------------------------ the class report
 
     @Test
     void the_pdf_renders_the_class_including_its_chinese_names() throws Exception {
@@ -98,15 +108,17 @@ class DebriefExportApiTest extends PostgresTestBase {
         assertThat(new String(body, 0, 5, StandardCharsets.ISO_8859_1)).isEqualTo("%PDF-");
         assertThat(result.getResponse().getContentType()).isEqualTo("application/pdf");
         assertThat(result.getResponse().getHeader("Content-Disposition"))
-                .contains("bizsim-debrief-run" + runId + "-round1.pdf");
+                .contains("bizsim-debrief-run" + runId + ".pdf");
 
-        PdfReader reader = new PdfReader(body);
-        String first = new PdfTextExtractor(reader).getTextFromPage(1);
-        assertThat(first).contains("阿尔法制造");
-        assertThat(first).contains("Beta Corp");
-        // Six KPIs on the slide (D13) plus the revenue/cost/profit lines the class reads out.
-        assertThat(first).contains("Revenue").contains("Profit").contains("Cash");
-        assertThat(reader.getNumberOfPages()).isGreaterThanOrEqualTo(2);
+        String text = new PdfTextExtractor(new PdfReader(body)).getTextFromPage(1);
+        assertThat(text).contains("阿尔法制造");
+        assertThat(text).contains("Beta Corp");
+        // Each round carries three blocks (D43): the plan, the money, the cost lines.
+        assertThat(text).contains("Round 1");
+        assertThat(text).contains("What each company sent");
+        assertThat(text).contains("What the month produced");
+        assertThat(text).contains("Cost lines");
+        assertThat(text).contains("Revenue").contains("Profit").contains("Cash");
     }
 
     @Test
@@ -122,23 +134,150 @@ class DebriefExportApiTest extends PostgresTestBase {
                 .isEqualTo("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(body))) {
-            Sheet sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Company");
-            assertThat(sheet.getRow(0).getCell(2).getStringCellValue()).isEqualTo("Revenue");
-            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isIn("阿尔法制造", "Beta Corp");
-            assertThat(sheet.getLastRowNum()).isEqualTo(2);
+            Sheet results = workbook.getSheet("Results");
+            assertThat(results.getRow(0).getCell(0).getStringCellValue()).isEqualTo("Round");
+            assertThat(results.getRow(0).getCell(1).getStringCellValue()).isEqualTo("Company");
+            assertThat(results.getRow(1).getCell(0).getNumericCellValue()).isEqualTo(1);
+            assertThat(results.getRow(1).getCell(1).getStringCellValue()).isIn("阿尔法制造", "Beta Corp");
+            // Two companies, one computed round.
+            assertThat(results.getLastRowNum()).isEqualTo(2);
+
+            Sheet submissions = workbook.getSheet("Submissions");
+            assertThat(submissions.getRow(0).getCell(2).getStringCellValue()).isEqualTo("Trainee");
             assertThat(workbook.getSheet("Cost lines")).isNotNull();
         }
     }
 
     @Test
-    void only_the_staff_side_may_export() throws Exception {
-        mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+    void every_computed_round_is_in_the_export() throws Exception {
+        // Round 2: open, decide, compute.
+        openRound();
+        submit(teamOne, payload(700, 120, 25, 15_000_000L, 30)).andExpect(status().isOk());
+        compute();
+
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "xlsx")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(result.getResponse().getContentAsByteArray()))) {
+            Sheet results = workbook.getSheet("Results");
+            // 2 rounds × 2 companies.
+            assertThat(results.getLastRowNum()).isEqualTo(4);
+            assertThat(results.getRow(3).getCell(0).getNumericCellValue()).isEqualTo(2);
+            assertThat(workbook.getSheet("Submissions").getLastRowNum()).isEqualTo(4);
+        }
+
+        String text = new PdfTextExtractor(new PdfReader(resultPdf(facilitatorToken)))
+                .getTextFromPage(2);
+        assertThat(text).contains("Round 2");
+    }
+
+    // ------------------------------------------------------------------ the trainee's own report
+
+    @Test
+    void a_trainee_gets_their_own_company_and_nothing_else() throws Exception {
+        openRound();
+        submit(teamOne, payload(700, 120, 25, 15_000_000L, 30)).andExpect(status().isOk());
+        compute();
+
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "pdf")
                         .header("Authorization", "Bearer " + playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertThat(result.getResponse().getHeader("Content-Disposition"))
+                .contains("bizsim-results-run" + runId + ".pdf");
+
+        PdfReader reader = new PdfReader(result.getResponse().getContentAsByteArray());
+        String text = new PdfTextExtractor(reader).getTextFromPage(1);
+        assertThat(text).contains("阿尔法制造");
+        // D21: no competitor, and no market share, reaches a trainee.
+        assertThat(text).doesNotContain("Beta Corp");
+        assertThat(text).doesNotContain("Share");
+
+        MvcResult workbookResult = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "xlsx")
+                        .header("Authorization", "Bearer " + playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        try (XSSFWorkbook workbook = new XSSFWorkbook(
+                new ByteArrayInputStream(workbookResult.getResponse().getContentAsByteArray()))) {
+            Sheet results = workbook.getSheet("Results");
+            // Two computed rounds, one company: two rows, and no market-share column.
+            assertThat(results.getLastRowNum()).isEqualTo(2);
+            assertThat(results.getRow(1).getCell(1).getStringCellValue()).isEqualTo("阿尔法制造");
+            List<String> headers = new java.util.ArrayList<>();
+            results.getRow(0).forEach(cell -> headers.add(cell.getStringCellValue()));
+            assertThat(headers).doesNotContain("Market share %");
+        }
+    }
+
+    @Test
+    void a_trainee_who_is_not_seated_is_refused() throws Exception {
+        String strangerToken = login("two@acme.test");
+        mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .header("Authorization", "Bearer " + strangerToken))
                 .andExpect(status().isForbidden());
     }
 
     // ------------------------------------------------------------------ helpers
+
+    private byte[] resultPdf(String token) throws Exception {
+        return mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "pdf")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsByteArray();
+    }
+
+    private void openRound() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+    }
+
+    private void compute() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions submit(long teamId,
+                                                                      Map<String, Object> body)
+            throws Exception {
+        return mvc.perform(post("/api/runs/" + runId + "/teams/" + teamId + "/decisions")
+                .header("Authorization", "Bearer " + playerToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(body)));
+    }
+
+    private static Map<String, Object> payload(int p1, int p2, int p3, long marketing, int production) {
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("production", List.of(
+                Map.of("product", "P1", "units", p1),
+                Map.of("product", "P2", "units", p2),
+                Map.of("product", "P3", "units", p3)));
+        body.put("price", List.of(
+                Map.of("product", "P1", "unitPrice", 1_000_000),
+                Map.of("product", "P2", "unitPrice", 2_500_000),
+                Map.of("product", "P3", "unitPrice", 5_000_000)));
+        body.put("marketing", List.of(Map.of("channel", "DIGITAL", "spend", marketing)));
+        body.put("manpower", Map.of("production", production));
+        body.put("rnd", List.of(Map.of("project", "RND-P1-COST", "invest", 0)));
+        body.put("capacityPurchase", 0);
+        body.put("marketReport", false);
+        return body;
+    }
+
+    private void addPlayer(long teamId, String email) throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/players")
+                        .header("Authorization", "Bearer " + facilitatorToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "teamId", teamId, "userId", idOf(email), "roleKey", "OWNER"))))
+                .andExpect(status().isCreated());
+    }
 
     private void user(long tenantId, String email, String role) {
         jdbc.update("""

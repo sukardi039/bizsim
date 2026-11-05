@@ -469,6 +469,14 @@ public class RoundRepository {
                 BigDecimal.class, delta, teamId);
     }
 
+    /** The company a trainee is seated in for this run, if any: the scope of their own report (D21). */
+    public Optional<Long> teamOfPlayer(long userId, long runId) {
+        return jdbc.query("""
+                select p.team_id from player p join team t on t.id = p.team_id
+                where p.user_id = ? and t.run_id = ? order by p.id limit 1
+                """, (rs, i) -> rs.getLong(1), userId, runId).stream().findFirst();
+    }
+
     public boolean teamBelongsToRun(long teamId, long runId) {
         Boolean ok = jdbc.queryForObject(
                 "select exists (select 1 from team where id = ? and run_id = ?)", Boolean.class, teamId, runId);

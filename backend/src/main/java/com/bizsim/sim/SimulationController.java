@@ -142,25 +142,40 @@ public class SimulationController {
     }
 
     /**
-     * The classroom debrief as a file (D13): `format=pdf` for projecting and printing, `format=xlsx`
-     * for the cohort to keep. Both read the stored results, never a recomputation.
+     * The debrief as a file: every computed round, each with its submission, its results and its cost
+     * lines (D13/D43). Formats: `pdf` for projecting and printing, `xlsx` for the cohort to keep.
+     *
+     * <p>Staff get the whole class. A trainee gets **their own company only**, without market share or
+     * any competitor line (D21); asking for someone else's company is not expressible here, because
+     * the team comes from their seat, not from the request.
      */
     @GetMapping("/debrief/export")
     public ResponseEntity<byte[]> exportDebrief(@PathVariable long runId,
                                                 @RequestParam(required = false) Integer round,
                                                 @RequestParam(defaultValue = "pdf") String format) {
-        TenantContext.Principal me = requireFacilitator();
-        DebriefExportService.Report report = debrief.load(me.tenantId(), runId, round);
+        TenantContext.Principal me = TenantContext.require();
+        boolean staff = "FACILITATOR".equals(me.role()) || "ADMIN".equals(me.role());
+        Long teamFilter = null;
+        if (!staff) {
+            if (!"PLAYER".equals(me.role())) {
+                throw ProblemException.forbidden("auth.staff_only", "staff or trainee role required");
+            }
+            teamFilter = rounds.teamOfPlayer(me.userId(), runId).orElseThrow(
+                    () -> ProblemException.forbidden("team.not_yours",
+                            "you are not seated in this session"));
+        }
+        DebriefExportService.Report report = debrief.load(me.tenantId(), runId, round, teamFilter);
         boolean excel = "xlsx".equalsIgnoreCase(format) || "excel".equalsIgnoreCase(format);
         byte[] body = excel ? debrief.xlsx(report) : debrief.pdf(report);
         String extension = excel ? "xlsx" : "pdf";
         String mediaType = excel
                 ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 : "application/pdf";
+        String name = staff ? "bizsim-debrief-run" : "bizsim-results-run";
         return ResponseEntity.ok()
                 .contentType(org.springframework.http.MediaType.parseMediaType(mediaType))
-                .header("Content-Disposition", "attachment; filename=\"bizsim-debrief-run" + runId
-                        + "-round" + report.round() + "." + extension + "\"")
+                .header("Content-Disposition", "attachment; filename=\"" + name + runId + "."
+                        + extension + "\"")
                 .body(body);
     }
 

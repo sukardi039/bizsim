@@ -138,7 +138,7 @@ export default function DebriefPanel({
               setProblem(null);
               setDownloading("pdf");
               try {
-                await downloadDebrief(runId, round, "pdf");
+                await downloadDebrief(runId, "pdf");
               } catch (error) {
                 setProblem(describeError(error, t));
               } finally {
@@ -154,7 +154,7 @@ export default function DebriefPanel({
               setProblem(null);
               setDownloading("xlsx");
               try {
-                await downloadDebrief(runId, round, "xlsx");
+                await downloadDebrief(runId, "xlsx");
               } catch (error) {
                 setProblem(describeError(error, t));
               } finally {

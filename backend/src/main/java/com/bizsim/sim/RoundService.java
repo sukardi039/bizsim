@@ -338,6 +338,12 @@ public class RoundService {
         return rounds.auditOf(runId);
     }
 
+    /** The company a trainee is seated in, so their own report can be scoped to it (D21/D43). */
+    @Transactional(readOnly = true)
+    public Optional<Long> teamOfPlayer(long userId, long runId) {
+        return rounds.teamOfPlayer(userId, runId);
+    }
+
     /** The clock of the open round, for the console header. Empty when nothing is open. */
     @Transactional(readOnly = true)
     public Optional<ClockState> openClock(long runId) {
