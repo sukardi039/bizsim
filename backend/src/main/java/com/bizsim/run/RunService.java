@@ -55,6 +55,7 @@ public class RunService {
 
     private final RunRepository runs;
     private final RoundService rounds;
+    private final com.bizsim.sim.BotRoundService bots;
     private final ScenarioRepository scenarios;
     private final EnvironmentService environment;
     private final JdbcTemplate jdbc;
@@ -65,9 +66,10 @@ public class RunService {
     public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
                       EnvironmentService environment, JdbcTemplate jdbc,
                       CompanyProfileRepository profiles, UserRepository users,
-                      PackageRepository packages) {
+                      PackageRepository packages, com.bizsim.sim.BotRoundService bots) {
         this.runs = runs;
         this.rounds = rounds;
+        this.bots = bots;
         this.scenarios = scenarios;
         this.environment = environment;
         this.jdbc = jdbc;
@@ -319,6 +321,8 @@ public class RunService {
 
         // Advancing closes whatever is open and computes it. Closing an already-computed round is a
         // no-op by design, so a facilitator who clicks twice does not get two rounds of results.
+        // D56: "open next round" computes the previous one, so opponents get their turn first.
+        bots.decideBeforeClose(tenantId, runId);
         rounds.closeAndCompute(tenantId, runId);
         rounds.openRound(runId, next);
         runs.setCurrentRound(runId, next);

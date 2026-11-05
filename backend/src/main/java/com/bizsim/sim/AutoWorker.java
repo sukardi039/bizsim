@@ -248,7 +248,10 @@ public final class AutoWorker {
             machines = BigDecimal.ZERO;
         }
 
-        why.append("P1 ").append(unitsByProduct.getOrDefault("P1", BigDecimal.ZERO).stripTrailingZeros())
+        // toPlainString(): stripTrailingZeros() turns 600.00 into 6E+2, and a rationale read aloud in
+        // class must not contain scientific notation.
+        why.append("P1 ").append(unitsByProduct.getOrDefault("P1", BigDecimal.ZERO)
+                .stripTrailingZeros().toPlainString())
                 .append(" @").append(shortMoney(priceByProduct.getOrDefault("P1", BigDecimal.ZERO)));
         why.append(" · staff ").append(productionStaff);
         why.append(" · marketing ").append(shortMoney(marketing));

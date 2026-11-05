@@ -166,6 +166,23 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     @Test
+    void computing_early_lets_the_opponent_play_instead_of_skipping_the_month() throws Exception {
+        openRound();
+        // Straight to compute, before the seeded moment: this is what a facilitator does in a workshop.
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("""
+                select count(*) from decision d join round r on r.id = d.round_id
+                where r.run_id = ? and d.team_id = ?
+                """, Integer.class, runId, botTeamId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select mode from bot_decision where team_id = ?",
+                String.class, botTeamId)).isEqualTo("AT_CLOSE");
+        assertThat(jdbc.queryForObject("select count(*) from round_statement where team_id = ?",
+                Integer.class, botTeamId)).isEqualTo(1);
+    }
+
+    @Test
     void a_package_can_seat_an_opponent_beside_a_person() throws Exception {
         long alpha = profile("Alpha");
         long market = profile("Market 1_high");

@@ -97,6 +97,8 @@ public class SimulationController {
     @PostMapping("/rounds/close")
     public ResponseEntity<ScoringEngine.RoundResult> close(@PathVariable long runId) {
         TenantContext.Principal me = requireFacilitator();
+        // D56: an opponent that has not had its moment yet plays now, rather than losing the month.
+        bots.decideBeforeClose(me.tenantId(), runId);
         Optional<ScoringEngine.RoundResult> result = rounds.closeAndCompute(me.tenantId(), runId);
         return result.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
     }

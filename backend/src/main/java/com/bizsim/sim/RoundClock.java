@@ -19,10 +19,12 @@ public class RoundClock {
 
     private final RoundService rounds;
     private final RoundRepository repository;
+    private final BotRoundService bots;
 
-    public RoundClock(RoundService rounds, RoundRepository repository) {
+    public RoundClock(RoundService rounds, RoundRepository repository, BotRoundService bots) {
         this.rounds = rounds;
         this.repository = repository;
+        this.bots = bots;
     }
 
     @Scheduled(fixedDelay = 5000L, initialDelay = 10000L)
@@ -31,6 +33,8 @@ public class RoundClock {
             long runId = due[0];
             long tenantId = due[1];
             try {
+                // D56: opponents that have not had their moment play before the clock closes the round.
+                bots.decideBeforeClose(tenantId, runId);
                 rounds.closeAndCompute(tenantId, runId)
                         .ifPresent(r -> log.info("round clock closed run {} ({} companies)", runId,
                                 r.teams().size()));

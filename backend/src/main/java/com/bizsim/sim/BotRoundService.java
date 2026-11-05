@@ -89,6 +89,31 @@ public class BotRoundService {
         return decided;
     }
 
+    /**
+     * A round is about to be computed. Any opponent whose seeded moment has not arrived yet decides
+     * now, as `AT_CLOSE` (D56): a facilitator computing early is the normal case in a workshop, and a
+     * company that never had its turn is not "a company like any other" — it is one that was denied
+     * the chance a person at the keyboard had. An opponent whose moment *did* pass and still produced
+     * nothing keeps its absence visible, so a broken worker is not hidden by this.
+     */
+    @Transactional
+    public int decideBeforeClose(long tenantId, long runId) {
+        int decided = 0;
+        for (BotRepository.Due due : bots.due(tenantId, runId)) {
+            try {
+                int minutes = scenarios.load(due.scenarioKey()).params().roundMinutes();
+                if (Instant.now().isBefore(submitAt(due, minutes))) {
+                    decideOne(due, "AT_CLOSE");
+                    decided++;
+                }
+            } catch (RuntimeException e) {
+                log.warn("auto worker {} (run {}) could not decide at close: {}", due.companyName(),
+                        runId, e.getMessage());
+            }
+        }
+        return decided;
+    }
+
     public List<BotRepository.TraceRow> trace(long tenantId, long runId) {
         return bots.trace(tenantId, runId);
     }
