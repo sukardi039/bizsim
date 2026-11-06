@@ -338,7 +338,16 @@ export default function App() {
 
         <nav className="nav" aria-label={t("nav.sections")}>
           {canRun && (
-            <button className={view === "runs" ? "active" : ""} onClick={() => setView("runs")}>
+            <button
+              className={view === "runs" ? "active" : ""}
+              onClick={() => {
+                // D70: Sessions is the way back to the session list and the start card. Leaving a run
+                // selected meant this button did nothing visible, and the package (and part) picker only
+                // came back after a page reload.
+                setView("runs");
+                setSelectedId(null);
+              }}
+            >
               {t("nav.sessions")}
             </button>
           )}
