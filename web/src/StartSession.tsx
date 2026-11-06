@@ -18,7 +18,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
   const [name, setName] = useState("");
   const [packageId, setPackageId] = useState<number | "">("");
   /** D62: which part of the programme to start; 1 when it has a single part. */
-  const [part, setPart] = useState(1);
+  const [part, setPart] = useState<number | "">(1);
 
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -30,7 +30,6 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
       setPackages(published);
       setCompanies(companyList);
       setPackageId((current) => current || published[0]?.id || "");
-      setPart(1);
     } catch (error) {
       setProblem(describeError(error, t));
     }
@@ -41,6 +40,25 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
   }, [load]);
 
   const chosen = packages.find((entry) => entry.id === packageId);
+  /**
+   * A part is started once. The parts that already have a session are not offered — a second
+   * session of the same part would duplicate a class that exists — and a package with nothing left
+   * to start cannot be started at all.
+   */
+  const parts = chosen?.parts ?? [];
+  const startedParts = new Set(chosen?.startedParts ?? []);
+  const openParts = parts.filter((entry) => !startedParts.has(entry.position));
+  const alreadyStarted = parts.filter((entry) => startedParts.has(entry.position));
+  const allStarted = chosen != null && openParts.length === 0;
+
+  // Keep the chosen part inside what is on offer: a package with part 1 begun opens on part 2,
+  // and switching packages never carries a part that the new package does not have.
+  useEffect(() => {
+    const first: number | "" = openParts.length > 0 ? openParts[0].position : "";
+    setPart((current) =>
+      openParts.some((entry) => entry.position === current) ? current : first,
+    );
+  }, [packageId, chosen]);
   const companyNames = (entry: SimulationPackage) =>
     entry.companyProfileIds
       .map((id) => companies.find((company) => company.id === id)?.name ?? `#${id}`)
@@ -48,7 +66,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
 
   const start = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (packageId === "") return;
+    if (packageId === "" || part === "") return;
     setBusy(true);
     setProblem(null);
     try {
@@ -108,11 +126,11 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
           </label>
         </div>
 
-        {chosen && (chosen.parts?.length ?? 0) > 1 && (
+        {parts.length > 1 && openParts.length > 0 && (
           <label>
             {t("start.part")}
             <select value={part} onChange={(e) => setPart(Number(e.target.value))}>
-              {chosen.parts!.map((entry) => (
+              {openParts.map((entry) => (
                 <option key={entry.position} value={entry.position}>
                   {entry.position}. {entry.name}
                 </option>
@@ -120,6 +138,17 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
             </select>
           </label>
         )}
+
+        {alreadyStarted.length > 0 && (
+          <p className="muted">
+            {t("start.partsStarted", {
+              parts: alreadyStarted
+                .map((entry) => `${entry.position}. ${entry.name}`)
+                .join(" · "),
+            })}
+          </p>
+        )}
+        {allStarted && <p className="error">{t("start.allPartsStarted")}</p>}
 
         {chosen && (
           <p className="muted">
@@ -145,7 +174,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
         </ul>
 
         <div className="buttons">
-          <button className="primary" type="submit" disabled={busy || packageId === ""}>
+          <button className="primary" type="submit" disabled={busy || packageId === "" || part === ""}>
             {busy ? t("start.starting") : t("start.start")}
           </button>
         </div>

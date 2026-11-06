@@ -29,10 +29,15 @@ public class PackageRepository {
                           int templateVersion) {
     }
 
+    /**
+     * {@code startedParts} are the parts that already have a session of this package, so the console
+     * can offer only the parts that have not begun (a part is started once). A legacy run started
+     * before D62 carries a null part and counts as part 1.
+     */
     public record PackageRow(long id, String name, String templateKey, String sourceTemplateKey,
                              int templateVersion, List<Long> companyProfileIds, List<Seat> seats,
                              String locale, String status, String publishedAt,
-                             List<PartRow> parts) {
+                             List<PartRow> parts, List<Integer> startedParts) {
     }
 
     private final JdbcTemplate jdbc;
@@ -83,8 +88,18 @@ public class PackageRepository {
                 rs.getString("template_key"), rs.getString("source_template_key"),
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
                 seatsOf(rs.getLong("id")), rs.getString("locale"), rs.getString("status"),
-                rs.getString("published_at"), partsOf(rs.getLong("id"))),
+                rs.getString("published_at"), partsOf(rs.getLong("id")),
+                startedPartsOf(tenantId, rs.getLong("id"))),
                 tenantId);
+    }
+
+    /** The parts of this package that already have a session: they cannot be started twice. */
+    public List<Integer> startedPartsOf(long tenantId, long packageId) {
+        return jdbc.queryForList("""
+                select distinct coalesce(part_position, 1) from run
+                where package_id = ? and tenant_id = ?
+                order by 1
+                """, Integer.class, packageId, tenantId);
     }
 
     /** The programme's parts, in order. A single-simulation package has exactly one. */

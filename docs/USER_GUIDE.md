@@ -327,7 +327,10 @@ once, so the same companies and the same people play every part; each part uses 
 starts from the same opening condition, so the parts can be compared fairly.
 
 - **Starting:** pick the part in **Start a session** (Part 1, Part 2…). A part only opens once the
-  previous one is finished.
+  previous one is finished. **A part is started once:** parts that already have a session are not
+  offered in the list (they are named underneath as *already started*), and *Start session* is
+  disabled when every part has begun. To replay a part, **Reset** that session or publish a new
+  package — you cannot open a second session of the same part by accident.
 - **Comparing:** the run screen of any part shows **Programme comparison** — each company's profit in
   every part, the move against the previous part, and the move against the class average.
 - **Resetting:** reset one part from its run screen, or the whole programme from the package.

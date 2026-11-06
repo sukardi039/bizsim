@@ -388,6 +388,11 @@ export interface SimulationPackage {
   publishedAt: string;
   /** D62: the parts of a programme, in order. A single-simulation package has one. */
   parts?: { position: number; name: string; templateKey: string; templateVersion: number }[];
+  /**
+   * Parts that already have a session. A part starts once, so the console offers only the rest —
+   * starting the same part twice would duplicate a class that already exists.
+   */
+  startedParts?: number[];
 }
 
 /** One simulation inside a programme. Omit parts entirely for a single-simulation package. */

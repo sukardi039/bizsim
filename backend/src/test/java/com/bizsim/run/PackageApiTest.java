@@ -245,6 +245,38 @@ class PackageApiTest extends PostgresTestBase {
                 Integer.class, firstRun, secondRun)).isZero();
     }
 
+    /**
+     * A part is started once. Replaying a class means resetting the session it belongs to or
+     * publishing a new package, not opening a second run of the same part — which the console could
+     * not distinguish from the first and a facilitator would have to guess between.
+     */
+    @Test
+    void a_part_that_has_started_is_offered_no_second_time() throws Exception {
+        long packageId = publish("Played once");
+
+        // Nothing has begun, so the package offers part 1.
+        mvc.perform(get("/api/packages").header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].startedParts.length()").value(0));
+
+        startPart(packageId, 1);
+
+        // The package now reports the part as started: the console leaves it out of the choice.
+        mvc.perform(get("/api/packages").header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].startedParts[0]").value(1));
+
+        // And the server refuses it whatever the client sends, so a duplicate cannot be created by hand.
+        mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Again", "part", 1))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("part.already_started"));
+        assertThat(jdbc.queryForObject("select count(*) from run where package_id = ?",
+                Integer.class, packageId)).isEqualTo(1);
+    }
+
     private long startPart(long packageId, int part) throws Exception {
         MvcResult session = mvc.perform(post("/api/packages/" + packageId + "/sessions")
                         .header("Authorization", "Bearer " + facilitator)

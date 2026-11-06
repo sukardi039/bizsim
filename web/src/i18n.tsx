@@ -471,6 +471,9 @@ const en: Dict = {
   "start.fullLine": "full product line",
   "start.start": "Start session",
   "start.starting": "Starting…",
+  "start.partsStarted": "Already started: {parts} — those parts are not offered again.",
+  "start.allPartsStarted":
+    "Every part of this package has already been started. Reset that session to replay it, or publish a new package.",
   "start.classList": "Class list",
   "start.classListHint":
     "Prepared with the package: one person per company. To change it, publish a new package — seats cannot be changed once the session starts.",
@@ -1026,6 +1029,9 @@ const zh: Dict = {
   "start.fullLine": "全部产品线",
   "start.start": "开始模拟",
   "start.starting": "正在开始…",
+  "start.partsStarted": "已开始的部次：{parts} —— 这些部次不再提供。",
+  "start.allPartsStarted":
+    "此模拟包的每个部次都已开始。如需重玩，请重置该场次；否则请发布新的模拟包。",
   "start.classList": "班级名单",
   "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包——模拟开始后无法调整座位。",
   "start.mapping": "座位安排",

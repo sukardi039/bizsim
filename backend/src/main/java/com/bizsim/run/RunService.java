@@ -268,6 +268,21 @@ public class RunService {
                 .orElseThrow(() -> ProblemException.badRequest("package.part_unknown",
                         "this package has " + parts.size() + " part(s); there is no part " + position,
                         "part", position));
+        // A part is started once. A second session of the same part would be a duplicate of a class
+        // that already exists — and for a single-part package the console cannot show it as a choice,
+        // so the rule has to hold on the server too. Deleting the session frees the part again.
+        String existing = jdbc.query("""
+                select status from run
+                where package_id = ? and tenant_id = ? and coalesce(part_position, 1) = ?
+                order by id desc limit 1
+                """, (rs, i) -> rs.getString(1), packageId, tenantId, position)
+                .stream().findFirst().orElse(null);
+        if (existing != null) {
+            throw ProblemException.conflict("part.already_started",
+                    "part " + position + " of this package has already been started"
+                            + " (it is " + existing + "); reset that session, or publish a new package",
+                    "part", position, "status", existing);
+        }
         if (position > 1) {
             String previous = jdbc.query("""
                     select status from run where package_id = ? and tenant_id = ? and part_position = ?
