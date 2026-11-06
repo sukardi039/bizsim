@@ -354,7 +354,7 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "With an opponent", "templateKey", "standard-v1",
+                                "locale", "en", "name", "With an opponent", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(alpha, market),
                                 "traineeIds", java.util.Arrays.asList(null, botUserId)))))
                 .andExpect(status().isCreated())
@@ -390,7 +390,7 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "No opponents", "templateKey", "standard-v1",
+                                "locale", "en", "name", "No opponents", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(alpha, market),
                                 "traineeIds", java.util.Arrays.asList(null, botUserId)))))
                 .andExpect(status().isConflict())

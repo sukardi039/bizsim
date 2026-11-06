@@ -463,7 +463,9 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 ---
 
 **Chinese classes:** the R&D catalogue exists in two sets — English and Chinese — and a session reads
-only its own, decided by the package's class language when the session starts. Builders see both sets
+only its own, decided by the package's **Language**, which is now required when you publish (English or
+中文). There is no "follow each trainee" option: the language also decides which project set the class
+competes on, and that cannot vary per reader. Builders see both sets
 in the template's **R&D projects** tab, distinguished by the *Catalogue* column (English / 中文).
 
 ## 9. Admin — accounts

@@ -103,7 +103,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + facilitator)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Mine", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Mine", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId)))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("auth.builder_only"));
@@ -164,7 +164,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Broken", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Broken", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
                                 "traineeIds", List.of(1L)))))
                 .andExpect(status().isBadRequest())
@@ -185,7 +185,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Course", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Course", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId),
                                 "traineeIds", java.util.Arrays.asList(
                                         jdbc.queryForObject("select id from app_user "
@@ -286,7 +286,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Autumn 2026", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Autumn 2026", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
                                 "traineeIds", java.util.Arrays.asList(ada, null)))))
                 .andExpect(status().isCreated())
@@ -348,15 +348,16 @@ class PackageApiTest extends PostgresTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].locale").value("zh"));
 
-        // No language declared: the package says nothing and each person keeps their own.
+        // D66: no language declared is refused — the class language is part of the package, because it
+        // decides both the interface and which R&D catalogue the class competes on.
         mvc.perform(post("/api/packages")
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Plain cohort", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId)))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.locale").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.locale_required"));
 
         // Anything else is refused rather than stored and half-honoured.
         mvc.perform(post("/api/packages")
@@ -385,7 +386,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Bad", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
                                 "traineeIds", List.of(ada)))))
                 .andExpect(status().isBadRequest())
@@ -396,7 +397,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Bad", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
                                 "traineeIds", List.of(ada, ada)))))
                 .andExpect(status().isBadRequest())
@@ -407,7 +408,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Bad", "templateKey", "standard-v1",
+                                "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId),
                                 "traineeIds", List.of(trainer)))))
                 .andExpect(status().isBadRequest())
@@ -568,7 +569,7 @@ class PackageApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", name, "templateKey", templateKey,
+                                "locale", "en", "name", name, "templateKey", templateKey,
                                 "companyProfileIds", List.of(profileId)))))
                 .andExpect(status().isCreated())
                 .andReturn();

@@ -18,7 +18,7 @@ import { useI18n } from "./i18n";
  * disappears, so the sessions it ran keep a name to point at.
  */
 export default function PackagesPanel() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [packages, setPackages] = useState<SimulationPackage[]>([]);
   const [templates, setTemplates] = useState<TemplateRow[]>([]);
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
@@ -31,7 +31,9 @@ export default function PackagesPanel() {
     name: "",
     templateKey: "",
     companyIds: [] as number[],
-    locale: "",
+    // D66: the class language is part of the package, so it starts as the builder's own and can be
+    // changed — never blank, because a blank one used to mean "each trainee decides".
+    locale: String(locale),
     /** D62: extra parts beyond the first. Empty = a single-simulation package. */
     parts: [] as { name: string; templateKey: string }[],
   });
@@ -102,7 +104,7 @@ export default function PackagesPanel() {
         name: "",
         templateKey: draft.templateKey,
         companyIds: [],
-        locale: "",
+        locale: String(locale),
         parts: [],
       });
       setSeats({});
@@ -168,6 +170,7 @@ export default function PackagesPanel() {
     !draft.name.trim() ? t("packages.blockedName") : null,
     draft.companyIds.length === 0 ? t("packages.blockedCompanies") : null,
     !draft.templateKey ? t("packages.blockedTemplate") : null,
+    !draft.locale ? t("packages.blockedLanguage") : null,
   ].filter((entry): entry is string => entry !== null);
 
   const companyName = (id: number) =>
@@ -383,9 +386,8 @@ export default function PackagesPanel() {
               value={draft.locale}
               onChange={(e) => setDraft((current) => ({ ...current, locale: e.target.value }))}
             >
-              <option value="">{t("packages.languagePerson")}</option>
-              <option value="en">English</option>
-              <option value="zh">中文</option>
+              <option value="en">{t("editor.catalogEnglish")}</option>
+              <option value="zh">{t("editor.catalogChinese")}</option>
             </select>
             <small className="muted">{t("packages.classLanguageHint")}</small>
           </label>

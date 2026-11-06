@@ -130,9 +130,15 @@ public class PackageController {
 
         // The class language travels with the package: a trainee seated from it reads the interface in
         // this language, whatever their own preference says. Blank/null means "no class language".
-        String locale = request.locale() == null || request.locale().isBlank()
-                ? null : request.locale().trim().toLowerCase();
-        if (locale != null && !java.util.List.of("en", "zh").contains(locale)) {
+        // D66: the class language is pinned when the package is published. It decides the interface
+        // language *and* which R&D catalogue the class reads, and "follow each trainee" cannot express
+        // that — a trainee's own choice must never decide which project set the class competes on.
+        String locale = request.locale() == null ? "" : request.locale().trim().toLowerCase();
+        if (locale.isBlank()) {
+            throw ProblemException.badRequest("package.locale_required",
+                    "choose the class language: English or Chinese", "field", "locale");
+        }
+        if (!java.util.List.of("en", "zh").contains(locale)) {
             throw ProblemException.badRequest("package.locale_invalid",
                     "the class language must be en or zh", "field", "locale");
         }
