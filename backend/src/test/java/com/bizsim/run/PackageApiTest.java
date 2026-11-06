@@ -176,6 +176,105 @@ class PackageApiTest extends PostgresTestBase {
     }
 
     @Test
+    void a_package_can_hold_several_parts_and_they_play_in_order() throws Exception {
+        String second = copyTemplate();
+        int templatesBefore = jdbc.queryForObject("select count(*) from scenario where "
+                + "frozen_for_package is null", Integer.class);
+
+        MvcResult published = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Course", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "traineeIds", java.util.Arrays.asList(
+                                        jdbc.queryForObject("select id from app_user "
+                                                + "where email = 'ada@acme.test'", Long.class)),
+                                "parts", List.of(
+                                        Map.of("name", "Basics", "templateKey", "standard-v1"),
+                                        Map.of("name", "Competition", "templateKey", second))))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.parts.length()").value(2))
+                .andExpect(jsonPath("$.parts[0].position").value(1))
+                .andExpect(jsonPath("$.parts[1].name").value("Competition"))
+                .andReturn();
+        long packageId = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
+
+        // Each part froze its own copy, and neither appears in the template library (D14/D54).
+        assertThat(jdbc.queryForObject("select count(*) from scenario where frozen_for_package is null",
+                Integer.class)).isEqualTo(templatesBefore);
+
+        // Part 2 before part 1 is refused, with the part named.
+        mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Too early", "part", 2))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("part.previous_missing"));
+
+        long firstRun = startPart(packageId, 1);
+        playAll(firstRun);
+        assertThat(jdbc.queryForObject("select status from run where id = ?", String.class, firstRun))
+                .isEqualTo("FINISHED");
+
+        long secondRun = startPart(packageId, 2);
+        assertThat(jdbc.queryForObject("select part_position from run where id = ?", Integer.class,
+                secondRun)).isEqualTo(2);
+        // Same class list, seated again in the new part.
+        assertThat(jdbc.queryForObject("select count(*) from team where run_id = ?", Integer.class,
+                secondRun)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from player where run_id = ?", Integer.class,
+                secondRun)).isEqualTo(1);
+
+        // The comparison sees both parts and the move between them.
+        mvc.perform(get("/api/packages/" + packageId + "/comparison")
+                        .header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.parts.length()").value(2))
+                .andExpect(jsonPath("$.companies.length()").value(1))
+                .andExpect(jsonPath("$.companies[0].parts.length()").value(2))
+                .andExpect(jsonPath("$.companies[0].parts[0].delta").doesNotExist())
+                .andExpect(jsonPath("$.companies[0].parts[1].delta").exists());
+
+        // Resetting the programme puts every part back to month 0.
+        mvc.perform(post("/api/packages/" + packageId + "/reset")
+                        .header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.partsReset").value(2));
+        assertThat(jdbc.queryForObject("select count(*) from round where run_id in (?, ?)",
+                Integer.class, firstRun, secondRun)).isZero();
+    }
+
+    private long startPart(long packageId, int part) throws Exception {
+        MvcResult session = mvc.perform(post("/api/packages/" + packageId + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "Course", "part", part))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        return json.readTree(session.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    /** Plays a part to the end: open, compute, open, compute… */
+    private void playAll(long runId) throws Exception {
+        boolean first = true;
+        while (true) {
+            mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                    .header("Authorization", "Bearer " + facilitator)).andExpect(status().isOk());
+            mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                    .header("Authorization", "Bearer " + facilitator)).andExpect(status().isOk());
+            String status = jdbc.queryForObject("select status from run where id = ?", String.class, runId);
+            if ("FINISHED".equals(status)) {
+                return;
+            }
+            if (!first && !"OPEN".equals(status)) {
+                return;
+            }
+            first = false;
+        }
+    }
+
+    @Test
     void the_class_list_is_prepared_with_the_package() throws Exception {
         long beta = jdbc.queryForObject("""
                 insert into company_profile (tenant_id, name, company_name, products)

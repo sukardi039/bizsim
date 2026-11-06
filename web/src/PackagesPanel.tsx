@@ -32,6 +32,8 @@ export default function PackagesPanel() {
     templateKey: "",
     companyIds: [] as number[],
     locale: "",
+    /** D62: extra parts beyond the first. Empty = a single-simulation package. */
+    parts: [] as { name: string; templateKey: string }[],
   });
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -86,9 +88,23 @@ export default function PackagesPanel() {
         // positional: one entry per company, null where the seat is left open
         traineeIds: draft.companyIds.map((id) => (seats[id] ? Number(seats[id]) : null)),
         locale: draft.locale || null,
+        // The first part is the package's own template; extra parts make it a programme.
+        parts:
+          draft.parts.length === 0
+            ? undefined
+            : [
+                { name: draft.name.trim() || t("packages.partOne"), templateKey: draft.templateKey },
+                ...draft.parts.filter((part) => part.templateKey),
+              ],
       });
       setNotice(t("packages.published", { name: made.name }));
-      setDraft({ name: "", templateKey: draft.templateKey, companyIds: [], locale: "" });
+      setDraft({
+        name: "",
+        templateKey: draft.templateKey,
+        companyIds: [],
+        locale: "",
+        parts: [],
+      });
       setSeats({});
       await load();
     } catch (error) {
@@ -253,6 +269,80 @@ export default function PackagesPanel() {
                 ))}
               </select>
             </label>
+          </div>
+
+          {/* D62: extra simulations in the same package, each with its own template. */}
+          <h3 className="pick-head">{t("packages.parts")}</h3>
+          <p className="muted">{t("packages.partsHint")}</p>
+          {draft.parts.map((part, index) => (
+            <div className="row" key={index}>
+              <label>
+                {t("packages.partName", { position: index + 2 })}
+                <input
+                  value={part.name}
+                  onChange={(e) =>
+                    setDraft((current) => ({
+                      ...current,
+                      parts: current.parts.map((row, at) =>
+                        at === index ? { ...row, name: e.target.value } : row,
+                      ),
+                    }))
+                  }
+                />
+              </label>
+              <label>
+                {t("start.template")}
+                <select
+                  value={part.templateKey}
+                  onChange={(e) =>
+                    setDraft((current) => ({
+                      ...current,
+                      parts: current.parts.map((row, at) =>
+                        at === index ? { ...row, templateKey: e.target.value } : row,
+                      ),
+                    }))
+                  }
+                >
+                  {templates.map((template) => (
+                    <option key={template.key} value={template.key}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() =>
+                  setDraft((current) => ({
+                    ...current,
+                    parts: current.parts.filter((_, at) => at !== index),
+                  }))
+                }
+              >
+                {t("packages.removePart")}
+              </button>
+            </div>
+          ))}
+          <div className="buttons">
+            <button
+              type="button"
+              className="ghost"
+              onClick={() =>
+                setDraft((current) => ({
+                  ...current,
+                  parts: [
+                    ...current.parts,
+                    {
+                      name: "",
+                      templateKey: current.templateKey || templates[0]?.key || "",
+                    },
+                  ],
+                }))
+              }
+            >
+              {t("packages.addPart")}
+            </button>
           </div>
 
           <h3 className="pick-head">

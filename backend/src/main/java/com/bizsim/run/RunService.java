@@ -47,7 +47,9 @@ public class RunService {
                           /** Seconds left, already frozen while paused; -1 for an untimed round. */
                           long clockRemainingSeconds,
                           /** D52: whether the class may read the standings table. */
-                          boolean standingsVisible) {
+                          boolean standingsVisible,
+                          /** D62: the programme, and which part of it this run plays. */
+                          Long packageId, Integer partPosition) {
     }
 
     public record RoundState(int number, String status) {
@@ -222,6 +224,20 @@ public class RunService {
     public RunView startFromPackage(long tenantId, long facilitatorId, long packageId, String name,
                                     List<Long> traineeIds, Integer requestedRounds,
                                     Integer requestedCycles) {
+        return startFromPackage(tenantId, facilitatorId, packageId, name, traineeIds, requestedRounds,
+                requestedCycles, null);
+    }
+
+    /**
+     * D62: start one part of a programme. Parts are separate runs of the same class list, each on its
+     * own frozen template, with no state carried between them — every part opens from the same
+     * starting condition, which is what makes the comparison between parts mean something. A later
+     * part cannot start until the previous one is finished.
+     */
+    @Transactional
+    public RunView startFromPackage(long tenantId, long facilitatorId, long packageId, String name,
+                                    List<Long> traineeIds, Integer requestedRounds,
+                                    Integer requestedCycles, Integer partPosition) {
         PackageRepository.PackageRow pkg = packages.find(tenantId, packageId).orElseThrow(
                 () -> ProblemException.notFound("package.not_found", "no such package"));
         if (!"PUBLISHED".equals(pkg.status())) {
@@ -242,10 +258,153 @@ public class RunService {
         }
         List<Long> effective = traineeIds == null || traineeIds.isEmpty() ? seats : traineeIds;
 
-        RunView view = startPrepared(tenantId, facilitatorId, name, pkg.templateKey(),
-                pkg.companyProfileIds(), effective, requestedRounds, requestedCycles);
-        jdbc.update("update run set package_id = ? where id = ?", packageId, view.id());
+        List<PackageRepository.PartRow> parts = pkg.parts();
+        int position = partPosition == null ? 1 : partPosition;
+        PackageRepository.PartRow part = parts.stream().filter(p -> p.position() == position)
+                .findFirst()
+                .orElseThrow(() -> ProblemException.badRequest("package.part_unknown",
+                        "this package has " + parts.size() + " part(s); there is no part " + position,
+                        "part", position));
+        if (position > 1) {
+            String previous = jdbc.query("""
+                    select status from run where package_id = ? and tenant_id = ? and part_position = ?
+                    order by id desc limit 1
+                    """, (rs, i) -> rs.getString(1), packageId, tenantId, position - 1)
+                    .stream().findFirst().orElse(null);
+            if (previous == null) {
+                throw ProblemException.conflict("part.previous_missing",
+                        "part " + (position - 1) + " has not been played, so part " + position
+                                + " cannot start", "part", position - 1);
+            }
+            if (!"FINISHED".equals(previous)) {
+                throw ProblemException.conflict("part.previous_unfinished",
+                        "part " + (position - 1) + " is still " + previous
+                                + ": finish it before starting part " + position,
+                        "part", position - 1, "status", previous);
+            }
+        }
+
+        // Rounds come from the part's template, never from the request: a part is defined by the
+        // template the builder published it with (ruling 5 Nov 2026).
+        RunView view = startPrepared(tenantId, facilitatorId, name, part.templateKey(),
+                pkg.companyProfileIds(), effective, null, null);
+        jdbc.update("update run set package_id = ?, part_position = ? where id = ?", packageId,
+                position, view.id());
         return view(tenantId, view.id());
+    }
+
+    /**
+     * D62: how the class moved between the parts of a programme. No state is carried, so each part is a
+     * fresh race and the interesting numbers are the deltas: what a company did in part 2 compared with
+     * part 1, and how that compares with the class's own move.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Object> comparison(long tenantId, long packageId) {
+        PackageRepository.PackageRow pkg = packages.find(tenantId, packageId).orElseThrow(
+                () -> ProblemException.notFound("package.not_found", "no such package"));
+
+        List<java.util.Map<String, Object>> runRows = packages.partRuns(tenantId, packageId);
+        List<java.util.Map<String, Object>> parts = new ArrayList<>();
+        // Keyed by company name, not team id: a part is a separate run with its own team rows, so the
+        // id changes between parts while the company is the same.
+        java.util.Map<String, java.util.Map<String, Object>> byCompany = new java.util.LinkedHashMap<>();
+
+        for (java.util.Map<String, Object> runRow : runRows) {
+            long runId = ((Number) runRow.get("run_id")).longValue();
+            int position = runRow.get("part_position") == null ? 0
+                    : ((Number) runRow.get("part_position")).intValue();
+            List<java.util.Map<String, Object>> profits = packages.partProfits(runId);
+
+            java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+            List<java.util.Map<String, Object>> companies = new ArrayList<>();
+            for (int i = 0; i < profits.size(); i++) {
+                java.util.Map<String, Object> row = profits.get(i);
+                long teamId = ((Number) row.get("team_id")).longValue();
+                String company = (String) row.get("company_name");
+                java.math.BigDecimal profit = (java.math.BigDecimal) row.get("profit");
+                total = total.add(profit);
+
+                java.util.Map<String, Object> cell = new java.util.LinkedHashMap<>();
+                cell.put("position", position);
+                cell.put("profit", profit);
+                cell.put("rank", i + 1);
+                companies.add(cell);
+                byCompany.computeIfAbsent(company, key -> new java.util.LinkedHashMap<>())
+                        .put("p" + position, cell);
+            }
+
+            java.util.Map<String, Object> part = new java.util.LinkedHashMap<>();
+            part.put("position", position);
+            part.put("name", runRow.get("part_name"));
+            part.put("runId", runId);
+            part.put("status", runRow.get("status"));
+            part.put("companies", companies.size());
+            part.put("totalProfit", total);
+            part.put("averageProfit", companies.isEmpty() ? java.math.BigDecimal.ZERO
+                    : total.divide(java.math.BigDecimal.valueOf(companies.size()), 2,
+                    java.math.RoundingMode.HALF_UP));
+            part.put("leader", companies.isEmpty() ? null : companyNameOf(profits.get(0)));
+            parts.add(part);
+        }
+
+        List<Integer> positions = new ArrayList<>();
+        for (java.util.Map<String, Object> part : parts) {
+            positions.add(((Number) part.get("position")).intValue());
+        }
+        java.util.Map<Integer, java.math.BigDecimal> averages = new java.util.LinkedHashMap<>();
+        for (java.util.Map<String, Object> part : parts) {
+            averages.put(((Number) part.get("position")).intValue(),
+                    (java.math.BigDecimal) part.get("averageProfit"));
+        }
+
+        List<java.util.Map<String, Object>> companies = new ArrayList<>();
+        for (java.util.Map.Entry<String, java.util.Map<String, Object>> entry : byCompany.entrySet()) {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("company", entry.getKey());
+            List<java.util.Map<String, Object>> cells = new ArrayList<>();
+            java.math.BigDecimal previous = null;
+            for (int position : positions) {
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> cell =
+                        (java.util.Map<String, Object>) entry.getValue().get("p" + position);
+                java.util.Map<String, Object> view = new java.util.LinkedHashMap<>();
+                view.put("position", position);
+                java.math.BigDecimal profit = cell == null ? java.math.BigDecimal.ZERO
+                        : (java.math.BigDecimal) cell.get("profit");
+                view.put("profit", profit);
+                view.put("rank", cell == null ? null : cell.get("rank"));
+                view.put("delta", previous == null ? null : profit.subtract(previous));
+                java.math.BigDecimal average = averages.get(position);
+                view.put("deltaToClass", average == null ? null : profit.subtract(average));
+                cells.add(view);
+                previous = profit;
+            }
+            row.put("parts", cells);
+            companies.add(row);
+        }
+        companies.sort((a, b) -> ((String) a.get("company")).compareTo((String) b.get("company")));
+
+        java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("packageId", pkg.id());
+        body.put("name", pkg.name());
+        body.put("parts", parts);
+        body.put("companies", companies);
+        return body;
+    }
+
+    /** D62: every part of a programme back to month 0, in part order. */
+    @Transactional
+    public int resetProgramme(long tenantId, long actorId, long packageId, String reason) {
+        int reset = 0;
+        for (java.util.Map<String, Object> run : packages.partRuns(tenantId, packageId)) {
+            rounds.resetRun(tenantId, ((Number) run.get("run_id")).longValue(), actorId, reason);
+            reset++;
+        }
+        return reset;
+    }
+
+    private static String companyNameOf(java.util.Map<String, Object> row) {
+        return (String) row.get("company_name");
     }
 
     @Transactional
@@ -386,7 +545,7 @@ public class RunService {
                 clock.map(RoundService.ClockState::closesAt).orElse(null),
                 clock.map(RoundService.ClockState::paused).orElse(false),
                 clock.map(RoundService.ClockState::remainingSeconds).orElse(-1L),
-                run.standingsVisible());
+                run.standingsVisible(), run.packageId(), run.partPosition());
     }
 
     private RunRepository.RunRow requireRun(long tenantId, long runId) {

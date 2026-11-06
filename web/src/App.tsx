@@ -5,6 +5,7 @@ import PeoplePanel from "./PeoplePanel";
 import AutoWorkersPanel from "./AutoWorkersPanel";
 import BotPanel from "./BotPanel";
 import StandingsPanel from "./StandingsPanel";
+import ProgrammeComparison from "./ProgrammeComparison";
 import StartSession from "./StartSession";
 import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
@@ -478,6 +479,8 @@ export default function App() {
                 </table>
               )}
             </section>
+
+            <ProgrammeComparison run={selected} />
 
             <StandingsPanel
               run={selected}

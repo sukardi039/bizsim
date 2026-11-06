@@ -320,6 +320,18 @@ to be re-registered.
 It asks for confirmation first, and it is recorded in the audit trail. Use it for a botched setup or a
 demonstration that has to be repeated, not to correct one month — for that, **void the last round**.
 
+### 7.2.5 Programmes of several simulations
+
+A package can hold **several parts** — a course rather than one simulation. The class list is chosen
+once, so the same companies and the same people play every part; each part uses its own template and
+starts from the same opening condition, so the parts can be compared fairly.
+
+- **Starting:** pick the part in **Start a session** (Part 1, Part 2…). A part only opens once the
+  previous one is finished.
+- **Comparing:** the run screen of any part shows **Programme comparison** — each company's profit in
+  every part, the move against the previous part, and the move against the class average.
+- **Resetting:** reset one part from its run screen, or the whole programme from the package.
+
 ### 7.3 Scoreboard
 
 One row per company for the latest computed round: profit, cash, share, stock. Empty until you

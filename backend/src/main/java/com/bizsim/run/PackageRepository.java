@@ -24,9 +24,15 @@ public class PackageRepository {
     public record Seat(int position, long userId, String displayName, String email) {
     }
 
+    /** One simulation of a programme (D62): its own frozen template, its own rounds. */
+    public record PartRow(int position, String name, String templateKey, String sourceTemplateKey,
+                          int templateVersion) {
+    }
+
     public record PackageRow(long id, String name, String templateKey, String sourceTemplateKey,
                              int templateVersion, List<Long> companyProfileIds, List<Seat> seats,
-                             String locale, String status, String publishedAt) {
+                             String locale, String status, String publishedAt,
+                             List<PartRow> parts) {
     }
 
     private final JdbcTemplate jdbc;
@@ -77,8 +83,54 @@ public class PackageRepository {
                 rs.getString("template_key"), rs.getString("source_template_key"),
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
                 seatsOf(rs.getLong("id")), rs.getString("locale"), rs.getString("status"),
-                rs.getString("published_at")),
+                rs.getString("published_at"), partsOf(rs.getLong("id"))),
                 tenantId);
+    }
+
+    /** The programme's parts, in order. A single-simulation package has exactly one. */
+    public List<PartRow> partsOf(long packageId) {
+        return jdbc.query("""
+                select position, name, template_key, source_template_key, template_version
+                from simulation_package_part where package_id = ? order by position
+                """, (rs, i) -> new PartRow(rs.getInt("position"), rs.getString("name"),
+                rs.getString("template_key"), rs.getString("source_template_key"),
+                rs.getInt("template_version")), packageId);
+    }
+
+    public void insertPart(long packageId, int position, String name, String templateKey,
+                           String sourceTemplateKey, int templateVersion) {
+        jdbc.update("""
+                insert into simulation_package_part
+                    (package_id, position, name, template_key, source_template_key, template_version)
+                values (?, ?, ?, ?, ?, ?)
+                """, packageId, position, name, templateKey, sourceTemplateKey, templateVersion);
+    }
+
+    /** The runs of one programme, in part order: what the course comparison reads (D62). */
+    public List<java.util.Map<String, Object>> partRuns(long tenantId, long packageId) {
+        return jdbc.queryForList("""
+                select r.id as run_id, r.part_position, r.status,
+                       coalesce(s.name, 'Part ' || r.part_position) as part_name
+                from run r
+                left join simulation_package_part s
+                       on s.package_id = r.package_id and s.position = r.part_position
+                where r.package_id = ? and r.tenant_id = ?
+                order by r.part_position nulls first, r.id
+                """, packageId, tenantId);
+    }
+
+    /** Profit per company across one run: the part's result, before any comparison. */
+    public List<java.util.Map<String, Object>> partProfits(long runId) {
+        return jdbc.queryForList("""
+                select t.id as team_id, t.company_name,
+                       coalesce(sum((rr.score->>'profit')::numeric), 0) as profit
+                from team t
+                left join round_result rr on rr.team_id = t.id
+                     and rr.round_id in (select id from round where run_id = ?)
+                where t.run_id = ?
+                group by t.id, t.company_name
+                order by profit desc, t.id
+                """, runId, runId);
     }
 
     /** The prepared class list for one package, in company order. */

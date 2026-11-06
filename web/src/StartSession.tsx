@@ -17,6 +17,8 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   const [name, setName] = useState("");
   const [packageId, setPackageId] = useState<number | "">("");
+  /** D62: which part of the programme to start; 1 when it has a single part. */
+  const [part, setPart] = useState(1);
 
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
       setPackages(published);
       setCompanies(companyList);
       setPackageId((current) => current || published[0]?.id || "");
+      setPart(1);
     } catch (error) {
       setProblem(describeError(error, t));
     }
@@ -53,6 +56,7 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
       const run = await api.startSession(packageId, {
         name: name.trim() || chosen?.name || t("start.defaultName"),
         traineeIds: [],
+        part,
       });
       setName("");
       onStarted(run);
@@ -103,6 +107,19 @@ export default function StartSession({ onStarted }: { onStarted: (run: Run) => v
             </select>
           </label>
         </div>
+
+        {chosen && (chosen.parts?.length ?? 0) > 1 && (
+          <label>
+            {t("start.part")}
+            <select value={part} onChange={(e) => setPart(Number(e.target.value))}>
+              {chosen.parts!.map((entry) => (
+                <option key={entry.position} value={entry.position}>
+                  {entry.position}. {entry.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {chosen && (
           <p className="muted">

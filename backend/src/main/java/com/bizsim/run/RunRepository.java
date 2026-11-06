@@ -19,7 +19,9 @@ public class RunRepository {
     public record RunRow(long id, long tenantId, long simulationId, String scenarioKey,
                          String status, int currentRound, Integer rounds, Integer cycles,
                          /** D52: may trainees read the standings table yet? */
-                         boolean standingsVisible) {
+                         boolean standingsVisible,
+                         /** D62: the programme this run belongs to, and which part it plays. */
+                         Long packageId, Integer partPosition) {
     }
 
     public record TeamRow(long id, String name, String companyName, BigDecimal cash,
@@ -35,7 +37,8 @@ public class RunRepository {
             rs.getLong("id"), rs.getLong("tenant_id"), rs.getLong("simulation_id"),
             rs.getString("scenario_key"), rs.getString("status"), rs.getInt("current_round"),
             (Integer) rs.getObject("rounds"), (Integer) rs.getObject("cycles"),
-            rs.getBoolean("standings_visible"));
+            rs.getBoolean("standings_visible"),
+            (Long) rs.getObject("package_id"), (Integer) rs.getObject("part_position"));
 
     private static final RowMapper<TeamRow> TEAM = (rs, i) -> new TeamRow(
             rs.getLong("id"), rs.getString("name"), rs.getString("company_name"),

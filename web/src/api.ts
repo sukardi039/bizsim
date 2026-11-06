@@ -155,6 +155,9 @@ export interface Run {
   clockRemainingSeconds?: number;
   /** D52: whether trainees may read the class standings table yet. */
   standingsVisible?: boolean;
+  /** D62: the programme this run belongs to, and which part it plays. */
+  packageId?: number | null;
+  partPosition?: number | null;
   scenarioKey: string;
   rounds: number;
   cycles: number;
@@ -381,6 +384,14 @@ export interface SimulationPackage {
   locale?: string | null;
   status: string;
   publishedAt: string;
+  /** D62: the parts of a programme, in order. A single-simulation package has one. */
+  parts?: { position: number; name: string; templateKey: string; templateVersion: number }[];
+}
+
+/** One simulation inside a programme. Omit parts entirely for a single-simulation package. */
+export interface PackagePartInput {
+  name: string;
+  templateKey: string;
 }
 
 export interface UserRow {
@@ -693,12 +704,42 @@ export const api = {
     companyProfileIds: number[];
     traineeIds: (number | null)[];
     locale?: string | null;
+    parts?: PackagePartInput[];
   }) =>
     request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
+  /** D62: the programme's parts compared — per company and against the class. */
+  packageComparison: (id: number) =>
+    request<{
+      packageId: number;
+      name: string;
+      parts: {
+        position: number;
+        name: string;
+        runId: number;
+        status: string;
+        companies: number;
+        totalProfit: number;
+        averageProfit: number;
+        leader: string | null;
+      }[];
+      companies: {
+        teamId: number;
+        company: string;
+        parts: {
+          position: number;
+          profit: number;
+          rank: number | null;
+          delta: number | null;
+          deltaToClass: number | null;
+        }[];
+      }[];
+    }>(`/packages/${id}/comparison`),
+  resetProgramme: (id: number) =>
+    request<{ partsReset: number }>(`/packages/${id}/reset`, { method: "POST", body: "{}" }),
   retirePackage: (id: number) =>
     request<unknown>(`/packages/${id}/retire`, { method: "POST" }),
   /** Execution: a facilitator starts a session from a published package. */
-  startSession: (packageId: number, body: { name: string; traineeIds: number[] }) =>
+  startSession: (packageId: number, body: { name: string; traineeIds: number[]; part?: number }) =>
     request<Run>(`/packages/${packageId}/sessions`, {
       method: "POST",
       body: JSON.stringify(body),
