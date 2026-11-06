@@ -181,12 +181,18 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       } catch {
         setStandings([]);
       }
+      if (!next.roundOpen) {
+        setNotice(null);
+      }
       // A new round must reset the form; a poll inside the same round must not wipe edits.
       if (roundRef.current !== next.round) {
         roundRef.current = next.round;
         setDraft(draftFrom(next));
         setGuidedRound(null);
         setReport(null);
+        // D68: a confirmation belongs to the round it was about; a new round must not show the last
+        // one's "submitted" over a form that has not been submitted.
+        setNotice(null);
         // D61: the opening rounds come with a suggested plan for a human seat. Only when the company
         // has nothing stored for this round — a saved draft is the trainee's own work, never replaced.
         if (!next.decision) {
@@ -274,7 +280,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     setNotice(null);
     try {
       await api.submitDecision(run.id, team.id, toPayload(context, draft));
-      setNotice(`Submitted for round ${context.round}. You can change it until the round closes.`);
+      setNotice(t("player.submitted", { round: context.round }));
       await load();
     } catch (error) {
       setShortfall(shortfallLines(error));
@@ -529,7 +535,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </div>
         </div>
         {context.submitted && (
-          <p className="banner good">You have submitted a decision for this round. Editing and submitting again replaces it.</p>
+          // D68: the message names the round it is about. Without that it sat above a header showing a
+          // later round — or a form the trainee had not sent — and the two read as contradictory.
+          <p className="banner good">{t("player.submittedPersistent", { round: context.round })}</p>
         )}
         {notice && <p className="banner good">{notice}</p>}
         {problem && <p className="error">{problem}</p>}

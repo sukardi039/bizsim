@@ -34,6 +34,13 @@ export default function SessionTools({
   const paused = Boolean(run.clockPaused);
   const untimed = (run.clockRemainingSeconds ?? -1) < 0;
 
+  // D68: a notice describes the round it happened in. A new round, or the round closing, clears it:
+  // a green "round 2 computed" sitting above a round-3 header is worse than no message.
+  useEffect(() => {
+    setNote(null);
+    setResetNote(null);
+  }, [run.id, run.currentRound, run.roundOpen]);
+
   // Reset the countdown whenever the server sends a new deadline (open, pause, extend, resume).
   useEffect(() => {
     setLeft(run.clockRemainingSeconds ?? -1);
