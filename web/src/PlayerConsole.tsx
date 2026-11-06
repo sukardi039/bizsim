@@ -704,9 +704,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         {context.rndProjects.map((project) => (
           <div className="project" key={project.code}>
             <div>
-              <strong>
-                {locale === "zh" && project.nameZh ? project.nameZh : project.name}
-              </strong>
+              <strong>{project.name}</strong>
               <p className="muted">
                 {project.advantageType.replaceAll("_", " ").toLowerCase()} {plain(project.advantageValue)} ·{" "}
                 {project.durationMonths} months · published estimate {money(project.hintLow)}–{money(project.hintHigh)}

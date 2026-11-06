@@ -66,6 +66,11 @@ class SchemaCreationTest extends PostgresTestBase {
                 "select count(*) from rnd_project where scenario_key = 'standard-v1'", Integer.class);
 
         assertThat(products).isEqualTo(3);
-        assertThat(projects).isEqualTo(5);
+        // D64: two catalogues, five projects each — a class reads one of them, never both.
+        assertThat(projects).isEqualTo(10);
+        assertThat(jdbc.queryForObject("select count(*) from rnd_project where scenario_key = "
+                + "'standard-v1' and lang = 'en'", Integer.class)).isEqualTo(5);
+        assertThat(jdbc.queryForObject("select count(*) from rnd_project where scenario_key = "
+                + "'standard-v1' and lang = 'zh'", Integer.class)).isEqualTo(5);
     }
 }

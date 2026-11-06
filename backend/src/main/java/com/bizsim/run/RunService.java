@@ -114,7 +114,10 @@ public class RunService {
         }
 
         long simulationId = runs.insertSimulation(tenantId, name, scenarioKey, facilitatorId);
-        long runId = runs.insertRun(tenantId, simulationId, scenarioKey, roundCount, cycles);
+        // D64: the catalogue language is fixed when the session starts — the facilitator's own here,
+        // replaced by the package's class language when the session comes from a package.
+        long runId = runs.insertRun(tenantId, simulationId, scenarioKey, roundCount, cycles,
+                users.localeOf(tenantId, facilitatorId));
         // The economy and the event deck are drawn once, here, and frozen for this run (D18/D19).
         environment.generateTimeline(scenario, runId, roundCount);
         environment.scheduleEvents(scenario, runId);
@@ -288,8 +291,12 @@ public class RunService {
         // template the builder published it with (ruling 5 Nov 2026).
         RunView view = startPrepared(tenantId, facilitatorId, name, part.templateKey(),
                 pkg.companyProfileIds(), effective, null, null);
-        jdbc.update("update run set package_id = ?, part_position = ? where id = ?", packageId,
-                position, view.id());
+        // The class language of the package decides the catalogue for every seat in this part.
+        jdbc.update("""
+                update run set package_id = ?, part_position = ?,
+                               lang = coalesce(?, lang)
+                where id = ?
+                """, packageId, position, pkg.locale(), view.id());
         return view(tenantId, view.id());
     }
 

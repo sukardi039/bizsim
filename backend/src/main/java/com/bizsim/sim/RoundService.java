@@ -36,12 +36,13 @@ public class RoundService {
     private final DecisionValidator validator;
     private final EnvironmentService environment;
     private final RunEventService events;
+    private final com.bizsim.user.UserRepository users;
     private final JdbcTemplate jdbc;
 
     public RoundService(RunRepository runs, RoundRepository rounds, ScenarioRepository scenarios,
                         ScoringEngine engine, DecisionValidator validator,
                         EnvironmentService environment, RunEventService events,
-                        JdbcTemplate jdbc) {
+                        JdbcTemplate jdbc, com.bizsim.user.UserRepository users) {
         this.runs = runs;
         this.rounds = rounds;
         this.scenarios = scenarios;
@@ -49,6 +50,7 @@ public class RoundService {
         this.validator = validator;
         this.environment = environment;
         this.events = events;
+        this.users = users;
         this.jdbc = jdbc;
     }
 
@@ -553,14 +555,17 @@ public class RoundService {
 
         Map<String, ScoringEngine.RndState> rnd = rounds.rnd(runId).getOrDefault(teamId, Map.of());
         List<Map<String, Object>> projects = new ArrayList<>();
+        // D64: the catalogue has one set per language; a class sees only its own, so the choice stays
+        // five projects rather than ten.
+        String classLang = runs.langOf(runId);
         for (Scenario.ProjectSpec project : scenario.projects()) {
+            if (!classLang.equals(project.lang())) {
+                continue;
+            }
             ScoringEngine.RndState state = rnd.get(project.code());
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", project.code());
             row.put("name", project.name());
-            // D63: the Chinese label, so a Chinese class reads Chinese project names. Null when the
-            // template has no translation, and the client falls back to `name`.
-            row.put("nameZh", project.nameZh());
             row.put("targetProduct", project.targetProduct());
             row.put("advantageType", project.advantageType());
             row.put("advantageValue", project.advantageValue());

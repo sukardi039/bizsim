@@ -20,6 +20,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -164,6 +165,38 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of("tenantCode", "acme",
                                 "email", "market-1-high@bots.invalid", "password", "x"))))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void a_class_reads_only_the_rnd_catalogue_of_its_own_language() throws Exception {
+        long playerTeam = jdbc.queryForObject(
+                "select id from team where run_id = ? order by id limit 1", Long.class, runId);
+        long player = otherPlayer("zh@acme.test");
+        seat(playerTeam, player);
+        // D64: the catalogue is fixed on the run, so flipping it here is the same act as a Chinese
+        // class being planned — no dependence on who happens to be reading.
+        jdbc.update("update run set lang = 'zh' where id = ?", runId);
+        String zhToken = login("zh@acme.test");
+        openRound();
+
+        MvcResult zh = mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/context")
+                        .header("Authorization", "Bearer " + zhToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        // MockMvc decodes with the response charset, which defaults to ISO-8859-1: read UTF-8 or the
+        // Chinese assertions compare against mojibake.
+        String zhBody = zh.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(zhBody).contains("基础款流程效率").doesNotContain("Process efficiency on Basic");
+
+        // The catalogue belongs to the run, not to the reader: switching the session's language switches
+        // the whole class to the other set, which is the point of keeping two sets rather than labels.
+        jdbc.update("update run set lang = 'en' where id = ?", runId);
+        MvcResult en = mvc.perform(get("/api/runs/" + runId + "/teams/" + playerTeam + "/context")
+                        .header("Authorization", "Bearer " + zhToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enBody = en.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(enBody).contains("Process efficiency on Basic").doesNotContain("基础款流程效率");
     }
 
     @Test

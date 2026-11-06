@@ -118,13 +118,13 @@ public class ScenarioRepository {
                         rs.getBigDecimal("brand_alpha")), key);
 
         List<Scenario.ProjectSpec> projects = jdbc.query("""
-                select code, name, coalesce(name_zh, name) as name_zh, target_product,
+                select code, name, lang, target_product,
                        advantage_type, advantage_value, hidden_cost,
                        hint_band, duration_months, partial_benefit, benefit_curve, benefit_exponent,
                        overfunding
-                from rnd_project where scenario_key = ? order by code
+                from rnd_project where scenario_key = ? order by lang, code
                 """, (rs, i) -> new Scenario.ProjectSpec(
-                        rs.getString("code"), rs.getString("name"), rs.getString("name_zh"),
+                        rs.getString("code"), rs.getString("name"), rs.getString("lang"),
                         rs.getString("target_product"),
                         rs.getString("advantage_type"), rs.getBigDecimal("advantage_value"),
                         rs.getBigDecimal("hidden_cost"), rs.getBigDecimal("hint_band"),
@@ -295,11 +295,11 @@ public class ScenarioRepository {
                 select ?, code, name, reach_weight, brand_alpha from channel where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
-                insert into rnd_project (scenario_key, code, name, name_zh, target_product,
+                insert into rnd_project (scenario_key, code, name, lang, target_product,
                                          advantage_type, advantage_value, hidden_cost, hint_band,
                                          duration_months, partial_benefit, benefit_curve,
                                          benefit_exponent, overfunding)
-                select ?, code, name, name_zh, target_product, advantage_type, advantage_value,
+                select ?, code, name, lang, target_product, advantage_type, advantage_value,
                        hidden_cost, hint_band, duration_months, partial_benefit, benefit_curve,
                        benefit_exponent, overfunding
                 from rnd_project where scenario_key = ?
@@ -420,7 +420,7 @@ public class ScenarioRepository {
     public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
     }
 
-    public record ProjectRow(String code, String name, String nameZh, String targetProduct,
+    public record ProjectRow(String code, String name, String lang, String targetProduct,
                              String advantageType,
                              BigDecimal advantageValue, BigDecimal hiddenCost, BigDecimal hintBand,
                              int durationMonths, boolean partialBenefit, String benefitCurve,
@@ -449,12 +449,12 @@ public class ScenarioRepository {
 
     public List<ProjectRow> projects(String key) {
         return jdbc.query("""
-                select code, name, coalesce(name_zh, name) as name_zh, target_product, advantage_type,
+                select code, name, lang, target_product, advantage_type,
                        advantage_value, hidden_cost, hint_band, duration_months, partial_benefit,
                        benefit_curve, benefit_exponent, overfunding
-                from rnd_project where scenario_key = ? order by code
+                from rnd_project where scenario_key = ? order by lang, code
                 """, (rs, i) -> new ProjectRow(rs.getString("code"), rs.getString("name"),
-                rs.getString("name_zh"),
+                rs.getString("lang"),
                 rs.getString("target_product"), rs.getString("advantage_type"),
                 rs.getBigDecimal("advantage_value"), rs.getBigDecimal("hidden_cost"),
                 rs.getBigDecimal("hint_band"), rs.getInt("duration_months"),
@@ -498,28 +498,18 @@ public class ScenarioRepository {
     }
 
     @Transactional
-    /**
-     * Replaces the catalogue. `name_zh` is preserved when the caller sends none (D63): a client that
-     * edits the English name should not silently erase the Chinese label, which is a translation, not
-     * a mechanic.
-     */
+    /** Replaces the catalogue. Each row carries its language, so both sets live here side by side. */
     public void saveProjects(String key, List<ProjectRow> rows) {
-        java.util.Map<String, String> zhBefore = new java.util.HashMap<>();
-        jdbc.query("select code, name_zh from rnd_project where scenario_key = ? and name_zh is not null",
-                rs -> {
-                    zhBefore.put(rs.getString(1), rs.getString(2));
-                }, key);
         jdbc.update("delete from rnd_project where scenario_key = ?", key);
         for (ProjectRow row : rows) {
-            String zh = row.nameZh() == null || row.nameZh().isBlank()
-                    ? zhBefore.get(row.code()) : row.nameZh();
+            String lang = "zh".equalsIgnoreCase(row.lang()) ? "zh" : "en";
             jdbc.update("""
-                    insert into rnd_project (scenario_key, code, name, name_zh, target_product,
+                    insert into rnd_project (scenario_key, code, name, lang, target_product,
                                              advantage_type, advantage_value, hidden_cost, hint_band,
                                              duration_months, partial_benefit, benefit_curve,
                                              benefit_exponent, overfunding)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, key, row.code(), row.name(), zh, row.targetProduct(), row.advantageType(),
+                    """, key, row.code(), row.name(), lang, row.targetProduct(), row.advantageType(),
                     row.advantageValue(), row.hiddenCost(), row.hintBand(), row.durationMonths(),
                     row.partialBenefit(), row.benefitCurve(), row.benefitExponent(), row.overfunding());
         }

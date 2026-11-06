@@ -247,8 +247,6 @@ export interface ContextChannel {
 export interface ContextProject {
   code: string;
   name: string;
-  /** D63: the Chinese label; null when the template has no translation. */
-  nameZh?: string | null;
   targetProduct: string;
   advantageType: string;
   advantageValue: number;
@@ -335,8 +333,8 @@ export interface TemplateChannel {
 export interface TemplateProject {
   code: string;
   name: string;
-  /** D63: Chinese label, edited beside the English one; blank means "no translation". */
-  nameZh?: string | null;
+  /** D64: which language catalogue this row belongs to — the sets are separate, not translated. */
+  lang?: "en" | "zh";
   targetProduct: string | null;
   advantageType: string;
   advantageValue: number;

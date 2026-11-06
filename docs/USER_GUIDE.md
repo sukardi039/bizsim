@@ -462,9 +462,9 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 
 ---
 
-**Chinese classes:** R&D projects carry both an English and a Chinese name, and the form shows the one
-matching the class language. Builders can edit the Chinese name in the template's **R&D projects** tab
-(the *Name (Chinese)* column).
+**Chinese classes:** the R&D catalogue exists in two sets — English and Chinese — and a session reads
+only its own, decided by the package's class language when the session starts. Builders see both sets
+in the template's **R&D projects** tab, distinguished by the *Catalogue* column (English / 中文).
 
 ## 9. Admin — accounts
 

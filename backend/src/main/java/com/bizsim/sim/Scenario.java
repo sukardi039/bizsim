@@ -86,7 +86,7 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
     public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
     }
 
-    public record ProjectSpec(String code, String name, String nameZh, String targetProduct,
+    public record ProjectSpec(String code, String name, String lang, String targetProduct,
                               String advantageType,
                               BigDecimal advantageValue, BigDecimal hiddenCost, BigDecimal hintBand,
                               int durationMonths, boolean partialBenefit, String benefitCurve,

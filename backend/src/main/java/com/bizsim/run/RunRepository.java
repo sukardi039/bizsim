@@ -126,12 +126,14 @@ public class RunRepository {
         return deleted > 0;
     }
 
-    public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles) {
+    public long insertRun(long tenantId, long simulationId, String scenarioKey, int rounds, int cycles,
+                          String lang) {
         return jdbc.queryForObject("""
                 insert into run (tenant_id, simulation_id, scenario_key, status, current_round,
-                                 rounds, cycles, started_at)
-                values (?, ?, ?, 'OPEN', 0, ?, ?, now()) returning id
-                """, Long.class, tenantId, simulationId, scenarioKey, rounds, cycles);
+                                 rounds, cycles, started_at, lang)
+                values (?, ?, ?, 'OPEN', 0, ?, ?, now(), ?) returning id
+                """, Long.class, tenantId, simulationId, scenarioKey, rounds, cycles,
+                "zh".equalsIgnoreCase(lang) ? "zh" : "en");
     }
 
     public long insertTeam(long runId, String name, String companyName, BigDecimal cash,
@@ -140,6 +142,12 @@ public class RunRepository {
                 insert into team (run_id, name, company_name, cash, brand_score)
                 values (?, ?, ?, ?, ?) returning id
                 """, Long.class, runId, name, companyName, cash, brandScore);
+    }
+
+    /** D64: the language whose R&D catalogue this session reads. */
+    public String langOf(long runId) {
+        return jdbc.queryForList("select lang from run where id = ?", String.class, runId).stream()
+                .findFirst().orElse("en");
     }
 
     /** The class language of the package this run came from; null when the package set none. */

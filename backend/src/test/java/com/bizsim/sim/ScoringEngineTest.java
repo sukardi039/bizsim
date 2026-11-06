@@ -338,7 +338,7 @@ class ScoringEngineTest {
 
     private static Scenario.ProjectSpec project(boolean partialBenefit, String curve,
                                                 BigDecimal exponent, String overfunding) {
-        return new Scenario.ProjectSpec("PRJ", "Process", null, "P", "UNIT_COST_DOWN", bd("0.5"), bd("1000"),
+        return new Scenario.ProjectSpec("PRJ", "Process", "en", "P", "UNIT_COST_DOWN", bd("0.5"), bd("1000"),
                 bd("0.2"), 2, partialBenefit, curve, exponent, overfunding);
     }
 
