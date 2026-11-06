@@ -462,6 +462,10 @@ zero"* or *"Not enough cash: the plan needs X, you have Y."*
 
 ---
 
+**Chinese classes:** R&D projects carry both an English and a Chinese name, and the form shows the one
+matching the class language. Builders can edit the Chinese name in the template's **R&D projects** tab
+(the *Name (Chinese)* column).
+
 ## 9. Admin — accounts
 
 **People** lists every account in the tenant with role and status. Building and admin see it; a

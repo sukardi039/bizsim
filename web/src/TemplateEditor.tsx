@@ -589,6 +589,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th className="num">{t("field.hiddenCost")}</th>
                   <th className="num">{t("field.durationMonths")}</th>
                   <th>{t("field.benefitCurve")}</th>
+                  <th>{t("editor.nameZh")}</th>
                   <th>{t("field.overfunding")}</th>
                 </tr>
               </thead>
@@ -597,6 +598,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <tr key={index}>
                     <td><input value={row.code} disabled={locked} onChange={(e) => setProjects((c) => c.map((r, i) => i === index ? { ...r, code: e.target.value } : r))} /></td>
                     <td><input value={row.name} disabled={locked} onChange={(e) => setProjects((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
+                    <td><input value={row.nameZh ?? ""} disabled={locked} placeholder="中文名称" onChange={(e) => setProjects((c) => c.map((r, i) => i === index ? { ...r, nameZh: e.target.value } : r))} /></td>
                     <td>
                       <select value={row.targetProduct ?? ""} disabled={locked} onChange={(e) => setProjects((c) => c.map((r, i) => i === index ? { ...r, targetProduct: e.target.value || null } : r))}>
                         <option value="">{t("editor.allProducts")}</option>

@@ -558,6 +558,9 @@ public class RoundService {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", project.code());
             row.put("name", project.name());
+            // D63: the Chinese label, so a Chinese class reads Chinese project names. Null when the
+            // template has no translation, and the client falls back to `name`.
+            row.put("nameZh", project.nameZh());
             row.put("targetProduct", project.targetProduct());
             row.put("advantageType", project.advantageType());
             row.put("advantageValue", project.advantageValue());
