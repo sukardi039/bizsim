@@ -171,6 +171,27 @@ Tick what should be in v1. Unticked = deferred, no argument needed.
 
 ## Note: soe r&d project could also be aiming at reducing production cost of existing products.
 
+## Deferred (not ruled) — 6 Nov 2026: market-pool scaling
+
+Raised while explaining how share is allocated; the product owner asked to revisit later, so these are
+**open, not decided**. Nothing in the engine changes until they are ruled.
+
+- **D-a (proposal):** keep the proportional scaling (`pool ∝ N`), i.e. reject a fixed total market.
+  Rationale: a fixed pool makes a small class capacity-bound and a large one comfortable — the failure
+  mode recorded in `SCENARIO_CALIBRATION.md` §1.
+- **D-b (proposal):** make `REFERENCE_COMPANIES` a template parameter (`market.referenceCompanies`,
+  default 10) and quote `base_demand` **per company**, so the divisor stops being an invisible
+  constant. The anchor to state in the builder: at 10, 400 P1 + 150 P2 + 60 P3 = 30 workers = the
+  starting workforce, and fair share (8.2% after the 18% baseline) sells ~24 of those 30.
+- **D-c (proposal, correctness):** scale on **trading** companies (seated and not `INSOLVENT`), not on
+  `teams.size()`. Empty seats and bankrupt companies currently enlarge the pool and absorb demand they
+  cannot serve, so reported shares do not sum to the served target.
+- **D-d (proposal, display only):** for comparing cohorts across terms, show share **of the served
+  market** (out of 82%) or as an index against the `1/N` fair share, because "20%" means different
+  things in a 4-class and a 10-class. Scoring stays as it is.
+
+Reference: `docs/SIMULATION_MODEL.md` §5, `ScoringEngine.allocateDemand()`, `ScenarioCalibrationTest`.
+
 ## Sign-off
 
 ```
