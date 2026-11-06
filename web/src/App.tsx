@@ -506,7 +506,7 @@ export default function App() {
               runId={selected.id}
               teams={selected.teams}
               players={selected.players}
-              rounds={selected.rounds}
+              
               currentRound={selected.currentRound}
             />
 

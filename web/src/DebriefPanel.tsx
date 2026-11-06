@@ -23,13 +23,11 @@ import { useI18n } from "./i18n";
 export default function DebriefPanel({
   runId,
   teams,
-  rounds,
   currentRound,
   players,
 }: {
   runId: number;
   teams: Team[];
-  rounds: number;
   currentRound: number;
   /** Who is seated where: performance is per company, but the class asks "whose company?". */
   players: RunPlayer[];
@@ -45,15 +43,40 @@ export default function DebriefPanel({
   const [slides, setSlides] = useState(false);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
 
+  // D69: the statements are the record of which rounds have been computed, so they are read for the
+  // whole run and not for the selected round. Reading them only after a scoreboard call made the
+  // selector depend on the very round it was supposed to police.
+  const loadStatements = useCallback(async () => {
+    try {
+      const perTeam = await Promise.all(
+        teams.map(async (team) => [team.id, await api.statements(runId, team.id)] as const),
+      );
+      setStatements(Object.fromEntries(perTeam));
+    } catch {
+      setStatements({});
+    }
+  }, [runId, teams]);
+
+  useEffect(() => {
+    void loadStatements();
+  }, [loadStatements]);
+
+  /** Every round the class has actually computed, ascending. */
+  const computedRounds = useMemo(() => {
+    const seen = new Set<number>();
+    for (const rows of Object.values(statements)) {
+      for (const entry of rows) {
+        if (entry.round > 0) seen.add(entry.round);
+      }
+    }
+    return [...seen].sort((a, b) => a - b);
+  }, [statements]);
+
   const load = useCallback(async () => {
     setProblem(null);
     try {
       const rows = await api.scoreboard(runId, round);
       setBoard(rows);
-      const perTeam = await Promise.all(
-        rows.map(async (row) => [row.team_id, await api.statements(runId, row.team_id)] as const),
-      );
-      setStatements(Object.fromEntries(perTeam));
       // A separate call on purpose: the statements are the result and must still render if the
       // decisions cannot be read.
       try {
@@ -74,9 +97,14 @@ export default function DebriefPanel({
     void load();
   }, [load]);
 
+  // D69: the selector cannot offer a round that has not been computed — asking the backend for one is
+  // what produced the error message. When rounds appear (or disappear, after a reset) the selection
+  // follows the last computed round.
   useEffect(() => {
-    if (currentRound > 0) setRound(currentRound);
-  }, [currentRound]);
+    if (computedRounds.length === 0) return;
+    const last = computedRounds[computedRounds.length - 1];
+    setRound((current) => (computedRounds.includes(current) ? current : last));
+  }, [computedRounds]);
 
   /** The trainee(s) seated in a company, so a row reads as a person's performance (D36). */
   const seats = (teamId: number) =>
@@ -123,12 +151,20 @@ export default function DebriefPanel({
         <h2>{t("debrief.title")}</h2>
         <label className="inline">
           {t("debrief.round")}
-          <select value={round} onChange={(e) => setRound(Number(e.target.value))}>
-            {Array.from({ length: Math.max(rounds, currentRound) }, (_, i) => i + 1).map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
+          <select
+            value={round}
+            disabled={computedRounds.length === 0}
+            onChange={(e) => setRound(Number(e.target.value))}
+          >
+            {computedRounds.length === 0 ? (
+              <option value={0}>{t("debrief.noRounds")}</option>
+            ) : (
+              computedRounds.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))
+            )}
           </select>
         </label>
         <div className="buttons">

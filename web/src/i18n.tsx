@@ -518,6 +518,7 @@ const en: Dict = {
   "debrief.title": "Debrief",
   "debrief.hint":
     "One row per company for the chosen round, straight from that round's statements. Open a company to see what it was charged.",
+  "debrief.noRounds": "no round computed yet",
   "debrief.round": "Round",
   "debrief.company": "Company",
   "debrief.revenue": "Revenue",
@@ -1067,6 +1068,7 @@ const zh: Dict = {
 
   "debrief.title": "复盘",
   "debrief.hint": "所选轮次每家公司的数据，直接来自该轮结算单。展开公司可查看各项费用。",
+  "debrief.noRounds": "尚无已计算的轮次",
   "debrief.round": "轮次",
   "debrief.company": "公司",
   "debrief.revenue": "收入",
