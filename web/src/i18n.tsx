@@ -423,7 +423,7 @@ const en: Dict = {
   "editor.catalogueHint":
     "A catalogue is a set, so it saves whole. Once this template has a simulation, its catalogue is frozen — copy it instead.",
   "editor.addRow": "Add a row",
-  "editor.removeRow": "Remove the last row",
+  "editor.removeThisRow": "Remove this row",
   "editor.allProducts": "all products",
   "field.code": "Code",
   "field.name": "Name",
@@ -971,7 +971,7 @@ const zh: Dict = {
   "editor.projects": "研发项目",
   "editor.catalogueHint": "目录是一个整体，会整体保存。模板一旦有模拟运行，其目录即被冻结——请改为复制新模板。",
   "editor.addRow": "添加一行",
-  "editor.removeRow": "删除最后一行",
+  "editor.removeThisRow": "删除此行",
   "editor.allProducts": "全部产品",
   "field.code": "编码",
   "field.name": "名称",

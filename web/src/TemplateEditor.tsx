@@ -459,6 +459,14 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                           ))}
                         </select>
                       </td>
+                      <td>
+                        <button type="button" className="ghost" disabled={locked || events.length <= 1}
+                          title={t("editor.removeThisRow")}
+                          aria-label={t("editor.removeThisRow")}
+                          onClick={() => setEvents((c) => c.filter((_, at) => at !== index))}>
+                          ✕
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -488,9 +496,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 }
               >
                 {t("editor.addRow")}
-              </button>
-              <button type="button" disabled={locked || events.length === 0} onClick={() => setEvents((c) => c.slice(0, -1))}>
-                {t("editor.removeRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
@@ -526,16 +531,21 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={String(row.unitsPerWorker)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, unitsPerWorker: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.incomeElasticity)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, incomeElasticity: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.trendAffinity)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, trendAffinity: Number(e.target.value) } : r))} /></td>
-                  </tr>
+                                        <td>
+                        <button type="button" className="ghost" disabled={locked || products.length <= 1}
+                          title={t("editor.removeThisRow")}
+                          aria-label={t("editor.removeThisRow")}
+                          onClick={() => setProducts((c) => c.filter((_, at) => at !== index))}>
+                          ✕
+                        </button>
+                      </td>
+</tr>
                 ))}
               </tbody>
             </table>
             <div className="buttons">
               <button type="button" disabled={locked} onClick={() => setProducts((c) => [...c, { code: "", name: "", basePrice: 1, baseUnitCost: 1, baseQuality: 50, baseDemand: 100, unitsPerWorker: 40, incomeElasticity: 1, trendAffinity: 0 }])}>
                 {t("editor.addRow")}
-              </button>
-              <button type="button" disabled={locked || products.length <= 1} onClick={() => setProducts((c) => c.slice(0, -1))}>
-                {t("editor.removeRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
@@ -560,16 +570,21 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={row.name} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
                     <td><input value={String(row.reachWeight)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, reachWeight: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.brandAlpha)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, brandAlpha: Number(e.target.value) } : r))} /></td>
-                  </tr>
+                                        <td>
+                        <button type="button" className="ghost" disabled={locked || channels.length <= 1}
+                          title={t("editor.removeThisRow")}
+                          aria-label={t("editor.removeThisRow")}
+                          onClick={() => setChannels((c) => c.filter((_, at) => at !== index))}>
+                          ✕
+                        </button>
+                      </td>
+</tr>
                 ))}
               </tbody>
             </table>
             <div className="buttons">
               <button type="button" disabled={locked} onClick={() => setChannels((c) => [...c, { code: "", name: "", reachWeight: 1, brandAlpha: 1 }])}>
                 {t("editor.addRow")}
-              </button>
-              <button type="button" disabled={locked || channels.length <= 1} onClick={() => setChannels((c) => c.slice(0, -1))}>
-                {t("editor.removeRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
@@ -636,16 +651,21 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                         ))}
                       </select>
                     </td>
-                  </tr>
+                                        <td>
+                        <button type="button" className="ghost" disabled={locked || projects.length <= 1}
+                          title={t("editor.removeThisRow")}
+                          aria-label={t("editor.removeThisRow")}
+                          onClick={() => setProjects((c) => c.filter((_, at) => at !== index))}>
+                          ✕
+                        </button>
+                      </td>
+</tr>
                 ))}
               </tbody>
             </table>
             <div className="buttons">
               <button type="button" disabled={locked} onClick={() => setProjects((c) => [...c, { code: "", name: "", targetProduct: null, advantageType: "UNIT_COST_DOWN", advantageValue: 0.1, hiddenCost: 0, hintBand: 0.2, durationMonths: 3, partialBenefit: true, benefitCurve: "LINEAR", benefitExponent: 1, overfunding: "LOST" }])}>
                 {t("editor.addRow")}
-              </button>
-              <button type="button" disabled={locked || projects.length <= 1} onClick={() => setProjects((c) => c.slice(0, -1))}>
-                {t("editor.removeRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
