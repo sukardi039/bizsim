@@ -88,7 +88,7 @@ The workbench is where a facilitator prepares; the console stays the place where
    `scenario_round`, `environment_event`. A copy that missed a catalogue table would load with no
    products and only fail at the first round, in a classroom.
 
-**Still to design — not written, and not needed before S6e:**
+**Shipped later (all of these are in the product now; the headings below are the original design):**
 
 3. **`company_profile`** (global base + tenant copies, same pattern as templates): `name`,
    `product_line`, `starting position`, `notes`. A run's `team` rows would be created from profiles.
@@ -156,7 +156,8 @@ package stays open.
   The console gained a **Companies** tab and a **Start a session** card that replaces the empty
   state, so a session is no longer assembled by typing company names.
 
-S6a and S6b are shipped; S6c is next (the settings and environment editor), then S6d, then S6e.
+S6a–S6e are all shipped (3 Nov 2026); the phase list below is kept as the record of how the
+workbench was cut, not as a plan of work remaining.
 
 ---
 
@@ -193,7 +194,8 @@ guard. The console shows the list with a confirmation before deleting anything.
 1. **Template ownership — answered 3 Nov 2026.** `standard-v1` stays global; a tenant copies it and
    modifies its own copy if needed. Shipped as S6b.
 2. **Company profiles — answered 3 Nov 2026.** One global, reusable profile that can be extended; it
-   is reusable across simulations, not defined per session. Designed in §5 (item 3), not yet built.
+   is reusable across simulations, not defined per session. Designed in §5 (item 3), **built as S6e
+   (V11, 3 Nov 2026)**.
 3. **Trainee identity — answered 3 Nov 2026.** Personal: one account per person, re-seated per
    session. Deleting a session removes the seat and any account that exists only for it, and keeps a
    person who is seated in another session (already enforced and tested).

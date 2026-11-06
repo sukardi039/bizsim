@@ -180,7 +180,8 @@ S1 complete: run/company/player management, round state machine.
   staff and machines, R&D per project, the paid market review, and a live cash-commitment line. The
   server returns the trainee's stored decision with the form so a reload reopens their own numbers,
   and a trainee may read only their own company (403 otherwise).
-**Next: S5 the debrief** — per-round statements and the class report on the facilitator's screen.
+**S5 complete (3 Nov 2026): the debrief** — per-round statements and the class report on the
+facilitator's screen (details below).
 **S6a/S6b complete (3 Nov 2026): setup → templates.** `GET /api/templates` lists the global
   `standard-v1` plus the tenant's own copies; `POST /api/templates/{key}/copy` clones a template —
   definition document and every catalogue row — into a tenant-owned `DRAFT` with its own key
@@ -222,13 +223,17 @@ Packages: retired packages that never ran a session, removable with a confirmati
   lines and the trainees already seated. Validation happens before anything is written, so a mismatch
   is a refusal rather than a half-built session.
 
-**D47–D50 in progress (5 Nov 2026): auto workers.** A company can be played by a policy instead of
+**D47–D50 complete (5–6 Nov 2026): auto workers.** A company can be played by a policy instead of
 a person — an identity (`AUTO_WORKER`), a versioned brain (`bot_profile`: level × personality) and a
 seat (`player.bot_profile_id`), all behind a per-template switch that is off by default. The policy
 runs through the same submission path as a trainee and can only see what a trainee sees; the
-self-play harness proves `high > mid > low` and reproduces a run exactly. Slices 4–5 (library UI,
-in-round worker, trace/replay) are not built yet, so nothing in production seats a bot. Design:
-[docs/AUTOWORKER.md](docs/AUTOWORKER.md).
+self-play harness proves `high > mid > low` and reproduces a run exactly. All six slices are built:
+the builder's **Auto workers** library and seating a brain in a package's class list, `BotRoundService`
+submitting during the round (a five-second sweep, seeded 20–70% of the template's round length),
+`GET /runs/{id}/bots`, `POST /runs/{id}/bots/decide` (recorded `MANUAL`) and
+`POST /runs/{id}/bots/{team}/replay`, plus the user guide (§3.5, §7.2.2). Nothing seats a bot unless
+a template turns `autoWorkers` on **and** a package's class list names a brain — two deliberate
+switches. Design: [docs/AUTOWORKER.md](docs/AUTOWORKER.md).
 
 **D39/D40/D41 complete (5 Nov 2026): the class day, and the room after it.** The facilitator's four
 missing powers are built: the round clock can be paused, resumed and extended (a paused clock never
