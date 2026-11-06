@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
 import { api, type AuditRow, type Run, type SubmissionRow } from "./api";
@@ -28,6 +28,8 @@ export default function SessionTools({
   const [note, setNote] = useState<string | null>(null);
   const [cash, setCash] = useState<Record<number, { delta: string; reason: string }>>({});
   const [resetNote, setResetNote] = useState<string | null>(null);
+  /** D67: which company's submission is expanded, so the detail belongs to a row rather than a cell. */
+  const [openTeam, setOpenTeam] = useState<number | null>(null);
 
   const paused = Boolean(run.clockPaused);
   const untimed = (run.clockRemainingSeconds ?? -1) < 0;
@@ -215,7 +217,8 @@ export default function SessionTools({
             </thead>
             <tbody>
               {submissions.map((row) => (
-                <tr key={row.teamId}>
+                <Fragment key={row.teamId}>
+                <tr>
                   <td>{row.companyName}</td>
                   <td>
                     {row.submitted ? (
@@ -229,10 +232,14 @@ export default function SessionTools({
                   </td>
                   <td>
                     {row.decision ? (
-                      <details>
-                        <summary>{t("tools.showDecision")}</summary>
-                        <DecisionSummary decision={row.decision} compact />
-                      </details>
+                      <button
+                        type="button"
+                        className="ghost"
+                        aria-expanded={openTeam === row.teamId}
+                        onClick={() => setOpenTeam((current) => (current === row.teamId ? null : row.teamId))}
+                      >
+                        {openTeam === row.teamId ? t("tools.hideDecision") : t("tools.showDecision")}
+                      </button>
                     ) : (
                       <span className="muted">—</span>
                     )}
@@ -277,6 +284,14 @@ export default function SessionTools({
                     </div>
                   </td>
                 </tr>
+                {openTeam === row.teamId && row.decision && (
+                  <tr className="detail-row">
+                    <td colSpan={4}>
+                      <DecisionSummary decision={row.decision} compact />
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               ))}
             </tbody>
           </table>

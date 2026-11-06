@@ -73,6 +73,8 @@ def main() -> None:
         "templateKey": "standard-v1",
         "companyProfileIds": [profiles["Alpha Industries"], profiles["Beta Corp"]],
         "traineeIds": [trainees["ana@demo.test"], trainees["bo@demo.test"]],
+        # D66: the class language is part of the package and is required.
+        "locale": "en",
     })
     if status != 201:
         raise SystemExit(f"publish failed: {status} {package}")
