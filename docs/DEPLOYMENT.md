@@ -51,8 +51,8 @@ containers read, so no credential is ever written into a tracked file.
 `GET /api/version` needs no login and answers the question directly:
 
 ```
-{"version":"0.9.0-workbench","builtAt":"2026-11-03T10:29:09Z",
- "migrations":14,"latest":"14","latestDescription":"frozen package templates", ...}
+{"version":"0.9.1","builtAt":"2026-11-06T12:48:14Z",
+ "migrations":27,"latest":"27","latestDescription":"rnd catalogue language", ...}
 ```
 
 The console has its own probe, because the API and the console are separate containers:
