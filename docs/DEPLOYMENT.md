@@ -85,6 +85,51 @@ Restart once, sign in, then remove the variables.
 If the first account is a facilitator, nobody can reach the setup screens until you either promote it
 or bootstrap a second account with a new email address.
 
+### Init data — a runnable class on an empty database (D72)
+
+An empty database is already complete on the **simulation** side: the 27 migrations create the schema
+and seed the shipped `standard-v1` template, its three products, three channels, five R&D projects
+(plus the Chinese catalogue), the eight-round environment, the four-event deck and one global company
+profile. What migrations cannot create is **people and a class** — that is tenant data.
+
+Init data creates it, through the same service calls the console makes (nothing is written with raw
+SQL), and then plays the session to a **FINISHED** result with real statements, standings and a working
+PDF/Excel debrief:
+
+- tenant + accounts: `admin@<tenant>.test` (ADMIN), `builder@`, `trainer@` (FACILITATOR), `player1@…playerN@` (PLAYER)
+- a tenant-owned **DRAFT** template copy (the shipped template is read-only, so this is what the editor shows)
+- one company profile per company, a published package with the class list seated, and a session started from it
+- N months played by the shipped opponent policy, submitted through the same validator a trainee's form uses
+
+**At boot** — the variables are inert unless a tenant is named:
+
+| Key | Value |
+|---|---|
+| `BIZSIM_INIT_TENANT` | tenant code to create, e.g. `demo`. **Unset = off** |
+| `BIZSIM_INIT_NAME` | tenant display name (default: the code) |
+| `BIZSIM_INIT_COMPANIES` | companies in the class, 1–6 (default **4**) |
+| `BIZSIM_INIT_TRAINEES` | trainees seated, 1–companies (default **4**) |
+| `BIZSIM_INIT_ROUNDS` | months played to a result (default **8**; `0` = create but do not play) |
+| `BIZSIM_INIT_CYCLES` | cycles for the session (default: the template's, shaped to the round count) |
+| `BIZSIM_INIT_LOCALE` | class language, `en` or `zh` (default `en`) |
+| `BIZSIM_INIT_PASSWORD` | credential for every seeded account (default: the documented demo one) |
+| `BIZSIM_INIT_PACKAGE` / `BIZSIM_INIT_RUN` | package and session names |
+
+A failure is **logged and the app continues** — a seeder must never crash-loop a deployment. Remove
+the variables after the first boot; they are a seed, not configuration.
+
+**On an existing deployment** (no restart, no environment change) an admin can ask for it once:
+
+```
+POST /api/admin/init-data      Authorization: Bearer <admin token>
+{"companies":4,"trainees":4,"rounds":8,"locale":"en","password":"…","packageName":"Autumn cohort"}
+```
+
+It runs **once per tenant**: a second call answers `409 init.already_present` as soon as a package
+exists, there is **no force or reset flag**, and existing accounts are reused, never rewritten, so it
+cannot reset anyone's password. Testing it is one boot against a throwaway database; the suite covers
+the same ground in `InitDataApiTest` (empty DB → accounts → package → computed rounds → login).
+
 ### Frontend → backend
 
 | Key | Value | Notes |

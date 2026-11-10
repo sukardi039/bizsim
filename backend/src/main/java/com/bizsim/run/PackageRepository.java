@@ -93,6 +93,17 @@ public class PackageRepository {
                 tenantId);
     }
 
+    /**
+     * How many packages a tenant has ever published, retired ones included. Used as the
+     * "has this tenant been set up already" question — a retired package still means people have
+     * worked here, and a seeder must not treat that as an empty tenant.
+     */
+    public int countForTenant(long tenantId) {
+        Integer count = jdbc.queryForObject(
+                "select count(*) from simulation_package where tenant_id = ?", Integer.class, tenantId);
+        return count == null ? 0 : count;
+    }
+
     /** The parts of this package that already have a session: they cannot be started twice. */
     public List<Integer> startedPartsOf(long tenantId, long packageId) {
         return jdbc.queryForList("""

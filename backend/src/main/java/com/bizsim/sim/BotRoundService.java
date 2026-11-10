@@ -149,12 +149,31 @@ public class BotRoundService {
         if (roundRepository.decisionPayload(runId, number, teamId).isPresent()) {
             return Optional.empty();
         }
-        BotRepository.State state = bots.state(scenario, runId, number, teamId);
-        AutoWorker.Context context = context(scenario, runId, number, state);
-        AutoWorker.Profile guide = AutoWorker.profile("MID", "BALANCED");
-        AutoWorker.Decision decision = AutoWorker.decide(scenario, runId, teamId, context, guide);
-        return Optional.of(affordable(scenario, environment.forRound(scenario, runId, number), state,
-                teamId, decision.payload()));
+        return Optional.of(planFor(tenantId, runId, teamId, number,
+                AutoWorker.profile("MID", "BALANCED")));
+    }
+
+    /**
+     * The policy's answer for one seat in one round, already trimmed to what the company can pay for.
+     *
+     * <p>No gates: not "is this the guided round", not "does the caller own the seat". Those belong to
+     * whoever asks. This is the seam the init-data seeder uses to play a class to a computed result
+     * through exactly the same path a trainee's form takes — the engine's preview decides
+     * affordability, so a seeded month cannot be a month the API would have refused.
+     */
+    public DecisionPayload planFor(long tenantId, long runId, long teamId, int roundNumber,
+                                   AutoWorker.Profile profile) {
+        String scenarioKey = roundRepository.scenarioKeyOfRun(tenantId, runId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        Scenario scenario = scenarios.load(scenarioKey);
+        if (!roundRepository.teamBelongsToRun(teamId, runId)) {
+            throw ProblemException.notFound("team.not_found", "no such company in this run");
+        }
+        BotRepository.State state = bots.state(scenario, runId, roundNumber, teamId);
+        AutoWorker.Context context = context(scenario, runId, roundNumber, state);
+        AutoWorker.Decision decision = AutoWorker.decide(scenario, runId, teamId, context, profile);
+        return affordable(scenario, environment.forRound(scenario, runId, roundNumber), state,
+                teamId, decision.payload());
     }
 
     public List<BotRepository.TraceRow> trace(long tenantId, long runId) {

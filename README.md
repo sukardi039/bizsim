@@ -93,6 +93,13 @@ BIZSIM_WEB_DIR=$PWD/web/dist BIZSIM_PORT=8080 mvn -f backend/pom.xml spring-boot
 
 If the directory does not exist, the backend runs API-only and behaves exactly as before.
 
+**A whole class in one boot.** `BIZSIM_INIT_TENANT=demo` creates a tenant, its staff and trainees, a
+template copy, a published package and a **played, finished** session — on an empty database, through
+the same service calls the console makes. Companies, seats, rounds, password and language are all
+variables; see [DEPLOYMENT.md](docs/DEPLOYMENT.md#init-data--a-runnable-class-on-an-empty-database-d72)
+and decision **D72**. An admin of an existing deployment can ask for the same thing once with
+`POST /api/admin/init-data`.
+
 Sign in with the seeded facilitator account, create a run (companies and cycles are chosen there),
 then drive the session with **Open next round** and **Compute round**. **Delete run** removes a
 simulation and everything played in it — the way to clear a rehearsal before the real class. The
