@@ -143,6 +143,9 @@ td select, td input { max-width: 12rem; }
 th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 500; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* A numeric field reads like the column it sits in: right-aligned, digits of equal width, so a
+   formatted value's magnitude is visible at a glance and the caret does not shift the number. */
+input.num { text-align: right; font-variant-numeric: tabular-nums; }
 
 .feed { list-style: none; margin: 0; padding: 0; font-size: .88rem; max-height: 260px; overflow: auto; }
 .feed li { display: flex; gap: .6rem; align-items: baseline; padding: .3rem 0; border-bottom: 1px solid #202733; }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
+import NumberInput from "./NumberInput";
 import ClockBadge from "./ClockBadge";
 import {
   api,
@@ -582,24 +583,22 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                 <td className="num">{plain(product.stock)}</td>
                 <td className="num">{money(product.unitCost)}</td>
                 <td className="num">
-                  <input
+                  <NumberInput
                     className="num"
-                    type="number"
+                    decimals={0}
                     min={0}
-                    step={1}
                     value={draft.production[product.code] ?? 0}
-                    onChange={(e) => setIn("production", product.code, Number(e.target.value))}
+                    onChange={(units) => setIn("production", product.code, units)}
                   />
                 </td>
                 <td className="num">{plain(workers.perProduct[product.code] ?? 0)}</td>
                 <td className="num">
-                  <input
+                  <NumberInput
                     className="num"
-                    type="number"
-                    min={1}
-                    step="any"
+                    decimals={2}
+                    min={0}
                     value={draft.price[product.code] ?? product.price}
-                    onChange={(e) => setIn("price", product.code, Number(e.target.value))}
+                    onChange={(price) => setIn("price", product.code, price)}
                   />
                 </td>
               </tr>
@@ -637,13 +636,12 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                     </td>
                     <td className="num">{plain(product.quality)}</td>
                     <td className="num">
-                      <input
+                      <NumberInput
                         className="num"
-                        type="number"
+                        decimals={2}
                         min={0}
-                        step="any"
                         value={invest}
-                        onChange={(e) => setIn("quality", product.code, Number(e.target.value))}
+                        onChange={(value) => setIn("quality", product.code, value)}
                       />
                     </td>
                     <td className="num">+{gain.toFixed(2)}</td>
@@ -661,12 +659,12 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {context.channels.map((channel) => (
             <label key={channel.code}>
               {channel.name}
-              <input
-                type="number"
+              <NumberInput
+                className="num"
+                decimals={2}
                 min={0}
-                step="any"
                 value={draft.marketing[channel.code] ?? 0}
-                onChange={(e) => setIn("marketing", channel.code, Number(e.target.value))}
+                onChange={(spend) => setIn("marketing", channel.code, spend)}
               />
             </label>
           ))}
@@ -678,22 +676,22 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         <div className="row">
           <label>
             {t("player.staff")}
-            <input
-              type="number"
+            <NumberInput
+              className="num"
+              decimals={0}
               min={0}
-              step={1}
               value={draft.manpower}
-              onChange={(e) => set("manpower", Number(e.target.value))}
+              onChange={(staff) => set("manpower", staff)}
             />
           </label>
           <label>
             {t("player.buyMachines", { cost: money(context.machineCostPerWorker) })}
-            <input
-              type="number"
+            <NumberInput
+              className="num"
+              decimals={0}
               min={0}
-              step={1}
               value={draft.capacity}
-              onChange={(e) => set("capacity", Number(e.target.value))}
+              onChange={(machines) => set("capacity", machines)}
             />
           </label>
         </div>
@@ -730,13 +728,13 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
               {t("player.rndThisMonth")}
               {/* COMPLETED or FAILED: nothing more can be invested, so the field is closed rather than
                   letting a trainee type a number the server will refuse (D35). */}
-              <input
-                type="number"
+              <NumberInput
+                className="num"
+                decimals={2}
                 min={0}
-                step="any"
                 disabled={project.status !== "ACTIVE"}
                 value={project.status === "ACTIVE" ? (draft.rnd[project.code] ?? 0) : 0}
-                onChange={(e) => setIn("rnd", project.code, Number(e.target.value))}
+                onChange={(invest) => setIn("rnd", project.code, invest)}
               />
               {project.status !== "ACTIVE" && (
                 <small className="muted">{t("player.rndFinished")}</small>
@@ -761,8 +759,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {t("player.marketIndices", {
             demand: plain(context.market.demandIndex),
             cost: plain(context.market.costIndex),
-          })}{" "}
-          {plain(context.market.wageIndex)}
+            wage: plain(context.market.wageIndex),
+          })}
         </p>
         <button type="button" onClick={buyReport} disabled={!context.submitted}>
           {t("player.showReview")}
