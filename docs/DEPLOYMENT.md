@@ -51,7 +51,7 @@ containers read, so no credential is ever written into a tracked file.
 `GET /api/version` needs no login and answers the question directly:
 
 ```
-{"version":"0.9.1","builtAt":"2026-11-06T12:48:14Z",
+{"version":"0.9.2","builtAt":"2026-11-10T13:37:40Z",
  "migrations":27,"latest":"27","latestDescription":"rnd catalogue language", ...}
 ```
 
