@@ -3,6 +3,7 @@ package com.bizsim.db;
 import com.bizsim.support.PostgresTestBase;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
+import com.bizsim.support.Migrations;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.mock.env.MockEnvironment;
@@ -37,9 +38,10 @@ class MigrationSafetyTest extends PostgresTestBase {
         Flyway flyway = Flyway.configure().dataSource(url, USER, USER)
                 .locations("classpath:db/migration").load();
 
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(27);
+        int migrations = Migrations.count();
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(migrations);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
-        assertThat(flyway.info().applied()).hasSize(27);
+        assertThat(flyway.info().applied()).hasSize(migrations);
         flyway.validate();
     }
 

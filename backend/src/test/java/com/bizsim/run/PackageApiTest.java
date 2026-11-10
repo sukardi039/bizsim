@@ -592,6 +592,67 @@ class PackageApiTest extends PostgresTestBase {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * A programme has one frozen copy per part (D62). Tidy up used to delete only the package's own
+     * copy, so every extra part left a copy behind with no back-reference — visible afterwards in the
+     * library and in the package template picker, named "… · Part B (vN)".
+     */
+    @Test
+    void tidy_up_removes_every_frozen_copy_of_a_multi_part_package() throws Exception {
+        String draft = copyTemplate();
+        MvcResult published = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "locale", "en", "name", "Two-part programme", "templateKey", draft,
+                                "companyProfileIds", List.of(profileId),
+                                "parts", List.of(
+                                        Map.of("name", "Part A", "templateKey", draft),
+                                        Map.of("name", "Part B", "templateKey", draft))))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long id = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
+
+        List<String> copies = jdbc.queryForList(
+                "select key from scenario where frozen_for_package = ? order by key", String.class, id);
+        assertThat(copies).as("one frozen copy per part").hasSize(2);
+
+        mvc.perform(post("/api/packages/" + id + "/retire")
+                        .header("Authorization", "Bearer " + builder))
+                .andExpect(status().isNoContent());
+        mvc.perform(post("/api/packages/tidy-up")
+                        .header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.removed").value(1));
+
+        for (String key : copies) {
+            assertThat(jdbc.queryForObject("select count(*) from scenario where key = ?",
+                    Integer.class, key)).as("copy %s removed", key).isZero();
+        }
+        // The library is what the picker reads: nothing of the programme is left in it.
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+    }
+
+    /**
+     * Belt and braces for copies already orphaned by the old tidy up: the library recognises the
+     * reserved frozen key shape even when the back-reference to a package is gone.
+     */
+    @Test
+    void a_frozen_copy_without_its_package_is_not_offered_as_a_template() throws Exception {
+        jdbc.update("""
+                insert into scenario (key, name, definition, version)
+                values ('pkg-acme-deadbeef', 'Ghost programme · Part B (v6)', '{"rounds":6}'::jsonb, 6)
+                """);
+
+        // Only the shipped template is left in the library: the inserted copy is not offered.
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].key").value("standard-v1"));
+    }
+
     private long publish(String name) throws Exception {
         return publishFrom("standard-v1", name);
     }

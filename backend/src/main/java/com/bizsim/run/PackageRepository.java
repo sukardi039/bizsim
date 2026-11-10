@@ -208,11 +208,18 @@ public class PackageRepository {
     }
 
     /**
-     * Removes one collectable package and its frozen template copy.
+     * Removes one collectable package and every frozen template copy it owns.
+     *
+     * <p>A programme has one frozen copy **per part** (D62), so the copies have to be read *before*
+     * the back-reference is cleared: after {@code frozen_for_package} is nulled they are
+     * indistinguishable from ordinary templates, and an earlier version of this method deleted only
+     * the package's own copy — leaving one hidden-looking template behind per extra part, which then
+     * showed up in the library and in the package template picker with its "(vN)" suffix.
      *
      * <p>Two foreign keys point at each other — {@code scenario.frozen_for_package} → package and
-     * {@code package.template_key} → scenario — so the back-reference is cleared first. The catalogue
-     * rows (product, channel, rnd_project, scenario_round, environment_event) cascade from scenario.
+     * {@code package.template_key} → scenario — so the back-reference is cleared first, then the
+     * package (its parts cascade), then the copies. The catalogue rows (product, channel,
+     * rnd_project, scenario_round, environment_event) cascade from scenario.
      */
     @Transactional
     public TidyRow collect(long tenantId, long id) {
@@ -221,9 +228,17 @@ public class PackageRepository {
                 .orElseThrow(() -> ProblemException.conflict("package.not_collectable",
                         "this package cannot be tidied up: it is still published, or a session ran "
                                 + "from it", "package", id));
+        List<String> copies = jdbc.queryForList(
+                "select key from scenario where frozen_for_package = ?", String.class, id);
+        if (copies.isEmpty()) {
+            // Defensive: a package published before the parts table existed still has its copy.
+            copies = List.of(row.frozenKey());
+        }
         jdbc.update("update scenario set frozen_for_package = null where frozen_for_package = ?", id);
         jdbc.update("delete from simulation_package where id = ? and tenant_id = ?", id, tenantId);
-        jdbc.update("delete from scenario where key = ?", row.frozenKey());
+        for (String key : copies) {
+            jdbc.update("delete from scenario where key = ?", key);
+        }
         return row;
     }
 

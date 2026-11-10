@@ -198,7 +198,13 @@ public class ScenarioRepository {
                        (select count(*) from product p where p.scenario_key = s.key) as products,
                        (select count(*) from scenario_round r where r.scenario_key = s.key) as rounds
                 from scenario s
-                where (s.tenant_id is null or s.tenant_id = ?) and s.frozen_for_package is null
+                where (s.tenant_id is null or s.tenant_id = ?)
+                  and s.frozen_for_package is null
+                  -- A frozen copy is named `pkg-<tenant>-<8 hex>` (PackageService.frozenKey). Normally
+                  -- the back-reference above hides it, but a copy whose package was deleted before this
+                  -- rule existed has no back-reference left and would read as an ordinary template —
+                  -- which is how deleted packages' copies ended up in the package template picker.
+                  and s.key !~ '^pkg-.+-[0-9a-f]{8}$'
                 order by s.tenant_id nulls first, s.name
                 """, (rs, i) -> new TemplateRow(
                 rs.getString("key"), rs.getString("name"),

@@ -51,8 +51,8 @@ containers read, so no credential is ever written into a tracked file.
 `GET /api/version` needs no login and answers the question directly:
 
 ```
-{"version":"0.9.2","builtAt":"2026-11-10T13:37:40Z",
- "migrations":27,"latest":"27","latestDescription":"rnd catalogue language", ...}
+{"version":"0.9.3","builtAt":"<this image>",
+ "migrations":28,"latest":"28","latestDescription":"orphan frozen copies", ...}
 ```
 
 The console has its own probe, because the API and the console are separate containers:
@@ -87,7 +87,7 @@ or bootstrap a second account with a new email address.
 
 ### Init data — a runnable class on an empty database (D72)
 
-An empty database is already complete on the **simulation** side: the 27 migrations create the schema
+An empty database is already complete on the **simulation** side: the migrations create the schema
 and seed the shipped `standard-v1` template, its three products, three channels, five R&D projects
 (plus the Chinese catalogue), the eight-round environment, the four-event deck and one global company
 profile. What migrations cannot create is **people and a class** — that is tenant data.

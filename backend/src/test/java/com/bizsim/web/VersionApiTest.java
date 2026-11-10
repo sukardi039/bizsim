@@ -1,6 +1,7 @@
 package com.bizsim.web;
 
 import com.bizsim.support.PostgresTestBase;
+import com.bizsim.support.Migrations;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,8 +33,8 @@ class VersionApiTest extends PostgresTestBase {
                 // Baked at build time: the only signal that distinguishes two deploys with the same
                 // migration count.
                 .andExpect(jsonPath("$.builtAt").isString())
-                .andExpect(jsonPath("$.migrations").value(27))
-                .andExpect(jsonPath("$.latest").value("27"))
+                .andExpect(jsonPath("$.migrations").value(Migrations.count()))
+                .andExpect(jsonPath("$.latest").value(String.valueOf(Migrations.latest())))
                 .andExpect(jsonPath("$.latestAppliedAt").isString())
                 .andExpect(jsonPath("$.serverTime").isString());
     }
