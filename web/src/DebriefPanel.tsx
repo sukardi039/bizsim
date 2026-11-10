@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   downloadDebrief,
@@ -72,6 +72,12 @@ export default function DebriefPanel({
     return [...seen].sort((a, b) => a - b);
   }, [statements]);
 
+  /**
+   * The computed rounds as one string, used as a dependency: a stable value that changes only when
+   * the set changes, which is the event the debrief table has to react to (see `load`).
+   */
+  const computedKey = computedRounds.join(",");
+
   const load = useCallback(async () => {
     setProblem(null);
     try {
@@ -91,19 +97,35 @@ export default function DebriefPanel({
       setProblem(describeError(error, t));
       setBoard([]);
     }
-  }, [runId, round, t]);
+    // `computedKey` is what makes a computed round appear. Fetching on `round` alone left the panel
+    // showing "no round has been computed yet" after the facilitator computed the round already on
+    // screen: that round's number did not change, so nothing re-read its scoreboard until a reload.
+    // The statements below are re-read when the run refreshes, so this key changes exactly when the
+    // set of computed rounds does — including after a reset, which removes them.
+  }, [runId, round, t, computedKey]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   // D69: the selector cannot offer a round that has not been computed — asking the backend for one is
-  // what produced the error message. When rounds appear (or disappear, after a reset) the selection
-  // follows the last computed round.
+  // what produced the error message. The selection follows the **newest** computed round when a new
+  // one appears (that is the round the facilitator just pressed Compute on, so it is the one the class
+  // should see), and falls back to the last remaining round when a reset removes them. A deliberate
+  // choice is kept otherwise: reading round 2 while nothing new is computed must not move.
+  const lastComputed = useRef<number | null>(null);
   useEffect(() => {
-    if (computedRounds.length === 0) return;
-    const last = computedRounds[computedRounds.length - 1];
-    setRound((current) => (computedRounds.includes(current) ? current : last));
+    if (computedRounds.length === 0) {
+      lastComputed.current = null;
+      return;
+    }
+    const newest = computedRounds[computedRounds.length - 1];
+    const previous = lastComputed.current;
+    lastComputed.current = newest;
+    setRound((current) => {
+      if (previous !== null && newest > previous) return newest;
+      return computedRounds.includes(current) ? current : newest;
+    });
   }, [computedRounds]);
 
   /** The trainee(s) seated in a company, so a row reads as a person's performance (D36). */
