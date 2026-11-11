@@ -32,9 +32,41 @@ RULE = (206, 212, 220)
 HEAD_FILL = (240, 244, 249)
 
 
+# The guide quotes the product's own Chinese labels ("其中：存货变动"), so the renderer needs a CJK
+# face. WenQuanYi ships with the image and, failing that, sits beside the backend's PDF font.
+CJK_CANDIDATES = [
+    Path("/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+    Path(__file__).resolve().parent.parent / "backend/src/main/resources/fonts/wqy-microhei.ttc",
+]
+
+
+def cjk_font() -> Path | None:
+    for candidate in CJK_CANDIDATES:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def release_line() -> str:
+    """The cover states the build it documents, read from the repo rather than typed by hand: a
+    hard-coded version drifts the moment the next release ships."""
+    repo = Path(__file__).resolve().parent.parent
+    version = "?"
+    try:
+        for line in (repo / "backend/src/main/resources/application.yml").read_text().splitlines():
+            if line.strip().startswith("version:"):
+                version = line.split(":", 1)[1].strip()
+                break
+    except OSError:
+        pass
+    migrations = len(list((repo / "backend/src/main/resources/db/migration").glob("V*.sql")))
+    today = __import__("datetime").date.today().strftime("%-d %B %Y")
+    return f"Version {version}  ·  schema V{migrations}  ·  {today}"
+
+
 def clean(text: str) -> str:
-    """DejaVu has no CJK: keep the guide ASCII so the PDF has no tofu boxes."""
-    return text.replace("English / 中文", "English / Chinese").replace("中文", "Chinese")
+    """Text goes out as written: the CJK fallback renders the labels, ASCII needs nothing."""
+    return text
 
 
 class Guide(FPDF):
@@ -46,6 +78,15 @@ class Guide(FPDF):
         self.add_font("sans", "B", str(SANS_BOLD))
         self.add_font("sans", "I", str(SANS_ITALIC))
         self.add_font("mono", "", str(MONO))
+        cjk = cjk_font()
+        if cjk is not None:
+            # Every body face falls back to it per glyph, so a Chinese label inside an English
+            # sentence renders instead of becoming a box (or being quietly edited out). All three
+            # styles are registered because the fallback lookup is per (family, style): a bold run of
+            # Chinese with only a regular face installed loses its glyphs silently.
+            for style in ("", "B", "I"):
+                self.add_font("cjk", style, str(cjk))
+            self.set_fallback_fonts(["cjk"])
         self.title_text = "bizsim — user guide"
 
     def header(self) -> None:
@@ -243,7 +284,7 @@ def render(markdown: str, out: Path) -> None:
     pdf.set_font("sans", "", 8.5)
     pdf.set_text_color(*MUTED)
     pdf.cell(0, 5, "bizsim · user guide · docs/USER_GUIDE.md", new_x="LMARGIN", new_y="NEXT")
-    pdf.cell(0, 5, "Version 0.9.0-workbench  ·  schema V14  ·  3 November 2026",
+    pdf.cell(0, 5, release_line(),
              new_x="LMARGIN", new_y="NEXT")
 
     pdf.add_page()

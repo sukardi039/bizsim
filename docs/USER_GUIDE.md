@@ -365,11 +365,11 @@ Under the scoreboard, for any computed round:
    - **Revenue** — revenue for the round, and units lost to stock-outs
    - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
      hiring/firing, capacity, market review, then **Total cost**
-   - **Result** — opening cash (the balance the round started from), profit, any **stock and capacity
-     movement** (cash tied up in stock built this month and in machines bought — neither is a cost, so
+   - **Result** — opening cash (the balance the round started from), profit, any stock and capacity
+     movement (cash tied up in stock built this month and in machines bought — neither is a cost, so
      neither touches profit), then cash after the round, brand after the round, capacity used, market
-     share. Where the statement can name the parts, it shows them as **其中：存货变动** and
-     **其中：研发超额退回** underneath, so the number is explained rather than asserted.
+     share. Where the statement can name the parts, two lines sit underneath it — "其中：存货变动"
+     and "其中：研发超额退回" — so the number is explained rather than asserted.
 
    **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
    exactly where the previous one closed — that is the continuity line. The same breakdown is shown
@@ -473,9 +473,9 @@ own — you do not need to reload.
    profitability, market management, operations, pricing and investment — each graded and explained in
    one sentence from your own figures, with what to try next term. It is written in the language of
    your class and it never compares you with a named competitor.
-8. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
-   round**: that month's summary, then what they sent, then the cost lines — their company only, no
-   market share, no competitor line. A trainee who has not been seated in the session gets a
+8. **My results (PDF / Excel)** in the same card gives the trainee their own report — one page
+   per round: that month's summary, then what they sent, then the cost lines — their company only,
+   no market share, no competitor line. A trainee who has not been seated in the session gets a
    refusal, not an empty file.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
