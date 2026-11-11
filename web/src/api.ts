@@ -239,7 +239,13 @@ export interface StatementRow {
   capacity_used: number;
   capacity_available: number;
   /** The per-product lines written by the engine at compute time (D34). */
-  detail?: { products?: ProductStat[] } | null;
+  detail?: {
+    products?: ProductStat[];
+    /** D79: what the closing stock cost minus what the opening stock cost. */
+    stockValueChange?: number;
+    /** D79: R&D money returned because a project was over-funded. */
+    refund?: number;
+  } | null;
 }
 
 export interface ScoreRow {

@@ -49,7 +49,10 @@ public class EvaluationReportService {
                                BigDecimal report, BigDecimal profit, BigDecimal cashAfter,
                                BigDecimal openingCash, BigDecimal brandAfter, BigDecimal lostSales,
                                BigDecimal capacityUsed, BigDecimal capacityAvailable, BigDecimal stock,
-                               BigDecimal marketShare, BigDecimal unitsSold, BigDecimal rndCompleted) {
+                               BigDecimal marketShare, BigDecimal unitsSold, BigDecimal rndCompleted,
+                               /** D79: the pieces of the cash-vs-profit gap: stock value, machines, refund. */
+                               BigDecimal stockValueChange, BigDecimal capacityBought,
+                               BigDecimal refund) {
 
         /** Everything the month paid out in cash: the cost of running the business. */
         BigDecimal cashCosts() {
@@ -79,7 +82,9 @@ public class EvaluationReportService {
                          BigDecimal marketingShare, BigDecimal firstShare, BigDecimal lastShare,
                          BigDecimal shareDelta, BigDecimal utilisation, BigDecimal lostSalesTotal,
                          BigDecimal unitsSold, BigDecimal endStock, BigDecimal grossMargin,
-                         BigDecimal rndCompleted) {
+                         BigDecimal rndCompleted,
+                         /** D79: the explanation of cashDelta − profitTotal, term on term. */
+                         BigDecimal stockValueChange, BigDecimal capacityBought, BigDecimal refund) {
     }
 
     public record Evaluation(Term term, Totals totals, List<Measure> measures) {
@@ -153,7 +158,10 @@ public class EvaluationReportService {
                        coalesce((rr.score->>'stock')::numeric, 0)        as stock,
                        coalesce((rr.score->>'marketShare')::numeric, 0)  as market_share,
                        coalesce((rr.score->>'unitsSold')::numeric, 0)    as units_sold,
-                       coalesce((rr.score->>'rndCompleted')::numeric, 0) as rnd_completed
+                       coalesce((rr.score->>'rndCompleted')::numeric, 0) as rnd_completed,
+                       coalesce((s.detail->>'stockValueChange')::numeric, 0) as stock_value_change,
+                       s.capacity_cost                                    as capacity_bought,
+                       coalesce((s.detail->>'refund')::numeric, 0)        as refund
                 from round r
                 join round_statement s on s.round_id = r.id and s.team_id = ?
                 join round_result rr on rr.round_id = r.id and rr.team_id = s.team_id
@@ -170,7 +178,8 @@ public class EvaluationReportService {
                 rs.getBigDecimal("lost_sales"), rs.getBigDecimal("capacity_used"),
                 rs.getBigDecimal("capacity_available"), rs.getBigDecimal("stock"),
                 rs.getBigDecimal("market_share"), rs.getBigDecimal("units_sold"),
-                rs.getBigDecimal("rnd_completed")), teamId, runId);
+                rs.getBigDecimal("rnd_completed"), rs.getBigDecimal("stock_value_change"),
+                rs.getBigDecimal("capacity_bought"), rs.getBigDecimal("refund")), teamId, runId);
         return new Term(teamId, String.valueOf(row.get("company_name")),
                 String.valueOf(row.get("trainees")), String.valueOf(row.get("session")),
                 String.valueOf(row.get("programme")), String.valueOf(row.get("lang")), rounds);
@@ -192,6 +201,9 @@ public class EvaluationReportService {
         BigDecimal cashCosts = BigDecimal.ZERO;
         BigDecimal used = BigDecimal.ZERO;
         BigDecimal available = BigDecimal.ZERO;
+        BigDecimal stockValueChange = BigDecimal.ZERO;
+        BigDecimal capacityBought = BigDecimal.ZERO;
+        BigDecimal refundTotal = BigDecimal.ZERO;
         BigDecimal minCash = null;
         int profitable = 0;
         for (RoundFigures r : rounds) {
@@ -208,6 +220,11 @@ public class EvaluationReportService {
             cashCosts = cashCosts.add(r.cashCosts());
             used = used.add(r.capacityUsed());
             available = available.add(r.capacityAvailable());
+            stockValueChange = stockValueChange.add(r.stockValueChange() == null
+                    ? BigDecimal.ZERO : r.stockValueChange());
+            capacityBought = capacityBought.add(r.capacityBought() == null
+                    ? BigDecimal.ZERO : r.capacityBought());
+            refundTotal = refundTotal.add(r.refund() == null ? BigDecimal.ZERO : r.refund());
             if (r.profit().signum() > 0) {
                 profitable++;
             }
@@ -229,7 +246,7 @@ public class EvaluationReportService {
                 div(used, available, 4),
                 lost, sold, last.stock(),
                 revenue.signum() > 0 ? div(revenue.subtract(cogs), revenue, 4) : BigDecimal.ZERO,
-                rndDone);
+                rndDone, stockValueChange, capacityBought, refundTotal);
     }
 
     List<Measure> measures(List<RoundFigures> rounds, Totals t) {
@@ -332,6 +349,8 @@ public class EvaluationReportService {
                 document.add(measureParagraph(measure, labels, head, body));
             }
 
+            document.add(bridge(evaluation, labels, body));
+
             document.add(new Paragraph(labels.t("adviceTitle"), head));
             int shown = 0;
             for (Measure measure : byNeed(evaluation.measures())) {
@@ -364,6 +383,49 @@ public class EvaluationReportService {
             document.close();
         }
         return out.toByteArray();
+    }
+
+    /**
+     * The sentence that answers "how can a loss end with more cash?" (D79). Cash and profit differ by
+     * stock, machines and refunds; when those three explain the gap to the rupiah the report says so
+     * by name, and when they do not (a template on replacement costing) it says that instead of
+     * pretending the numbers add up.
+     */
+    private Paragraph bridge(Evaluation evaluation, Labels labels, Font body) {
+        Totals t = evaluation.totals();
+        BigDecimal gap = t.cashDelta().subtract(t.profitTotal());
+        Paragraph p = new Paragraph();
+        if (gap.abs().compareTo(BigDecimal.ONE) < 0) {
+            p.add(new Phrase(labels.t("bridgeNone"), body));
+        } else {
+            BigDecimal stock = t.stockValueChange().negate();
+            BigDecimal machines = t.capacityBought().negate();
+            BigDecimal residual = gap.subtract(stock).subtract(machines).subtract(t.refund());
+            if (residual.abs().compareTo(BigDecimal.ONE) >= 0) {
+                // A template on replacement costing revalues stock, and that piece has no stored
+                // number to quote; say so rather than print a bridge that does not add up.
+                p.add(new Phrase(labels.t("bridgeLegacy", signedMoney(gap)), body));
+            } else {
+                List<String> parts = new ArrayList<>();
+                if (stock.signum() != 0) {
+                    // A positive stock term is cash released by selling down the shelf; a negative one
+                    // is cash tied up in goods that profit has already carried.
+                    parts.add(labels.t(stock.signum() > 0
+                            ? "bridgePartStockReleased" : "bridgePartStockBuilt", money(stock.abs())));
+                }
+                if (machines.signum() != 0) {
+                    parts.add(labels.t("bridgePartMachines", money(machines.abs())));
+                }
+                if (t.refund().signum() != 0) {
+                    parts.add(labels.t("bridgePartRefund", money(t.refund().abs())));
+                }
+                p.add(new Phrase(labels.t(gap.signum() > 0 ? "bridgeUp" : "bridgeDown",
+                        money(gap.abs()), String.join(labels.t("bridgeJoiner"), parts)), body));
+            }
+        }
+        p.setSpacingBefore(2);
+        p.setSpacingAfter(10);
+        return p;
     }
 
     /** WATCH first: the advice section should lead with what to change. */
@@ -533,6 +595,20 @@ public class EvaluationReportService {
                 Map.entry("col.profit", "Profit"),
                 Map.entry("col.cash", "Cash after"),
                 Map.entry("col.share", "Share"),
+                Map.entry("bridgeNone", "Cash moved exactly as much as profit: nothing was left in "
+                        + "stock and nothing was spent on machines."),
+                Map.entry("bridgeUp", "Cash finished {0} above profit: {1}. None of that is a cost, "
+                        + "which is why a loss-making term can still end with more cash than it began."),
+                Map.entry("bridgeDown", "Cash finished {0} below profit: {1}. None of that is a cost — "
+                        + "the money is in stock and machines, not in the income statement."),
+                Map.entry("bridgePartStockBuilt", "{0} tied up in stock"),
+                Map.entry("bridgePartStockReleased", "{0} released by selling stock down"),
+                Map.entry("bridgePartMachines", "{0} spent on machines"),
+                Map.entry("bridgePartRefund", "{0} of research money returned after over-funding"),
+                Map.entry("bridgeJoiner", ", "),
+                Map.entry("bridgeLegacy", "Cash and profit differ by {0}. Part of that is stock valued at "
+                        + "this month's cost rather than the price paid for it — the session's template uses "
+                        + "replacement costing."),
                 Map.entry("closing", "You finished with {0} in the bank and {1} of cumulative profit."),
                 Map.entry("note", "Every figure is taken from the round statements this session computed; "
                         + "nothing here is re-estimated. Your position in the class is the separate class "
@@ -583,6 +659,18 @@ public class EvaluationReportService {
                 Map.entry("col.profit", "利润"),
                 Map.entry("col.cash", "期末现金"),
                 Map.entry("col.share", "市场份额"),
+                Map.entry("bridgeNone", "现金变动与利润完全一致：期末没有存货，也没有购置产能。"),
+                Map.entry("bridgeUp", "期末现金比累计利润多 {0}：{1}。这些都不是成本，所以亏损的学期仍可能"
+                        + "以更多现金结束。"),
+                Map.entry("bridgeDown", "期末现金比累计利润少 {0}：{1}。这些都不是成本——钱在存货和设备里，"
+                        + "不在利润表里。"),
+                Map.entry("bridgePartStockBuilt", "{0} 沉淀在存货中"),
+                Map.entry("bridgePartStockReleased", "{0} 由出售存货回笼"),
+                Map.entry("bridgePartMachines", "{0} 用于购置产能"),
+                Map.entry("bridgePartRefund", "{0} 为研发超额投入的退回"),
+                Map.entry("bridgeJoiner", "，"),
+                Map.entry("bridgeLegacy", "现金与累计利润相差 {0}。其中一部分来自按当期成本而非实际买价计价的存货——"
+                        + "本场模拟的模板使用的是「当期成本」计价。"),
                 Map.entry("closing", "期末现金为 {0}，累计利润为 {1}。"),
                 Map.entry("note", "所有数字均取自本场模拟各轮已结算的报表，未做任何重新估算。在班级中的名次见"
                         + "教师展示的班级排名表。"),

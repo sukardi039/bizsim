@@ -368,7 +368,8 @@ Under the scoreboard, for any computed round:
    - **Result** — opening cash (the balance the round started from), profit, any **stock and capacity
      movement** (cash tied up in stock built this month and in machines bought — neither is a cost, so
      neither touches profit), then cash after the round, brand after the round, capacity used, market
-     share
+     share. Where the statement can name the parts, it shows them as **其中：存货变动** and
+     **其中：研发超额退回** underneath, so the number is explained rather than asserted.
 
    **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
    exactly where the previous one closed — that is the continuity line. The same breakdown is shown
@@ -479,6 +480,14 @@ own — you do not need to reload.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."*
+
+**Why a loss can end with more cash (D79).** Stock is charged at the price the company actually paid
+for it, so cash and profit only differ for three reasons: stock still on the shelf, machines bought,
+and research money returned after over-funding a project. None of the three is a cost. A term that
+starts and ends with an empty shelf therefore has cash movement exactly equal to its cumulative
+profit — if the two ever disagree on such a session, that is a bug, not a teaching point. Older
+packages published before D79 use *replacement* costing (stock is revalued at this month's cost), and
+their development report says so in the bridging sentence instead of pretending the numbers add up.
 
 ---
 

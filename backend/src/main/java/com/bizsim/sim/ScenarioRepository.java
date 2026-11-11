@@ -97,7 +97,8 @@ public class ScenarioRepository {
                         ? dec(d.path("qualityCostPerPoint")) : new BigDecimal("60000000"),
                 // D48: absent means off, so an existing package seats the same companies it always did.
                 d.path("autoWorkers").asBoolean(false),
-                d.path("guidedRounds").asInt(0));
+                d.path("guidedRounds").asInt(0),
+                "WEIGHTED".equalsIgnoreCase(d.path("costBasis").asText("REPLACEMENT")));
 
 
         List<Scenario.ProductSpec> products = jdbc.query("""
@@ -262,6 +263,14 @@ public class ScenarioRepository {
     public String freeze(String sourceKey, long tenantId, String frozenKey, String name) {
         // PUBLISHED, not DRAFT: a frozen copy is what a class runs on, not something to be edited.
         cloneInto(sourceKey, frozenKey, name, tenantId, "PUBLISHED");
+        // D79: publishing is the last moment the economics can still be chosen, so a template that
+        // does not name its inventory basis is frozen on weighted-average cost — the basis under
+        // which cash movement equals profit plus stock change. A template that says REPLACEMENT keeps
+        // it, and everything already published is untouched.
+        jdbc.update("""
+                update scenario set definition = jsonb_set(definition, '{costBasis}', '"WEIGHTED"')
+                where key = ? and not jsonb_exists(definition, 'costBasis')
+                """, frozenKey);
         return frozenKey;
     }
 
@@ -347,7 +356,9 @@ public class ScenarioRepository {
             // D15/D26: the quality mechanic is a per-template switch; the price is a builder number.
             "qualityUpgrade", "qualityCostPerPoint", "autoWorkers",
             // D61: how many opening rounds a trainee sees a suggested plan in.
-            "guidedRounds");
+            "guidedRounds",
+            // D79: REPLACEMENT or WEIGHTED inventory costing — a builder choice, not calibration.
+            "costBasis");
 
     /** The editable part of the definition document, as stored. */
     public Map<String, Object> settings(String key) {

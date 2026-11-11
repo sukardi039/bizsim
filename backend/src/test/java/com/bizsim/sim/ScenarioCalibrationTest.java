@@ -86,7 +86,7 @@ class ScenarioCalibrationTest extends PostgresTestBase {
         Map<String, ScoringEngine.ProductState> products = new LinkedHashMap<>();
         for (Scenario.ProductSpec p : scenario.products()) {
             products.put(p.code(), new ScoringEngine.ProductState(p.code(), p.basePrice(),
-                    p.baseQuality(), p.baseUnitCost(), BigDecimal.ZERO));
+                    p.baseQuality(), p.baseUnitCost(), BigDecimal.ZERO, BigDecimal.ZERO));
         }
         Map<String, ScoringEngine.RndState> rnd = new LinkedHashMap<>();
         for (Scenario.ProjectSpec project : scenario.projects()) {

@@ -43,8 +43,13 @@ public class ScoringEngine {
 
     // ------------------------------------------------------------------ inputs
 
+    /**
+     * One product line as the company holds it. {@code stockValue} is what the units in stock cost
+     * when they were paid for — the basis weighted-average costing charges against COGS (D79); a
+     * template on REPLACEMENT costing never reads it.
+     */
     public record ProductState(String code, BigDecimal price, BigDecimal quality,
-                               BigDecimal unitCost, BigDecimal stock) {
+                               BigDecimal unitCost, BigDecimal stock, BigDecimal stockValue) {
     }
 
     public record RndState(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
@@ -63,7 +68,11 @@ public class ScoringEngine {
                               BigDecimal openingStock, BigDecimal demand, BigDecimal sold,
                               BigDecimal closingStock, BigDecimal lost, BigDecimal price,
                               BigDecimal unitCost, BigDecimal quality, BigDecimal revenue,
-                              BigDecimal cogs) {
+                              BigDecimal cogs,
+                              /** The cost per unit COGS was charged at: replacement or average (D79). */
+                              BigDecimal averageCost,
+                              /** What the closing stock cost, at the basis this round used. */
+                              BigDecimal stockValue) {
     }
 
     public record RndUpdate(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
@@ -81,7 +90,9 @@ public class ScoringEngine {
                               BigDecimal openingCash, BigDecimal profit, BigDecimal cashChange,
                               BigDecimal lostSales,
                               BigDecimal capacityUsed, BigDecimal capacityAvailable,
-                              List<RndUpdate> rndUpdates) {
+                              List<RndUpdate> rndUpdates,
+                              Map<String, BigDecimal> stockValues, BigDecimal stockValueChange,
+                              BigDecimal refund) {
     }
 
     public record Commitment(BigDecimal materials, BigDecimal payroll, BigDecimal hiring,
@@ -468,6 +479,9 @@ public class ScoringEngine {
         BigDecimal cogs = ZERO;
         BigDecimal lostSales = ZERO;
         BigDecimal capacityUsed = ZERO;
+        Map<String, BigDecimal> stockValues = new LinkedHashMap<>();
+        BigDecimal stockValueChange = ZERO;
+        boolean weighted = scenario.params().weightedCosting();
 
         for (Scenario.ProductSpec spec : scenario.products()) {
             ProductState state = team.products().get(spec.code());
@@ -484,16 +498,39 @@ public class ScoringEngine {
             BigDecimal closing = available.subtract(sold).max(ZERO);
 
             BigDecimal lineRevenue = money(sold.multiply(price));
-            BigDecimal lineCogs = money(sold.multiply(unitCost));
+
+            // D79. Replacement costing charges this month's cost for goods paid for last month, so a
+            // company that stocked up before a cost rise is expensed at a price it never paid — and
+            // with stock at zero at both ends, cash and profit stop agreeing. Weighted average charges
+            // what the units in stock actually cost; then cash movement = profit + stock change.
+            BigDecimal openingValue = state == null ? ZERO : nz(state.stockValue());
+            BigDecimal addedValue = money(produced.multiply(unitCost));
+            BigDecimal availableValue = openingValue.add(addedValue);
+            BigDecimal lineCogs;
+            BigDecimal averageCost;
+            BigDecimal closingValue;
+            if (weighted) {
+                averageCost = available.signum() > 0
+                        ? div(availableValue, available) : unitCost;
+                lineCogs = money(sold.multiply(averageCost));
+                closingValue = availableValue.subtract(lineCogs).max(ZERO);
+            } else {
+                averageCost = unitCost;
+                lineCogs = money(sold.multiply(unitCost));
+                closingValue = money(closing.multiply(unitCost));
+            }
 
             revenue = revenue.add(lineRevenue);
             cogs = cogs.add(lineCogs);
             lostSales = lostSales.add(lost);
             stock.put(spec.code(), closing);
+            stockValues.put(spec.code(), closingValue);
+            stockValueChange = stockValueChange.add(closingValue.subtract(openingValue));
 
             lines.add(new ProductLine(spec.code(), units(plan.planned().get(spec.code())), produced,
                     units(opening), demanded, sold, units(closing), units(lost), price, unitCost,
-                    units(plan.effectiveQuality().get(spec.code())), lineRevenue, lineCogs));
+                    units(plan.effectiveQuality().get(spec.code())), lineRevenue, lineCogs,
+                    averageCost.setScale(2, RoundingMode.HALF_UP), closingValue));
         }
 
         // R&D: fixed duration, evaluated at the deadline (D10). Advantages reach the market next month.
@@ -588,7 +625,8 @@ public class ScoringEngine {
                 plan.qualitySpend(),
                 money(nz(team.cash())),
                 money(profit), money(cashChange), units(lostSales), plan.capacityUsed(),
-                plan.capacityAvailable(), rndUpdates);
+                plan.capacityAvailable(), rndUpdates,
+                stockValues, money(stockValueChange), money(refund));
     }
 
     /** Brand is a stock, not a flow: this month's spend is felt next month, and it decays (D5/marketing). */

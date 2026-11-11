@@ -139,7 +139,8 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
                         carried == null ? spec.basePrice() : carried.price(),
                         carried == null ? spec.baseQuality() : carried.quality(),
                         carried == null ? spec.baseUnitCost() : carried.unitCost(),
-                        carried == null ? BigDecimal.ZERO : carried.stock()));
+                        carried == null ? BigDecimal.ZERO : carried.stock(),
+                        carried == null ? BigDecimal.ZERO : carried.stockValue()));
             }
             Map<String, Integer> workforce = staff.isEmpty()
                     ? Map.of("PRODUCTION", scenario.params().startingStaff()
@@ -165,7 +166,7 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
             Map<String, ScoringEngine.ProductState> next = new LinkedHashMap<>();
             for (ScoringEngine.ProductLine line : outcome.lines()) {
                 next.put(line.product(), new ScoringEngine.ProductState(line.product(), line.price(),
-                        line.quality(), line.unitCost(), line.closingStock()));
+                        line.quality(), line.unitCost(), line.closingStock(), line.stockValue()));
             }
             products = next;
             Map<String, ScoringEngine.RndState> rndNext = new LinkedHashMap<>();

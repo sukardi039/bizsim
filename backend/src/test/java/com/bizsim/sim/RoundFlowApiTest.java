@@ -976,6 +976,66 @@ class RoundFlowApiTest extends PostgresTestBase {
         assertThat((BigDecimal) statement(2, teamTwo).get("capacity_available")).isEqualByComparingTo("30");
     }
 
+    /**
+     * D79, end to end: a company builds stock in one month and sells it in later ones. Once the shelf
+     * is empty again, the cash movement over the whole term must equal the cumulative profit exactly.
+     * Under the old replacement-cost basis it never did: carried stock was expensed at the current
+     * month's price instead of the price actually paid, so a loss-making term could end with more cash
+     * than it started with.
+     */
+    @Test
+    void a_term_that_ends_with_no_stock_has_cash_equal_to_profit() throws Exception {
+        openRound();
+        // More than this market takes in a month, so part of it sits on the shelf over the boundary.
+        submit(playerOneToken, teamOne, payload(900, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        submit(playerTwoToken, teamTwo, payload(0, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        close();
+
+        // Draw the shelf down: produce nothing more, round after round, until it is empty.
+        for (int round = 0; round < 4 && closingStock(teamOne).signum() > 0; round++) {
+            mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                    .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+            submit(playerOneToken, teamOne, payload(0, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+            submit(playerTwoToken, teamTwo, payload(0, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+            close();
+        }
+
+        JsonNode rows = statementsOf(teamOne);
+        BigDecimal opening = new BigDecimal(rows.get(0).path("opening_cash").asText());
+        BigDecimal closing = new BigDecimal(rows.get(rows.size() - 1).path("cash_after").asText());
+        BigDecimal profit = BigDecimal.ZERO;
+        for (JsonNode row : rows) {
+            profit = profit.add(new BigDecimal(row.path("profit").asText()));
+        }
+        assertThat(closingStock(teamOne)).as("the shelf is empty, so nothing is left to value")
+                .isEqualByComparingTo("0");
+        assertThat(closing.subtract(opening))
+                .as("cash movement equals cumulative profit when no stock is carried across")
+                .isEqualByComparingTo(profit);
+    }
+
+    private void close() throws Exception {
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + facilitatorToken)).andExpect(status().isOk());
+    }
+
+    /** What is on the shelf after the last computed round: every product, not just the last row. */
+    private BigDecimal closingStock(long teamId) throws Exception {
+        JsonNode rows = statementsOf(teamId);
+        BigDecimal total = BigDecimal.ZERO;
+        for (JsonNode line : rows.get(rows.size() - 1).path("detail").path("products")) {
+            total = total.add(new BigDecimal(line.path("closingStock").asText()));
+        }
+        return total;
+    }
+
+    private JsonNode statementsOf(long teamId) throws Exception {
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/statements")
+                        .header("Authorization", "Bearer " + playerOneToken))
+                .andExpect(status().isOk()).andReturn();
+        return json.readTree(result.getResponse().getContentAsString());
+    }
+
     private Map<String, Object> statement(int round, long teamId) {
         return jdbc.queryForMap("""
                 select s.capacity_cost, s.capacity_available, s.profit, s.cash_after, t.machine_workers

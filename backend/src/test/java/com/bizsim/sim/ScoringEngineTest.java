@@ -167,7 +167,7 @@ class ScoringEngineTest {
         for (long id = 1; id <= 20; id++) {
             ScoringEngine.TeamInput input = new ScoringEngine.TeamInput(id, "ACTIVE", bd("1000000"),
                     bd("1000000"), ZERO, Map.of("PRODUCTION", 10),
-                    Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO)),
+                    Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO, ZERO)),
                     Map.of("PRJ", new ScoringEngine.RndState("PRJ", bd("400"), 1, 1, "ACTIVE", ZERO)),
                     decision(bd("0"), bd("500")));
             thresholds.add(runAt(2, input, chance).rndUpdates().get(0).threshold().toPlainString());
@@ -218,7 +218,7 @@ class ScoringEngineTest {
                 active("PRJ"), ZERO);
         ScoringEngine.TeamInput second = new ScoringEngine.TeamInput(2L, "ACTIVE", bd("1000000"),
                 bd("50"), ZERO, Map.of("PRODUCTION", 10),
-                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO)),
+                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), ZERO, ZERO)),
                 active("PRJ"), decision(bd("0"), ZERO));
 
         ScoringEngine.RoundResult result = engine.compute(scenario, neutral, List.of(first, second));
@@ -303,7 +303,7 @@ class ScoringEngineTest {
                         List.of(ONE), ZERO, ZERO, ZERO, ZERO,
                         Map.of("PRODUCTION", ZERO), Map.of("PRODUCTION", 10),
                         bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01"),
-                        false, ZERO, false, 0),
+                        false, ZERO, false, 0, false),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
                         bd("10000"), bd("10"), ONE, ZERO)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
@@ -320,7 +320,7 @@ class ScoringEngineTest {
                 p.priceElasticity(), p.qualityElasticity(), p.brandElasticity(), p.marketingElasticity(),
                 p.salaries(), p.startingStaff(), p.marketReportCost(), p.forecastHorizon(),
                 p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
-                true, bd("60000000"), false, 0);
+                true, bd("60000000"), false, 0, false);
         return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
                 base.rounds(), base.events());
     }
@@ -348,8 +348,60 @@ class ScoringEngineTest {
                                                 BigDecimal stock) {
         return new ScoringEngine.TeamInput(1L, status, cash, bd("50"), ZERO,
                 Map.of("PRODUCTION", 10),
-                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), stock)),
+                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"), stock, ZERO)),
                 rnd, decision);
+    }
+
+    /**
+     * D79: what a unit in stock cost is what was paid for it. The shop floor's current cost is 40,
+     * but the 100 units on the shelf were bought at 30 — weighted costing charges 30, replacement
+     * costing charges today's 40. That difference is the whole reason a profitable-looking term can
+     * end with cash and profit disagreeing.
+     */
+    @Test
+    void weighted_costing_charges_the_price_the_stock_was_bought_at() {
+        EnvironmentService.RoundEnvironment neutral =
+                EnvironmentService.RoundEnvironment.neutral(1, java.util.Set.of("P"));
+        DecisionPayload sell50 = new DecisionPayload(
+                List.of(new DecisionPayload.ProductRow("P", ZERO)),
+                List.of(new DecisionPayload.PriceRow("P", bd("100"))),
+                List.of(),
+                new DecisionPayload.ManpowerRow(10),
+                List.of(), List.of(), ZERO, false);
+
+        BigDecimal weightedCogs = engine.compute(scenarioWeighted(true), neutral,
+                List.of(stockedTeam(sell50))).teams().get(0).cogs();
+        BigDecimal replacementCogs = engine.compute(scenarioWeighted(false), neutral,
+                List.of(stockedTeam(sell50))).teams().get(0).cogs();
+
+        // nothing is produced, so every unit sold comes off the shelf: 100 x 30 actually paid for
+        // them, versus 100 x 40 of "what it would cost to make one today".
+        assertThat(weightedCogs).isEqualByComparingTo("3000");
+        assertThat(replacementCogs).isEqualByComparingTo("4000");
+    }
+
+    private static Scenario scenarioWeighted(boolean weighted) {
+        Scenario base = scenario();
+        Scenario.Params p = base.params();
+        Scenario.Params q = new Scenario.Params(p.rounds(), p.roundMinutes(), p.startingCash(),
+                p.startingBrand(), p.fixedCostPerMonth(), p.brandDecay(), p.holdingCostPerUnit(),
+                p.referenceQuality(), p.referenceSpend(), p.machineCostPerWorker(), p.hiringCostMonths(),
+                p.severanceMonths(), p.minRndBenefitRatio(), p.baselineShare(), p.seasonality(),
+                p.priceElasticity(), p.qualityElasticity(), p.brandElasticity(), p.marketingElasticity(),
+                p.salaries(), p.startingStaff(), p.marketReportCost(), p.forecastHorizon(),
+                p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
+                p.qualityUpgrade(), p.qualityCostPerPoint(), p.autoWorkers(), p.guidedRounds(), weighted);
+        return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
+                base.rounds(), base.events());
+    }
+
+    /** 100 units on the shelf that cost 30 each; today's unit cost is 40. */
+    private static ScoringEngine.TeamInput stockedTeam(DecisionPayload decision) {
+        return new ScoringEngine.TeamInput(1L, "ACTIVE", bd("1000000"), bd("50"), ZERO,
+                Map.of("PRODUCTION", 10),
+                Map.of("P", new ScoringEngine.ProductState("P", bd("100"), bd("50"), bd("40"),
+                        bd("100"), bd("3000"))),
+                active("PRJ"), decision);
     }
 
     private static Map<String, ScoringEngine.RndState> active(String code) {

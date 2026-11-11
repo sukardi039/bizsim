@@ -104,12 +104,12 @@ public class BotRepository {
                 }, teamId);
         Map<String, ScoringEngine.ProductState> products = new LinkedHashMap<>();
         jdbc.query("""
-                select product_code, unit_price, quality_level, unit_cost, stock
+                select product_code, unit_price, quality_level, unit_cost, stock, stock_value
                 from company_product where team_id = ? order by product_code
                 """, rs -> {
             products.put(rs.getString(1), new ScoringEngine.ProductState(rs.getString(1),
                     rs.getBigDecimal(2), rs.getBigDecimal(3), rs.getBigDecimal(4),
-                    rs.getBigDecimal(5)));
+                    rs.getBigDecimal(5), rs.getBigDecimal(6)));
         }, teamId);
         Map<String, ScoringEngine.RndState> rnd = new LinkedHashMap<>();
         jdbc.query("""
@@ -146,7 +146,8 @@ public class BotRepository {
                         dec(node, "planned"), dec(node, "produced"), dec(node, "openingStock"),
                         dec(node, "demand"), dec(node, "sold"), dec(node, "closingStock"),
                         dec(node, "lost"), dec(node, "price"), dec(node, "unitCost"),
-                        dec(node, "quality"), dec(node, "revenue"), dec(node, "cogs")));
+                        dec(node, "quality"), dec(node, "revenue"), dec(node, "cogs"),
+                        dec(node, "averageCost"), dec(node, "stockValue")));
             }
             return lines;
         } catch (Exception e) {
@@ -172,7 +173,8 @@ public class BotRepository {
             for (JsonNode p : node.path("products")) {
                 String code = p.path("product").asText();
                 products.put(code, new ScoringEngine.ProductState(code, dec(p, "price"),
-                        dec(p, "quality"), dec(p, "unitCost"), dec(p, "stock")));
+                        dec(p, "quality"), dec(p, "unitCost"), dec(p, "stock"),
+                        dec(p, "stockValue")));
             }
             Map<String, ScoringEngine.RndState> rnd = new LinkedHashMap<>();
             for (JsonNode p : node.path("rnd")) {

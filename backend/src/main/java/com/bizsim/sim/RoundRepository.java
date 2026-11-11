@@ -137,7 +137,7 @@ public class RoundRepository {
                     'products', coalesce((select jsonb_agg(jsonb_build_object(
                             'product', cp.product_code, 'price', cp.unit_price,
                             'quality', cp.quality_level, 'unitCost', cp.unit_cost,
-                            'stock', cp.stock))
+                            'stock', cp.stock, 'stockValue', cp.stock_value))
                         from company_product cp where cp.team_id = t.id), '[]'::jsonb),
                     'staff', coalesce((select jsonb_object_agg(cs.function, cs.headcount)
                         from company_staff cs where cs.team_id = t.id), '{}'::jsonb),
@@ -218,10 +218,12 @@ public class RoundRepository {
 
         for (JsonNode product : state.path("products")) {
             jdbc.update("""
-                    update company_product set unit_price = ?, quality_level = ?, unit_cost = ?, stock = ?
+                    update company_product
+                    set unit_price = ?, quality_level = ?, unit_cost = ?, stock = ?, stock_value = ?
                     where team_id = ? and product_code = ?
                     """, dec(product, "price"), dec(product, "quality"), dec(product, "unitCost"),
-                    dec(product, "stock"), teamId, product.path("product").asText());
+                    dec(product, "stock"), dec(product, "stockValue"), teamId,
+                    product.path("product").asText());
         }
         state.path("staff").fields().forEachRemaining(entry -> jdbc.update("""
                 insert into company_staff (team_id, function, headcount) values (?, ?, ?)
@@ -337,7 +339,8 @@ public class RoundRepository {
     public Map<Long, Map<String, ScoringEngine.ProductState>> products(long runId) {
         Map<Long, Map<String, ScoringEngine.ProductState>> result = new LinkedHashMap<>();
         jdbc.query("""
-                select cp.team_id, cp.product_code, cp.unit_price, cp.quality_level, cp.unit_cost, cp.stock
+                select cp.team_id, cp.product_code, cp.unit_price, cp.quality_level, cp.unit_cost,
+                       cp.stock, cp.stock_value
                 from company_product cp join team t on t.id = cp.team_id
                 where t.run_id = ?
                 """, rs -> {
@@ -345,7 +348,7 @@ public class RoundRepository {
                     .put(rs.getString("product_code"), new ScoringEngine.ProductState(
                             rs.getString("product_code"), rs.getBigDecimal("unit_price"),
                             rs.getBigDecimal("quality_level"), rs.getBigDecimal("unit_cost"),
-                            rs.getBigDecimal("stock")));
+                            rs.getBigDecimal("stock"), rs.getBigDecimal("stock_value")));
         }, runId);
         return result;
     }
@@ -427,10 +430,11 @@ public class RoundRepository {
 
         for (ScoringEngine.ProductLine line : outcome.lines()) {
             jdbc.update("""
-                    update company_product set unit_price = ?, quality_level = ?, stock = ?
+                    update company_product set unit_price = ?, quality_level = ?, stock = ?,
+                                              stock_value = ?
                     where team_id = ? and product_code = ?
-                    """, line.price(), line.quality(), line.closingStock(), outcome.teamId(),
-                    line.product());
+                    """, line.price(), line.quality(), line.closingStock(), line.stockValue(),
+                    outcome.teamId(), line.product());
         }
         for (Map.Entry<String, Integer> entry : outcome.staff().entrySet()) {
             jdbc.update("""
@@ -670,6 +674,12 @@ public class RoundRepository {
         detail.put("products", outcome.lines());
         detail.put("rnd", outcome.rndUpdates());
         detail.put("cashChange", outcome.cashChange());
+        // D79: the components of the line the trainee sees as 库存与产能变动, so the statement can
+        // explain itself instead of asserting a single unexplained number.
+        detail.put("stockValueChange", outcome.stockValueChange());
+        detail.put("stockValues", outcome.stockValues());
+        detail.put("capacityBought", outcome.capacityCost());
+        detail.put("refund", outcome.refund());
         return toJson(detail);
     }
 

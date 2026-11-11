@@ -51,6 +51,10 @@ export default function StatementDetail({
   // numbers that produced revenue and lost sales above, so the table is a breakdown, never a
   // second calculation.
   const products = row.detail?.products ?? [];
+  // D79: the terms inside 库存与产能变动, so the trainee reads why cash and profit differ instead of
+  // being handed one unexplained number. Absent on statements computed before D79.
+  const stockChange = row.detail?.stockValueChange;
+  const refund = row.detail?.refund;
   const sumOf = (pick: (line: (typeof products)[number]) => number) =>
     products.reduce((sum, line) => sum + Number(pick(line) ?? 0), 0);
 
@@ -123,6 +127,18 @@ export default function StatementDetail({
             <div>
               <dt>{t("debrief.stockAndCapacity")}</dt>
               <dd>{money(cashMove - profit)}</dd>
+            </div>
+          )}
+          {stockChange !== undefined && Math.abs(Number(stockChange ?? 0)) >= 1 && (
+            <div className="muted sub">
+              <dt>· {t("debrief.stockValueChange")}</dt>
+              <dd>{money(Number(stockChange))}</dd>
+            </div>
+          )}
+          {refund !== undefined && Math.abs(Number(refund ?? 0)) >= 1 && (
+            <div className="muted sub">
+              <dt>· {t("debrief.rndRefund")}</dt>
+              <dd>{money(Number(refund))}</dd>
             </div>
           )}
           <div className="total">

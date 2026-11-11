@@ -59,7 +59,10 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          /** D48: auto workers are a per-template mechanic, off unless turned on. */
                          boolean autoWorkers,
                          /** D61: how many opening rounds come with a suggested plan, 0 = none. */
-                         int guidedRounds) {
+                         int guidedRounds,
+                         /** D79: stock is charged at what it cost (weighted average) rather than at
+                          *  this month's replacement cost. Off = the pre-D79 behaviour. */
+                         boolean weightedCosting) {
     }
 
     /** The economy for one cycle position. Missing positions fall back to neutral (1.0). */

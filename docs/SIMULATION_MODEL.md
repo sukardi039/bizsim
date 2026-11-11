@@ -91,7 +91,12 @@ Order matters and is part of the contract; the debrief must explain the same ord
 5. **Market** — per product, compute each company's attractiveness and take its share of that
    product's demand pool (§5). `demandUnits = share × pool`.
 6. **Sales** — `sold = min(demandUnits, openingStock + produced)`. Unsold demand is **lost** and is
-   not redistributed to rivals in v1. Revenue = `sold × price`.
+   not redistributed to rivals in v1. Revenue = `sold × price`. **COGS** is charged on the units sold
+   at the cost basis the template names: `WEIGHTED` (default for new packages) charges the average
+   price actually paid for the units in stock, `REPLACEMENT` charges this month's unit cost. The
+   difference is not cosmetic: under `REPLACEMENT`, stock carried across a cost rise is expensed at a
+   price the company never paid, so cash and profit stop agreeing even when the shelf starts and ends
+   empty (D79).
 7. **R&D resolution** — projects that reached their hidden expected cost complete; advantage applies
    from the next month (§6).
 8. **Brand update** — gain from marketing, minus decay (§5.3).
