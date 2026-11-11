@@ -87,6 +87,39 @@ export async function downloadDebrief(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * D76: the trainee's own development report. Same download mechanics as the debrief, one company,
+ * and the server refuses a company the caller is not seated in.
+ */
+export async function downloadEvaluation(
+  runId: number,
+  teamId: number,
+  /** The class language; the server falls back to the package's own when this is omitted. */
+  locale?: string,
+): Promise<void> {
+  const token = getToken();
+  const query = new URLSearchParams();
+  if (locale) query.set("locale", locale);
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const response = await fetch(`${BASE}/runs/${runId}/teams/${teamId}/evaluation${suffix}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new ApiError(response.status, await response.json().catch(() => null));
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const named = /filename="?([^";]+)"?/.exec(disposition);
+  link.download = named ? named[1] : `bizsim-development-report-run${runId}-team${teamId}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function getToken(): string {
   return localStorage.getItem(STORAGE) ?? "";
 }

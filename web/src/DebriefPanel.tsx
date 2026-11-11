@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   downloadDebrief,
+  downloadEvaluation,
   type DecisionInput,
   type RunPlayer,
   type ScoreRow,
@@ -42,6 +43,8 @@ export default function DebriefPanel({
   const [open, setOpen] = useState<number | null>(null);
   const [slides, setSlides] = useState(false);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
+  /** D76: which company's development report is being fetched. */
+  const [reportFor, setReportFor] = useState<number | null>(null);
 
   // D69: the statements are the record of which rounds have been computed, so they are read for the
   // whole run and not for the selected round. Reading them only after a scoreboard call made the
@@ -127,6 +130,19 @@ export default function DebriefPanel({
       return computedRounds.includes(current) ? current : newest;
     });
   }, [computedRounds]);
+
+  /** D76: the same report the trainee can download, generated for any company by staff. */
+  const developmentReport = async (teamId: number) => {
+    setProblem(null);
+    setReportFor(teamId);
+    try {
+      await downloadEvaluation(runId, teamId, locale);
+    } catch (error) {
+      setProblem(describeError(error, t));
+    } finally {
+      setReportFor(null);
+    }
+  };
 
   /** The trainee(s) seated in a company, so a row reads as a person's performance (D36). */
   const seats = (teamId: number) =>
@@ -281,6 +297,14 @@ export default function DebriefPanel({
                   <td className="num">
                     <button className="link" onClick={() => setOpen(open === row.team_id ? null : row.team_id)}>
                       {open === row.team_id ? t("debrief.hide") : t("debrief.detail")}
+                    </button>
+                    {" · "}
+                    <button
+                      className="link"
+                      onClick={() => void developmentReport(row.team_id)}
+                      disabled={reportFor !== null}
+                    >
+                      {reportFor === row.team_id ? t("debrief.exporting") : t("debrief.developmentReport")}
                     </button>
                   </td>
                 </tr>

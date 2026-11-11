@@ -311,6 +311,16 @@ it. It starts **hidden**: press **Show the class** after
 reading the debrief, and every computed round is then visible to the trainees; **Hide from the class**
 takes it away again. Both moments are in the audit trail.
 
+### 7.2.3b Development report, per company
+
+Next to **Detail** on each row of the debrief there is **Development report**. It downloads one PDF
+for that company: six dimensions — liquidity, profitability, market management, operations, pricing
+and investment — each with a band (strong / steady / needs attention), one sentence quoting the
+figures, and the three pieces of advice the report considers most urgent. It is the same document a
+trainee can download for themselves (D76), generated here for any company in the session. It is
+written in the language of the class, and it never names another company: it is a report on how this
+company was run, not a comparison.
+
 ### 7.2.4 Starting over
 
 **Reset the session** puts the run back to its pre-start condition: every company returns to the cash,
@@ -456,7 +466,11 @@ own — you do not need to reload.
    computed: rank, company, cash after the round and that round's profit, in that order of importance —
    **the class is ranked by cash**. Your own line is highlighted. That is all a trainee sees of anyone
    else — no market share, no cost lines, no statements. Your facilitator decides when it appears.
-7. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
+7. **Development report (PDF)** beside them is your term report: six dimensions — liquidity,
+   profitability, market management, operations, pricing and investment — each graded and explained in
+   one sentence from your own figures, with what to try next term. It is written in the language of
+   your class and it never compares you with a named competitor.
+8. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
    round**: that month's summary, then what they sent, then the cost lines — their company only, no
    market share, no competitor line. A trainee who has not been seated in the session gets a
    refusal, not an empty file.

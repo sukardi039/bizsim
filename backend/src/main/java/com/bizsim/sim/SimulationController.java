@@ -25,12 +25,14 @@ public class SimulationController {
     private final RoundService rounds;
     private final DebriefExportService debrief;
     private final BotRoundService bots;
+    private final EvaluationReportService evaluations;
 
     public SimulationController(RoundService rounds, DebriefExportService debrief,
-                                BotRoundService bots) {
+                                BotRoundService bots, EvaluationReportService evaluations) {
         this.rounds = rounds;
         this.debrief = debrief;
         this.bots = bots;
+        this.evaluations = evaluations;
     }
 
     @PostMapping("/teams/{teamId}/decisions")
@@ -231,6 +233,44 @@ public class SimulationController {
                 .contentType(org.springframework.http.MediaType.parseMediaType(mediaType))
                 .header("Content-Disposition", "attachment; filename=\"" + name + runId + "."
                         + extension + "\"")
+                .body(body);
+    }
+
+    /**
+     * A trainee's own development report for the term (D76): what the numbers say about how they ran
+     * the company, in the class's language.
+     *
+     * <p>Access follows the debrief: a trainee may ask only for their own company (the team comes from
+     * their seat, and asking for another one is refused, not silently redirected); staff may ask for
+     * any company in the session. The document is produced from the same statement rows the console
+     * reads, so it cannot disagree with what the trainee sees.
+     */
+    @GetMapping("/teams/{teamId}/evaluation")
+    public ResponseEntity<byte[]> evaluation(@PathVariable long runId, @PathVariable long teamId,
+                                             @RequestParam(required = false) String locale) {
+        TenantContext.Principal me = TenantContext.require();
+        boolean staff = "FACILITATOR".equals(me.role()) || "ADMIN".equals(me.role());
+        if (!staff) {
+            if (!"PLAYER".equals(me.role())) {
+                throw ProblemException.forbidden("auth.staff_only", "staff or trainee role required");
+            }
+            long own = rounds.teamOfPlayer(me.userId(), runId).orElseThrow(
+                    () -> ProblemException.forbidden("team.not_yours",
+                            "you are not seated in this session"));
+            if (own != teamId) {
+                throw ProblemException.forbidden("team.not_yours",
+                        "this report belongs to another company");
+            }
+        }
+        EvaluationReportService.Evaluation evaluation = evaluations.evaluate(me.tenantId(), runId, teamId);
+        // The class language decides the document (D66): the package pins it and run.lang carries it,
+        // so the server never depends on the client for it. A caller may still ask for one explicitly.
+        String lang = locale == null || locale.isBlank() ? evaluation.term().lang() : locale;
+        byte[] body = evaluations.pdf(evaluation, EvaluationReportService.Labels.of(lang));
+        return ResponseEntity.ok()
+                .contentType(org.springframework.http.MediaType.parseMediaType("application/pdf"))
+                .header("Content-Disposition", "attachment; filename=\"bizsim-development-report-run"
+                        + runId + "-team" + teamId + ".pdf\"")
                 .body(body);
     }
 

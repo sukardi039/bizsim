@@ -8,6 +8,7 @@ import {
   api,
   ApiError,
   downloadDebrief,
+  downloadEvaluation,
   type DecisionFormContext,
   type DecisionInput,
   type MarketForecast,
@@ -141,6 +142,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   /** D61: the round whose form arrived pre-filled by the teaching guide, if any. */
   const [guidedRound, setGuidedRound] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
+  /** D76: their own development report, separate from the round-by-round debrief. */
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const [resultRound, setResultRound] = useState<number | null>(null);
   const roundRef = useRef<number | null>(null);
 
@@ -272,6 +275,20 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     }
   };
 
+  /** D76: the term report for this company, in the class language. */
+  const developmentReport = async () => {
+    if (!run || !team) return;
+    setDownloadingReport(true);
+    setProblem(null);
+    try {
+      await downloadEvaluation(run.id, team.id, locale);
+    } catch (error) {
+      setProblem(errorText(error, t));
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!run || !team || !context || !draft) return;
@@ -375,6 +392,11 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </button>
           <button onClick={() => void download("xlsx")} disabled={downloading !== null}>
             {downloading === "xlsx" ? t("debrief.exporting") : t("player.downloadExcel")}
+          </button>
+          {/* D76: the development report answers "how did I run it", the downloads above answer
+              "what happened each round". */}
+          <button onClick={() => void developmentReport()} disabled={downloadingReport}>
+            {downloadingReport ? t("debrief.exporting") : t("player.developmentReport")}
           </button>
         </div>
         <p className="muted">{t("player.downloadHint")}</p>
