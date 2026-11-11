@@ -1,6 +1,7 @@
 package com.bizsim.sim;
 
 import com.bizsim.support.PostgresTestBase;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -418,7 +419,7 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
     }
 
     @Test
-    void a_trainee_sees_the_class_ranked_by_profit_and_nothing_more() throws Exception {
+    void a_trainee_sees_the_class_ranked_by_cash_and_nothing_else_about_the_class() throws Exception {
         long playerTeam = jdbc.queryForObject(
                 "select id from team where run_id = ? order by id limit 1", Long.class, runId);
         seat(playerTeam, otherPlayer("one@acme.test"));
@@ -466,14 +467,27 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].rank").value(1))
                 .andExpect(jsonPath("$[0].company").isString())
+                // D75: the ranking figure travels with the row, because it is what the rank means.
+                .andExpect(jsonPath("$[0].cash").isNumber())
                 .andExpect(jsonPath("$[0].profit").isNumber())
                 .andReturn();
 
-        // D21 stays true for everything else: no share, no cash, no statement in the payload.
+        // D21 stays true for everything else: no share, no stock, no cost lines in the payload. Cash
+        // is now part of it on purpose (D75) — it is the figure the table ranks by.
         String body = result.getResponse().getContentAsString();
-        assertThat(body).doesNotContain("marketShare").doesNotContain("cash")
-                .doesNotContain("stock").doesNotContain("share");
+        assertThat(body).doesNotContain("marketShare").doesNotContain("stock")
+                .doesNotContain("cogs").doesNotContain("share");
         assertThat(body).contains("\"own\":true");
+
+        // The order is cash first, then the round's profit — not profit alone.
+        JsonNode rows = json.readTree(body);
+        assertThat(rows.get(0).get("cash").decimalValue())
+                .isGreaterThanOrEqualTo(rows.get(1).get("cash").decimalValue());
+        if (rows.get(0).get("cash").decimalValue()
+                .compareTo(rows.get(1).get("cash").decimalValue()) == 0) {
+            assertThat(rows.get(0).get("profit").decimalValue())
+                    .isGreaterThanOrEqualTo(rows.get(1).get("profit").decimalValue());
+        }
 
         // Hiding it again closes the class view but never the facilitator's.
         mvc.perform(post("/api/runs/" + runId + "/standings")

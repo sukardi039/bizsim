@@ -352,6 +352,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                 <tr>
                   <th className="num">{t("player.rank")}</th>
                   <th>{t("debrief.company")}</th>
+                  <th className="num">{t("debrief.cash")}</th>
                   <th className="num">{t("debrief.profit")}</th>
                 </tr>
               </thead>
@@ -360,6 +361,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                   <tr key={row.teamId} className={row.own ? "own-row" : undefined}>
                     <td className="num">{row.rank}</td>
                     <td>{row.company}</td>
+                    <td className="num">{money(Number(row.cash ?? 0))}</td>
                     <td className="num">{money(Number(row.profit ?? 0))}</td>
                   </tr>
                 ))}

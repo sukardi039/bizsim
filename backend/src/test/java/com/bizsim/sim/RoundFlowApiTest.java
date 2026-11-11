@@ -876,6 +876,60 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     // ------------------------------------------------------------------ helpers
 
+    /**
+     * D75: the class table ranks by cash after the round, then by that round's profit. Cash and profit
+     * are set so the two orderings disagree — the failure this test is here to catch is a table that
+     * still sorts on profit while showing cash.
+     */
+    @Test
+    void the_class_table_ranks_by_cash_then_by_that_rounds_profit() throws Exception {
+        openRound();
+        submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+
+        // More cash, less profit: liquidity wins.
+        score(teamOne, "1600000000", "10000000");
+        score(teamTwo, "1500000000", "90000000");
+
+        JsonNode first = standings();
+        assertThat(first).hasSize(2);
+        assertThat(first.get(0).get("teamId").asLong()).isEqualTo(teamOne);
+        assertThat(first.get(0).get("rank").asInt()).isEqualTo(1);
+        assertThat(first.get(0).get("cash").decimalValue()).isEqualByComparingTo("1600000000");
+        assertThat(first.get(0).get("profit").decimalValue()).isEqualByComparingTo("10000000");
+        assertThat(first.get(1).get("teamId").asLong()).isEqualTo(teamTwo);
+
+        // Same cash: the round's profit breaks the tie.
+        score(teamOne, "1500000000", "10000000");
+        score(teamTwo, "1500000000", "90000000");
+
+        JsonNode second = standings();
+        assertThat(second.get(0).get("teamId").asLong()).isEqualTo(teamTwo);
+        assertThat(second.get(0).get("rank").asInt()).isEqualTo(1);
+        assertThat(second.get(1).get("rank").asInt()).isEqualTo(2);
+    }
+
+    private JsonNode standings() throws Exception {
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/standings")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        return json.readTree(result.getResponse().getContentAsString());
+    }
+
+    /** Rewrites one company's cash and profit for round 1, to force the ordering under test. */
+    private void score(long teamId, String cash, String profit) {
+        jdbc.update("""
+                update round_result
+                set score = jsonb_set(jsonb_set(score, '{cash}', to_jsonb(?::numeric)),
+                                      '{profit}', to_jsonb(?::numeric))
+                where team_id = ? and round_id = (select id from round where run_id = ? and number = 1)
+                """, cash, profit, teamId, runId);
+    }
+
     /** What the console does between rounds: compute the open one, then open the next (D57). */
     private void advance() throws Exception {
         mvc.perform(post("/api/runs/" + runId + "/rounds/close")

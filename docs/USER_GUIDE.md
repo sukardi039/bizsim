@@ -305,8 +305,9 @@ It is recorded as *by hand*, so the log stays honest.
 
 ### 7.2.3 The class table
 
-**Class standings** on the run page is the exact table the class reads — rank, company, profit — and
-the switch that decides whether they may read it. It starts **hidden**: press **Show the class** after
+**Class standings** on the run page is the exact table the class reads — rank, company, cash after the
+round and that round's profit, **ranked by cash** — and the switch that decides whether they may read
+it. It starts **hidden**: press **Show the class** after
 reading the debrief, and every computed round is then visible to the trainees; **Hide from the class**
 takes it away again. Both moments are in the audit trail.
 
@@ -452,9 +453,9 @@ own — you do not need to reload.
    only their own company. Everything comes from the same statement rows the debrief reads.
 
 6. **Class standings** — above your results, once your facilitator has shown it and a round has been
-   computed: rank, company and that round's profit for every company in the class, with your own line
-   highlighted. That is all a trainee sees of anyone else — no market share, no cash, no statements.
-   Your facilitator decides when it appears.
+   computed: rank, company, cash after the round and that round's profit, in that order of importance —
+   **the class is ranked by cash**. Your own line is highlighted. That is all a trainee sees of anyone
+   else — no market share, no cost lines, no statements. Your facilitator decides when it appears.
 7. **My results (PDF / Excel)** in the same card gives the trainee their own report, **one page per
    round**: that month's summary, then what they sent, then the cost lines — their company only, no
    market share, no competitor line. A trainee who has not been seated in the session gets a

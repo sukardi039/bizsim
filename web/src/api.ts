@@ -510,6 +510,8 @@ export interface StandingsRow {
   rank: number;
   teamId: number;
   company: string;
+  /** D75: cash after the round — the figure the rank is built on. */
+  cash: number;
   profit: number;
   own: boolean;
 }

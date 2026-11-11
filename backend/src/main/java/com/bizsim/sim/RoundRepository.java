@@ -541,9 +541,14 @@ public class RoundRepository {
     // ------------------------------------------------------------------ reading results
 
     /**
-     * The class as a table a trainee may see (D51): rank, company and this round's profit — and
-     * nothing else. Deliberately its own query rather than a projection of the scoreboard, so widening
-     * this view later is a decision, not an accident.
+     * The class as a table a trainee may see (D51/D75): rank, company, cash after the round and that
+     * round's profit — and nothing else. Deliberately its own query rather than a projection of the
+     * scoreboard, so widening this view later is a decision, not an accident.
+     *
+     * <p>Ranked by **cash after the round**, then by the round's profit (D75): liquidity is the
+     * measure of whether the month's plan was affordable, not the accrual result. Profit is the
+     * tie-break — a company that earned more while holding the same cash planned better — and the
+     * company name makes the order total, so two identical months never swap places between reads.
      */
     public List<Map<String, Object>> standings(long runId, Integer round) {
         return jdbc.queryForList("""
@@ -551,8 +556,12 @@ public class RoundRepository {
                     select coalesce(?::int, (select max(number) from round
                                              where run_id = ? and status = 'COMPUTED')) as number
                 )
-                select row_number() over (order by (rr.score->>'profit')::numeric desc, t.id) as rank,
+                select row_number() over (
+                           order by (rr.score->>'cash')::numeric desc,
+                                    (rr.score->>'profit')::numeric desc,
+                                    t.company_name, t.id) as rank,
                        rr.team_id, t.company_name,
+                       (rr.score->>'cash')::numeric as cash,
                        (rr.score->>'profit')::numeric as profit
                 from round r
                 join latest on latest.number = r.number

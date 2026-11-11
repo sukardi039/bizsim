@@ -437,8 +437,8 @@ public class RoundService {
     }
 
     /**
-     * The standings a trainee may read (D51): rank, company, this round's profit. Staff see the same
-     * table; a person who is not seated in the session sees nothing at all.
+     * The standings a trainee may read (D51/D75): rank, company, cash after the round and that round's
+     * profit. Staff see the same table; a person who is not seated in the session sees nothing at all.
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> standings(long tenantId, long userId, String role, long runId,
@@ -462,6 +462,9 @@ public class RoundService {
             view.put("rank", ((Number) row.get("rank")).intValue());
             view.put("teamId", ((Number) row.get("team_id")).longValue());
             view.put("company", row.get("company_name"));
+            // D75: the rank is by cash, so cash is part of the row — a rank a trainee cannot account
+            // for is worse than no rank.
+            view.put("cash", row.get("cash"));
             view.put("profit", row.get("profit"));
             view.put("own", rounds.userOwnsTeam(userId, ((Number) row.get("team_id")).longValue()));
             rows.add(view);
