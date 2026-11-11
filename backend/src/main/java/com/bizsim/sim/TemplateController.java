@@ -34,6 +34,7 @@ public class TemplateController {
     public record Detail(String key, String name, Long tenantId, String status, String basedOn,
                          boolean editable, Map<String, Object> settings,
                          List<ScenarioRepository.RoundRow> environment,
+                         List<ScenarioRepository.SegmentRow> segments,
                          List<ScenarioRepository.ProductRow> products,
                          List<ScenarioRepository.ChannelRow> channels,
                          List<ScenarioRepository.ProjectRow> projects,
@@ -47,6 +48,9 @@ public class TemplateController {
     }
 
     public record ProductsRequest(List<ScenarioRepository.ProductRow> products) {
+    }
+
+    public record SegmentsRequest(List<ScenarioRepository.SegmentRow> segments) {
     }
 
     public record ChannelsRequest(List<ScenarioRepository.ChannelRow> channels) {
@@ -127,7 +131,24 @@ public class TemplateController {
         requireUnused(me, key);
         List<ScenarioRepository.ProductRow> products = request == null ? null : request.products();
         validateProducts(products);
+        validateSegmentTargets(products, scenarios.segments(key));
         scenarios.saveProducts(key, products);
+        return detail(me, row);
+    }
+
+    /**
+     * Replaces the customer classes (D81). Refused once the template has sessions, for the same
+     * reason as the product catalogue: the class is what every round's market is computed from, so
+     * editing it mid-run would rewrite a class that has already played (D84).
+     */
+    @PutMapping("/{key}/segments")
+    public Detail saveSegments(@PathVariable String key, @RequestBody SegmentsRequest request) {
+        TenantContext.Principal me = requireBuilder();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        requireUnused(me, key);
+        List<ScenarioRepository.SegmentRow> segments = request == null ? null : request.segments();
+        validateSegments(segments, scenarios.products(key));
+        scenarios.saveSegments(key, segments);
         return detail(me, row);
     }
 
@@ -141,7 +162,7 @@ public class TemplateController {
         TenantContext.Principal me = requireBuilder();
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         List<Scenario.EventSpec> events = request == null ? null : request.events();
-        validateEvents(events, key);
+        validateEvents(events, key, scenarios.segments(key));
         scenarios.saveEvents(key, events);
         return detail(me, row);
     }
@@ -347,9 +368,82 @@ public class TemplateController {
         return ProblemException.badRequest("template.catalog_invalid", message, params);
     }
 
-    private static void validateEvents(List<Scenario.EventSpec> events, String key) {
+    /** A product may only target a class the template actually has. */
+    private static void validateSegmentTargets(List<ScenarioRepository.ProductRow> products,
+                                               List<ScenarioRepository.SegmentRow> segments) {
+        Set<String> codes = new java.util.LinkedHashSet<>();
+        for (ScenarioRepository.SegmentRow segment : segments) {
+            codes.add(segment.code());
+        }
+        for (ScenarioRepository.ProductRow product : products) {
+            if (!isBlank(product.targetSegment()) && !codes.contains(product.targetSegment())) {
+                throw ProblemException.badRequest("template.catalog_invalid",
+                        product.code() + ": unknown customer class " + product.targetSegment(),
+                        "field", "targetSegment", "code", product.code());
+            }
+            if (product.crossSegmentPct() != null && (product.crossSegmentPct().signum() < 0
+                    || product.crossSegmentPct().compareTo(BigDecimal.ONE) > 0)) {
+                throw ProblemException.badRequest("template.catalog_invalid",
+                        product.code() + ": crossSegmentPct must be between 0 and 1",
+                        "field", "crossSegmentPct", "code", product.code());
+            }
+        }
+    }
+
+    /**
+     * The classes a product can serve. Two rules matter: a class a product points at cannot vanish
+     * (the product would silently fall back to the legacy pool), and a class must have a positive
+     * size and purchasing power — a zero would make its market disappear with no explanation.
+     */
+    private static void validateSegments(List<ScenarioRepository.SegmentRow> segments,
+                                         List<ScenarioRepository.ProductRow> products) {
+        if (segments == null || segments.isEmpty()) {
+            throw ProblemException.badRequest("template.segments_invalid",
+                    "a template needs at least one customer class", "field", "segments");
+        }
+        Set<String> codes = new java.util.LinkedHashSet<>();
+        for (ScenarioRepository.SegmentRow segment : segments) {
+            if (segment == null || isBlank(segment.code()) || isBlank(segment.name())) {
+                throw ProblemException.badRequest("template.segments_invalid",
+                        "every customer class needs a code and a name", "field", "code");
+            }
+            if (!codes.add(segment.code())) {
+                throw ProblemException.badRequest("template.segments_invalid",
+                        "duplicate customer class " + segment.code(), "field", "code",
+                        "code", segment.code());
+            }
+            requirePositive(segment.baseSize(), "baseSize", segment.code());
+            requirePositive(segment.basePurchasingPower(), "basePurchasingPower", segment.code());
+            if (segment.incomeElasticity() == null || segment.incomeElasticity().signum() < 0) {
+                throw ProblemException.badRequest("template.segments_invalid",
+                        segment.code() + ": incomeElasticity must be 0 or more",
+                        "field", "incomeElasticity", "code", segment.code());
+            }
+            if (segment.trendAffinity() == null
+                    || segment.trendAffinity().abs().compareTo(BigDecimal.ONE) > 0) {
+                throw ProblemException.badRequest("template.segments_invalid",
+                        segment.code() + ": trendAffinity must be between -1 and 1",
+                        "field", "trendAffinity", "code", segment.code());
+            }
+        }
+        for (ScenarioRepository.ProductRow product : products) {
+            if (!isBlank(product.targetSegment()) && !codes.contains(product.targetSegment())) {
+                throw ProblemException.badRequest("template.segments_invalid",
+                        "product " + product.code() + " targets a customer class that is not in the list: "
+                                + product.targetSegment(), "field", "targetSegment",
+                        "code", product.code());
+            }
+        }
+    }
+
+    private static void validateEvents(List<Scenario.EventSpec> events, String key,
+                                       List<ScenarioRepository.SegmentRow> segments) {
         if (events == null) {
             return; // an empty deck is legitimate: some economies have no shocks
+        }
+        Set<String> classes = new java.util.LinkedHashSet<>();
+        for (ScenarioRepository.SegmentRow segment : segments) {
+            classes.add(segment.code());
         }
         Set<String> codes = new java.util.LinkedHashSet<>();
         for (Scenario.EventSpec event : events) {
@@ -376,6 +470,36 @@ public class TemplateController {
                 throw ProblemException.badRequest("template.events_invalid",
                         "event " + event.code() + " lasts 1 to 12 months",
                         "field", "durationMonths", "code", event.code());
+            }
+            if (!isBlank(event.category())
+                    && !ScenarioRepository.EVENT_CATEGORIES.contains(event.category())) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "event " + event.code() + ": category must be one of "
+                                + ScenarioRepository.EVENT_CATEGORIES,
+                        "field", "category", "code", event.code());
+            }
+            Set<String> affected = new java.util.LinkedHashSet<>();
+            for (Scenario.EventEffect effect : event.effects() == null
+                    ? List.<Scenario.EventEffect>of() : event.effects()) {
+                if (effect == null || isBlank(effect.segmentCode())) {
+                    throw ProblemException.badRequest("template.events_invalid",
+                            "event " + event.code() + ": an effect needs a customer class",
+                            "field", "segmentCode", "code", event.code());
+                }
+                if (!affected.add(effect.segmentCode())) {
+                    throw ProblemException.badRequest("template.events_invalid",
+                            "event " + event.code() + ": " + effect.segmentCode()
+                                    + " appears more than once",
+                            "field", "segmentCode", "code", event.code());
+                }
+                if (!classes.contains(effect.segmentCode())) {
+                    throw ProblemException.badRequest("template.events_invalid",
+                            "event " + event.code() + ": no customer class " + effect.segmentCode(),
+                            "field", "segmentCode", "code", event.code());
+                }
+                requirePositive(effect.sizeMultiplier(), "sizeMultiplier", event.code());
+                requirePositive(effect.purchasingPowerMultiplier(), "purchasingPowerMultiplier",
+                        event.code());
             }
             for (String field : List.of("demandMultiplier", "costMultiplier", "wageMultiplier")) {
                 BigDecimal value = switch (field) {
@@ -427,7 +551,8 @@ public class TemplateController {
         return new Detail(row.key(), row.name(), row.tenantId(), row.status(), row.basedOn(),
                 row.tenantId() != null && row.tenantId() == me.tenantId(),
                 scenarios.settings(row.key()), scenarios.environment(row.key()),
-                scenarios.products(row.key()), scenarios.channels(row.key()),
+                scenarios.segments(row.key()), scenarios.products(row.key()),
+                scenarios.channels(row.key()),
                 scenarios.projects(row.key()), scenarios.eventsOf(row.key()));
     }
 

@@ -32,6 +32,9 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
     @Autowired
     private ScenarioRepository scenarios;
 
+    @Autowired
+    private com.bizsim.sim.EnvironmentService environment;
+
     @Test
     void a_better_level_earns_more_over_a_full_run() {
         Scenario scenario = scenarios.load("standard-v1");
@@ -47,17 +50,16 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
         BigDecimal mid = first.averageProfit("MID");
         BigDecimal low = first.averageProfit("LOW");
 
+        // Printed before the assertions so a calibration failure still shows the table.
+        System.out.printf("%nSELF-PLAY (run of %d rounds): high %.0f | mid %.0f | low %.0f"
+                        + "  (avg profit/round)%n",
+                scenario.params().rounds(), high, mid, low);
         assertThat(high)
                 .as("high %s vs mid %s", high, mid)
                 .isGreaterThan(mid);
         assertThat(mid)
                 .as("mid %s vs low %s", mid, low)
                 .isGreaterThan(low);
-        // The calibration table: the numbers this test asserts on, printed so a template change can
-        // be judged by them instead of by a pass/fail alone.
-        System.out.printf("%nSELF-PLAY (run of %d rounds): high %.0f | mid %.0f | low %.0f  (avg profit/round)%n",
-                scenario.params().rounds(), high, mid, low);
-
         // Every level has to survive: a class should not watch a bot die of starvation in round 2.
         assertThat(first.insolvent()).isEmpty();
     }
@@ -97,14 +99,17 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
         return new Game(players);
     }
 
-    private static EnvironmentService.RoundEnvironment neutral(Scenario scenario, int round) {
-        Map<String, BigDecimal> multipliers = new LinkedHashMap<>();
-        for (Scenario.ProductSpec product : scenario.products()) {
-            multipliers.put(product.code(), scenario.seasonality(round));
-        }
-        return new EnvironmentService.RoundEnvironment(round, scenario.seasonality(round),
-                BigDecimal.ONE, BigDecimal.ONE, BigDecimal.ZERO, "Stable", multipliers, List.of());
+    /**
+     * The real round environment, produced by the engine's own service for a run id no test creates
+     * (so no event can leak in). The harness used to hand-build a multiplier map, which applied
+     * seasonality twice and knew nothing about customer classes — a synthetic economy that stopped
+     * describing the game the moment the market became segment-based (D81).
+     */
+    private EnvironmentService.RoundEnvironment neutral(Scenario scenario, int round) {
+        return environment.forRound(scenario, QUIET_RUN, round);
     }
+
+    private static final long QUIET_RUN = 987_654_322L;
 
     /** One company's mutable state, exactly what the engine hands back each month. */
     private static final class Player {

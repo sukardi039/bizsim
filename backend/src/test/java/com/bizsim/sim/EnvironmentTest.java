@@ -128,6 +128,122 @@ class EnvironmentTest extends PostgresTestBase {
                 .isEqualByComparingTo("0.938");
     }
 
+    // ---------------------------------------------------------------- D81-D85: the class is the unit
+
+    @Test
+    void the_shipped_template_carries_the_customer_model() {
+        Scenario scenario = scenarios.load("standard-v1");
+
+        assertThat(scenario.segments()).extracting(Scenario.SegmentSpec::code)
+                .containsExactly("SEG-BASIC", "SEG-MID", "SEG-PREMIUM");
+        assertThat(scenario.products()).allSatisfy(product ->
+                assertThat(scenario.segmentOf(product)).as("%s serves a class", product.code())
+                        .isPresent());
+        assertThat(scenario.product("P3").orElseThrow().crossSegmentPct())
+                .isEqualByComparingTo("0.020");
+        // The deck names the shocks a trainer actually asks for, each with a row per class.
+        assertThat(scenario.events()).extracting(Scenario.EventSpec::code)
+                .contains("EV-OIL-CRISIS", "EV-INFLATION", "EV-TECH-DEPRESSION");
+        assertThat(scenario.events()).allSatisfy(event ->
+                assertThat(event.effects()).as("%s moves all three classes", event.code()).hasSize(3));
+    }
+
+    @Test
+    void a_recession_hits_the_affluent_class_harder_than_the_mass_market() {
+        Scenario scenario = scenarios.load("standard-v1");
+
+        EnvironmentService.RoundEnvironment trough = environment.forRound(scenario, NO_EVENTS_RUN, 3);
+
+        assertThat(trough.segmentSize("SEG-PREMIUM"))
+                .as("affluent, elasticity 1.8").isLessThan(trough.segmentSize("SEG-BASIC"));
+        assertThat(trough.segmentSize("SEG-MID"))
+                .isBetween(trough.segmentSize("SEG-PREMIUM"), trough.segmentSize("SEG-BASIC"));
+        // With no card firing, purchasing power is the class's base (no event has touched it).
+        assertThat(trough.segmentPurchasingPower("SEG-PREMIUM")).isEqualByComparingTo("1.000");
+    }
+
+    @Test
+    void an_event_moves_the_classes_it_names_and_no_others() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long runId = seedRun();
+
+        // Freeze the card's effect on this run the way the draw does (D84): premium customers fall
+        // by half and can afford 20% less; the mass market is untouched.
+        jdbc.update("""
+                insert into run_environment_event (run_id, event_code, starts_round, duration_months,
+                                                   demand_multiplier, cost_multiplier,
+                                                   wage_multiplier, effects)
+                values (?, 'EV-RECESSION', 1, 6, 1.000, 1.100, 1.000, ?::jsonb)
+                """, runId, """
+                [{"segmentCode": "SEG-PREMIUM", "sizeMultiplier": 0.500,
+                  "purchasingPowerMultiplier": 0.800}]
+                """);
+
+        EnvironmentService.RoundEnvironment environment1 = environment.forRound(scenario, runId, 1);
+
+        assertThat(environment1.segmentSize("SEG-PREMIUM")).isEqualByComparingTo("0.500000");
+        assertThat(environment1.segmentPurchasingPower("SEG-PREMIUM")).isEqualByComparingTo("0.800000");
+        assertThat(environment1.segmentSize("SEG-BASIC")).isEqualByComparingTo("1.000000");
+        assertThat(environment1.segmentPurchasingPower("SEG-BASIC")).isEqualByComparingTo("1.000000");
+        // The premium product inherits its class's weather; the basic one is untouched.
+        assertThat(environment1.demandByProduct().get("P3")).isEqualByComparingTo("0.400000");
+        assertThat(environment1.demandByProduct().get("P1")).isEqualByComparingTo("1.000000");
+        // The card's cost side still reaches every product.
+        assertThat(environment1.costIndex()).isEqualByComparingTo("1.100");
+    }
+
+    @Test
+    void the_workbench_reads_the_economy_in_the_class_language() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long runId = seedRun();
+        environment.generateTimeline(scenario, runId, 4);
+
+        Map<String, Object> english = environment.conditions(scenario, runId, 1, "en");
+        Map<String, Object> chinese = environment.conditions(scenario, runId, 1, "zh");
+
+        assertThat((String) english.get("description"))
+                .contains("Demand and costs are at their baseline");
+        assertThat((String) chinese.get("description"))
+                .contains("需求与成本都处于基准水平");
+        assertThat((String) chinese.get("headline")).isEqualTo("平稳");
+        assertThat((List<Map<String, Object>>) chinese.get("segments"))
+                .extracting(row -> row.get("name"))
+                .containsExactly("大众市场", "中端市场", "高端客户");
+        assertThat((List<Map<String, Object>>) english.get("segments"))
+                .extracting(row -> row.get("name"))
+                .containsExactly("Mass market", "Middle market", "Affluent buyers");
+        // Each class says which product serves it, so the table is readable on its own.
+        assertThat((List<Map<String, Object>>) english.get("segments"))
+                .extracting(row -> row.get("product"))
+                .containsExactly("P1", "P2", "P3");
+    }
+
+    @Test
+    void an_active_card_is_described_in_words_the_class_can_read() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long runId = seedRun();
+        environment.generateTimeline(scenario, runId, 4);
+        jdbc.update("""
+                insert into run_environment_event (run_id, event_code, starts_round, duration_months,
+                                                   demand_multiplier, cost_multiplier,
+                                                   wage_multiplier, effects)
+                values (?, 'EV-INFLATION', 1, 3, 1.000, 1.120, 1.080, '[]'::jsonb)
+                """, runId);
+
+        Map<String, Object> chinese = environment.conditions(scenario, runId, 1, "zh");
+        Map<String, Object> english = environment.conditions(scenario, runId, 1, "en");
+
+        List<Map<String, Object>> zhEvents = (List<Map<String, Object>>) chinese.get("events");
+        assertThat(zhEvents).hasSize(1);
+        assertThat(zhEvents.get(0).get("name")).isEqualTo("通货膨胀");
+        assertThat(zhEvents.get(0).get("category")).isEqualTo("INFLATION");
+        assertThat((String) chinese.get("description")).contains("物价上涨快于工资");
+
+        List<Map<String, Object>> enEvents = (List<Map<String, Object>>) english.get("events");
+        assertThat(enEvents.get(0).get("name")).isEqualTo("Inflation");
+        assertThat((String) english.get("description")).contains("Prices rise faster than wages");
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private long seedRun() {

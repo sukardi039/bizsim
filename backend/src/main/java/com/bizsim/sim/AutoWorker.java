@@ -139,7 +139,11 @@ public final class AutoWorker {
                     ? forecast.multiply(profile.targetShare())
                     : forecast;
             if (stock.compareTo(forecast) < 0) {
-                planned = planned.add(forecast.subtract(stock).min(forecast));
+                // Rebuild the shelf, but only to a fifth of expected demand: chasing the whole gap
+                // doubles the plan and doubles the crew, which turns one thin month into a payroll
+                // the company cannot carry.
+                planned = planned.add(forecast.subtract(stock)
+                        .min(forecast.multiply(new BigDecimal("0.20"))));
             }
             planned = planned.min(spec.baseDemand().multiply(new BigDecimal("1.5")));
             planned = planned.setScale(0, RoundingMode.HALF_UP);
@@ -216,7 +220,7 @@ public final class AutoWorker {
         if (profile.buysQuality() && scenario.params().qualityUpgrade()
                 && comfortable(context, scenario, profile)) {
             Scenario.ProductSpec first = scenario.products().get(0);
-            qualitySpend = scenario.params().qualityCostPerPoint().multiply(BigDecimal.valueOf(2));
+            qualitySpend = scenario.params().qualityCostPerPoint();
             quality.add(new DecisionPayload.QualityRow(first.code(), qualitySpend));
         }
 

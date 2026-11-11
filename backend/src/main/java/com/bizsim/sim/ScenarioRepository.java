@@ -103,13 +103,14 @@ public class ScenarioRepository {
 
         List<Scenario.ProductSpec> products = jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
-                       income_elasticity, trend_affinity
+                       income_elasticity, trend_affinity, target_segment, cross_segment_pct
                 from product where scenario_key = ? order by code
                 """, (rs, i) -> new Scenario.ProductSpec(
                         rs.getString("code"), rs.getString("name"), rs.getBigDecimal("base_price"),
                         rs.getBigDecimal("base_unit_cost"), rs.getBigDecimal("base_quality"),
                         rs.getBigDecimal("base_demand"), rs.getBigDecimal("units_per_worker"),
-                        rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity")), key);
+                        rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity"),
+                        rs.getString("target_segment"), rs.getBigDecimal("cross_segment_pct")), key);
 
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
@@ -138,52 +139,171 @@ public class ScenarioRepository {
         }
 
         List<Scenario.RoundSpec> rounds = jdbc.query("""
-                select round_number, demand_index, cost_index, wage_index, trend_strength,
-                       trend_label, note
-                from scenario_round where scenario_key = ? order by round_number
+                select r.round_number, r.demand_index, r.cost_index, r.wage_index, r.trend_strength,
+                       r.trend_label, r.note,
+                       (select t.description from environment_text t
+                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
+                          and t.ref_code = r.round_number::text and t.lang = 'en') as description,
+                       (select t.description from environment_text t
+                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
+                          and t.ref_code = r.round_number::text and t.lang = 'zh') as description_zh,
+                       (select t.name from environment_text t
+                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
+                          and t.ref_code = r.round_number::text and t.lang = 'zh') as label_zh
+                from scenario_round r where r.scenario_key = ? order by r.round_number
                 """, (rs, i) -> new Scenario.RoundSpec(
                         rs.getInt("round_number"), rs.getBigDecimal("demand_index"),
                         rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
                         rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
-                        rs.getString("note")), key);
+                        rs.getString("note"), rs.getString("description"),
+                        rs.getString("description_zh"), rs.getString("label_zh")), key);
 
-        return new Scenario(key, params, products, channels, projects, rounds, eventsOf(key));
+        return new Scenario(key, params, products, channels, projects, rounds, segmentsOf(key), eventsOf(key));
+    }
+
+    /**
+     * The customer classes of a template (D81). Elasticity and trend affinity live here, not on the
+     * product: the class is what an economy moves, and a product inherits its class's weather.
+     */
+    public List<Scenario.SegmentSpec> segmentsOf(String key) {
+        return jdbc.query("""
+                select s.code, s.name, s.base_size, s.base_purchasing_power, s.income_elasticity,
+                       s.trend_affinity, s.sort_order,
+                       (select t.name from environment_text t where t.scenario_key = s.scenario_key
+                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'en') as name_en,
+                       (select t.description from environment_text t where t.scenario_key = s.scenario_key
+                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'en') as description_en,
+                       (select t.name from environment_text t where t.scenario_key = s.scenario_key
+                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'zh') as name_zh,
+                       (select t.description from environment_text t where t.scenario_key = s.scenario_key
+                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'zh') as description_zh
+                from customer_segment s where s.scenario_key = ? order by s.sort_order, s.code
+                """, (rs, i) -> new Scenario.SegmentSpec(
+                        rs.getString("code"),
+                        orElse(rs.getString("name_en"), rs.getString("name")),
+                        rs.getString("name_zh"), rs.getString("description_en"),
+                        rs.getString("description_zh"), rs.getBigDecimal("base_size"),
+                        rs.getBigDecimal("base_purchasing_power"),
+                        rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity"),
+                        rs.getInt("sort_order")), key);
+    }
+
+    private static String orElse(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     /** The event deck a builder may edit: the same shape the engine draws from (D18). */
     public List<Scenario.EventSpec> eventsOf(String key) {
+        Map<String, List<Scenario.EventEffect>> effects = effectsOf(key);
+        Map<String, String[]> words = wordsOf(key, "EVENT");
         return jdbc.query("""
-                select code, name, description, earliest_round, latest_round, probability,
+                select code, name, description, category, earliest_round, latest_round, probability,
                        duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
                        target_product
                 from environment_event where scenario_key = ? order by code
-                """, (rs, i) -> new Scenario.EventSpec(
-                        rs.getString("code"), rs.getString("name"), rs.getString("description"),
-                        rs.getInt("earliest_round"), rs.getInt("latest_round"),
-                        rs.getBigDecimal("probability"), rs.getInt("duration_months"),
-                        rs.getBigDecimal("demand_multiplier"), rs.getBigDecimal("cost_multiplier"),
-                        rs.getBigDecimal("wage_multiplier"), rs.getString("target_product")), key);
+                """, (rs, i) -> {
+                    String code = rs.getString("code");
+                    String[] zh = words.getOrDefault(code, new String[2]);
+                    return new Scenario.EventSpec(
+                            code, rs.getString("name"), rs.getString("description"),
+                            rs.getString("category"), rs.getInt("earliest_round"),
+                            rs.getInt("latest_round"), rs.getBigDecimal("probability"),
+                            rs.getInt("duration_months"), rs.getBigDecimal("demand_multiplier"),
+                            rs.getBigDecimal("cost_multiplier"), rs.getBigDecimal("wage_multiplier"),
+                            rs.getString("target_product"), zh[0], zh[1],
+                            effects.getOrDefault(code, List.of()));
+                }, key);
     }
 
-    /** Replaces the whole deck: an event set with a gap or a duplicate code is not a set. */
+    /** Effects of every card, keyed by event code. */
+    private Map<String, List<Scenario.EventEffect>> effectsOf(String key) {
+        Map<String, List<Scenario.EventEffect>> byEvent = new LinkedHashMap<>();
+        jdbc.query("""
+                select event_code, segment_code, size_multiplier, purchasing_power_multiplier
+                from environment_event_effect where scenario_key = ? order by event_code, segment_code
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                        byEvent.computeIfAbsent(rs.getString("event_code"), k -> new ArrayList<>())
+                                .add(new Scenario.EventEffect(rs.getString("segment_code"),
+                                        rs.getBigDecimal("size_multiplier"),
+                                        rs.getBigDecimal("purchasing_power_multiplier"))), key);
+        return byEvent;
+    }
+
+    /** The Chinese {name, description} of every text row of one kind, keyed by ref_code. */
+    private Map<String, String[]> wordsOf(String key, String refType) {
+        Map<String, String[]> words = new LinkedHashMap<>();
+        jdbc.query("""
+                select ref_code, name, description from environment_text
+                where scenario_key = ? and ref_type = ? and lang = 'zh'
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                        words.put(rs.getString("ref_code"),
+                                new String[]{rs.getString("name"), rs.getString("description")}),
+                key, refType);
+        return words;
+    }
+
+    /**
+     * Replaces the whole deck: an event set with a gap or a duplicate code is not a set.
+     *
+     * <p>Effects and the Chinese words go with the card. Three tables, one transaction: a card saved
+     * without its effects would fire and do nothing, which is worse than refusing the edit.
+     */
     @Transactional
     public void saveEvents(String key, List<Scenario.EventSpec> events) {
+        jdbc.update("""
+                delete from environment_text where scenario_key = ? and ref_type = 'EVENT'
+                """, key);
         jdbc.update("delete from environment_event where scenario_key = ?", key);
         if (events == null) {
             return;
         }
         for (Scenario.EventSpec event : events) {
             jdbc.update("""
-                    insert into environment_event (scenario_key, code, name, description, earliest_round,
-                                                   latest_round, probability, duration_months,
-                                                   demand_multiplier, cost_multiplier, wage_multiplier,
-                                                   target_product)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, key, event.code(), event.name(), event.description(), event.earliestRound(),
-                    event.latestRound(), event.probability(), event.durationMonths(),
-                    event.demandMultiplier(), event.costMultiplier(), event.wageMultiplier(),
-                    event.targetProduct());
+                    insert into environment_event (scenario_key, code, name, description, category,
+                                                   earliest_round, latest_round, probability,
+                                                   duration_months, demand_multiplier, cost_multiplier,
+                                                   wage_multiplier, target_product)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, event.code(), event.name(), event.description(),
+                    category(event.category()), event.earliestRound(), event.latestRound(),
+                    event.probability(), event.durationMonths(), event.demandMultiplier(),
+                    event.costMultiplier(), event.wageMultiplier(), event.targetProduct());
+            for (Scenario.EventEffect effect : event.effects() == null ? List.<Scenario.EventEffect>of()
+                    : event.effects()) {
+                jdbc.update("""
+                        insert into environment_event_effect (scenario_key, event_code, segment_code,
+                                                              size_multiplier,
+                                                              purchasing_power_multiplier)
+                        values (?, ?, ?, ?, ?)
+                        """, key, event.code(), effect.segmentCode(), effect.sizeMultiplier(),
+                        effect.purchasingPowerMultiplier());
+            }
+            saveWords(key, "EVENT", event.code(), event.nameZh(), event.descriptionZh());
         }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    /** Only the categories the workbench knows how to print; anything else is a plain shock. */
+    private static String category(String value) {
+        return value != null && EVENT_CATEGORIES.contains(value) ? value : "OTHER";
+    }
+
+    public static final List<String> EVENT_CATEGORIES = List.of("SUPPLY_SHOCK", "FINANCIAL_CRISIS",
+            "INFLATION", "TECHNOLOGY", "DEMAND_SHOCK", "POLICY", "OTHER");
+
+    /** Upserts one language's words for one object. A blank value deletes the row rather than storing "". */
+    private void saveWords(String key, String refType, String refCode, String name, String description) {
+        jdbc.update("""
+                delete from environment_text where scenario_key = ? and ref_type = ? and ref_code = ?
+                  and lang = 'zh'
+                """, key, refType, refCode);
+        if ((name == null || name.isBlank()) && (description == null || description.isBlank())) {
+            return;
+        }
+        jdbc.update("""
+                insert into environment_text (scenario_key, ref_type, ref_code, lang, name, description)
+                values (?, ?, ?, 'zh', ?, ?)
+                """, key, refType, refCode, name, description);
     }
 
     // ------------------------------------------------------------------ templates
@@ -300,9 +420,11 @@ public class ScenarioRepository {
 
         jdbc.update("""
                 insert into product (scenario_key, code, name, base_price, base_unit_cost, base_quality,
-                                     base_demand, units_per_worker, income_elasticity, trend_affinity)
+                                     base_demand, units_per_worker, income_elasticity, trend_affinity,
+                                     target_segment, cross_segment_pct)
                 select ?, code, name, base_price, base_unit_cost, base_quality, base_demand,
-                       units_per_worker, income_elasticity, trend_affinity
+                       units_per_worker, income_elasticity, trend_affinity, target_segment,
+                       cross_segment_pct
                 from product where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
@@ -327,14 +449,35 @@ public class ScenarioRepository {
                 from scenario_round where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
-                insert into environment_event (scenario_key, code, name, description, earliest_round,
-                                               latest_round, probability, duration_months,
-                                               demand_multiplier, cost_multiplier, wage_multiplier,
-                                               target_product)
-                select ?, code, name, description, earliest_round, latest_round, probability,
-                       duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
-                       target_product
+                insert into environment_event (scenario_key, code, name, description, category,
+                                               earliest_round, latest_round, probability,
+                                               duration_months, demand_multiplier, cost_multiplier,
+                                               wage_multiplier, target_product)
+                select ?, code, name, description, category, earliest_round, latest_round,
+                       probability, duration_months, demand_multiplier, cost_multiplier,
+                       wage_multiplier, target_product
                 from environment_event where scenario_key = ?
+                """, key, sourceKey);
+        // D81/D82: the customer classes and each card's effect on them are catalogue data too. A
+        // copy without them would load with no customers and every event doing nothing.
+        jdbc.update("""
+                insert into customer_segment (scenario_key, code, name, base_size,
+                                              base_purchasing_power, income_elasticity,
+                                              trend_affinity, sort_order)
+                select ?, code, name, base_size, base_purchasing_power, income_elasticity,
+                       trend_affinity, sort_order
+                from customer_segment where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into environment_event_effect (scenario_key, event_code, segment_code,
+                                                      size_multiplier, purchasing_power_multiplier)
+                select ?, event_code, segment_code, size_multiplier, purchasing_power_multiplier
+                from environment_event_effect where scenario_key = ?
+                """, key, sourceKey);
+        jdbc.update("""
+                insert into environment_text (scenario_key, ref_type, ref_code, lang, name, description)
+                select ?, ref_type, ref_code, lang, name, description
+                from environment_text where scenario_key = ?
                 """, key, sourceKey);
 
     }
@@ -343,7 +486,8 @@ public class ScenarioRepository {
 
     /** One position of the environment timeline, as the editor sees it. */
     public record RoundRow(int round, BigDecimal demandIndex, BigDecimal costIndex, BigDecimal wageIndex,
-                           BigDecimal trendStrength, String trendLabel, String note) {
+                           BigDecimal trendStrength, String trendLabel, String note,
+                           String description, String descriptionZh) {
     }
 
     /** The definition keys a facilitator may change. Everything else is engine calibration. */
@@ -381,10 +525,17 @@ public class ScenarioRepository {
 
     public List<RoundRow> environment(String key) {
         return jdbc.query("""
-                select round_number, demand_index, cost_index, wage_index, trend_strength, trend_label, note
-                from scenario_round where scenario_key = ? order by round_number
+                select round_number, demand_index, cost_index, wage_index, trend_strength, trend_label, note,
+                       (select t.description from environment_text t
+                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
+                          and t.ref_code = r.round_number::text and t.lang = 'en') as description,
+                       (select t.description from environment_text t
+                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
+                          and t.ref_code = r.round_number::text and t.lang = 'zh') as description_zh
+                from scenario_round r where r.scenario_key = ? order by r.round_number
                 """, (rs, i) -> new RoundRow(rs.getInt(1), rs.getBigDecimal(2), rs.getBigDecimal(3),
-                rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7)), key);
+                rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7),
+                rs.getString(8), rs.getString(9)), key);
     }
 
     /**
@@ -416,6 +567,9 @@ public class ScenarioRepository {
     @Transactional
     public void saveEnvironment(String key, List<RoundRow> rows) {
         jdbc.update("delete from scenario_round where scenario_key = ?", key);
+        jdbc.update("""
+                delete from environment_text where scenario_key = ? and ref_type = 'ROUND'
+                """, key);
         for (RoundRow row : rows) {
             jdbc.update("""
                     insert into scenario_round (scenario_key, round_number, demand_index, cost_index,
@@ -423,15 +577,37 @@ public class ScenarioRepository {
                     values (?, ?, ?, ?, ?, ?, ?, ?)
                     """, key, row.round(), row.demandIndex(), row.costIndex(), row.wageIndex(),
                     row.trendStrength(), row.trendLabel(), row.note());
+            // D83: the brief description a player reads. Both languages are written here so the
+            // workbench can show the class's language without a second edit round.
+            saveRoundWords(key, row, "en", row.trendLabel(), row.description());
+            saveRoundWords(key, row, "zh", row.trendLabel(), row.descriptionZh());
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    private void saveRoundWords(String key, RoundRow row, String lang, String name, String description) {
+        if ((description == null || description.isBlank())) {
+            return;
+        }
+        jdbc.update("""
+                insert into environment_text (scenario_key, ref_type, ref_code, lang, name, description)
+                values (?, 'ROUND', ?, ?, ?, ?)
+                """, key, String.valueOf(row.round()), lang, name, description);
     }
 
     // ------------------------------------------------------------------ catalogue (S6d)
 
     public record ProductRow(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
                              BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
-                             BigDecimal incomeElasticity, BigDecimal trendAffinity) {
+                             BigDecimal incomeElasticity, BigDecimal trendAffinity,
+                             String targetSegment, BigDecimal crossSegmentPct) {
+    }
+
+    /** One customer class as the editor sees it (D81). */
+    public record SegmentRow(String code, String name, String nameZh, String description,
+                             String descriptionZh, BigDecimal baseSize,
+                             BigDecimal basePurchasingPower, BigDecimal incomeElasticity,
+                             BigDecimal trendAffinity, int sortOrder) {
     }
 
     public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
@@ -447,13 +623,21 @@ public class ScenarioRepository {
     public List<ProductRow> products(String key) {
         return jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
-                       income_elasticity, trend_affinity
+                       income_elasticity, trend_affinity, target_segment, cross_segment_pct
                 from product where scenario_key = ? order by code
                 """, (rs, i) -> new ProductRow(rs.getString("code"), rs.getString("name"),
                 rs.getBigDecimal("base_price"), rs.getBigDecimal("base_unit_cost"),
                 rs.getBigDecimal("base_quality"), rs.getBigDecimal("base_demand"),
                 rs.getBigDecimal("units_per_worker"), rs.getBigDecimal("income_elasticity"),
-                rs.getBigDecimal("trend_affinity")), key);
+                rs.getBigDecimal("trend_affinity"), rs.getString("target_segment"),
+                rs.getBigDecimal("cross_segment_pct")), key);
+    }
+
+    /** The customer classes the editor may change: economy parameters, not catalogue codes. */
+    public List<SegmentRow> segments(String key) {
+        return segmentsOf(key).stream().map(s -> new SegmentRow(s.code(), s.name(), s.nameZh(),
+                s.description(), s.descriptionZh(), s.baseSize(), s.basePurchasingPower(),
+                s.incomeElasticity(), s.trendAffinity(), s.sortOrder())).toList();
     }
 
     public List<ChannelRow> channels(String key) {
@@ -493,12 +677,62 @@ public class ScenarioRepository {
         for (ProductRow row : rows) {
             jdbc.update("""
                     insert into product (scenario_key, code, name, base_price, base_unit_cost, base_quality,
-                                         base_demand, units_per_worker, income_elasticity, trend_affinity)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                         base_demand, units_per_worker, income_elasticity, trend_affinity,
+                                         target_segment, cross_segment_pct)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, key, row.code(), row.name(), row.basePrice(), row.baseUnitCost(),
                     row.baseQuality(), row.baseDemand(), row.unitsPerWorker(), row.incomeElasticity(),
-                    row.trendAffinity());
+                    row.trendAffinity(), row.targetSegment(),
+                    row.crossSegmentPct() == null ? BigDecimal.ZERO : row.crossSegmentPct());
         }
+        jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    /**
+     * Replaces the customer classes (D81). The class is the unit the economy moves, so a class edit
+     * changes every round of every session on this template — the controller refuses it once the
+     * template has runs, exactly like the product catalogue.
+     */
+    @Transactional
+    public void saveSegments(String key, List<SegmentRow> rows) {
+        // Never nulls a product's target: a class a product serves cannot be removed, and the
+        // controller refuses that edit before reaching here. Removing the link here would silently
+        // drop those products back to the legacy demand pool.
+        jdbc.update("delete from customer_segment where scenario_key = ?", key);
+        jdbc.update("""
+                delete from environment_text where scenario_key = ? and ref_type = 'SEGMENT'
+                """, key);
+        if (rows == null) {
+            jdbc.update("update scenario set version = version + 1 where key = ?", key);
+            return;
+        }
+        int position = 0;
+        for (SegmentRow row : rows) {
+            jdbc.update("""
+                    insert into customer_segment (scenario_key, code, name, base_size,
+                                                  base_purchasing_power, income_elasticity,
+                                                  trend_affinity, sort_order)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, row.code(), row.name(), row.baseSize(), row.basePurchasingPower(),
+                    row.incomeElasticity(), row.trendAffinity(),
+                    row.sortOrder() == 0 ? ++position : row.sortOrder());
+            saveWords(key, "SEGMENT", row.code(), row.nameZh(), row.descriptionZh());
+            if (row.description() != null && !row.description().isBlank()) {
+                jdbc.update("""
+                        insert into environment_text (scenario_key, ref_type, ref_code, lang, name,
+                                                      description)
+                        values (?, 'SEGMENT', ?, 'en', ?, ?)
+                        on conflict (scenario_key, ref_type, ref_code, lang) do update
+                            set name = excluded.name, description = excluded.description
+                        """, key, row.code(), row.name(), row.description());
+            }
+        }
+        // An effect pointing at a class that is gone would never fire and would confuse the editor.
+        jdbc.update("""
+                delete from environment_event_effect e where e.scenario_key = ?
+                  and not exists (select 1 from customer_segment s
+                                  where s.scenario_key = e.scenario_key and s.code = e.segment_code)
+                """, key);
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }
 

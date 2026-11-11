@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * The deterministic scoring engine (decision 4). No randomness, no I/O, no clock: same inputs, same
@@ -414,20 +415,46 @@ public class ScoringEngine {
      * The market for one product, in whole pieces: base demand scaled for the cohort, then for the
      * round's environment. Rounded once, here, so the allocation and the market-share denominator
      * agree on the same number (D34).
+     *
+     * <p>D81: when the product serves a customer class, the market is that class's purchasing power
+     * — how many buyers there are times what each can afford — plus the stated percentage of the
+     * other classes' purchasable demand. The class's economy, not a per-product index, decides.
      */
     private BigDecimal wholePool(Scenario scenario, Scenario.ProductSpec spec,
                                  EnvironmentService.RoundEnvironment environment, int companies) {
+        Optional<Scenario.SegmentSpec> target = scenario.segmentOf(spec);
+        if (target.isPresent()) {
+            Scenario.SegmentSpec segment = target.get();
+            BigDecimal own = units(nz(segment.baseSize())
+                    .multiply(environment.segmentSize(segment.code()))
+                    .multiply(environment.segmentPurchasingPower(segment.code())));
+            BigDecimal others = ZERO;
+            for (Scenario.SegmentSpec other : scenario.segments()) {
+                if (other.code().equals(segment.code())) {
+                    continue;
+                }
+                others = others.add(units(nz(other.baseSize())
+                        .multiply(environment.segmentSize(other.code()))
+                        .multiply(environment.segmentPurchasingPower(other.code()))));
+            }
+            BigDecimal uplift = nz(spec.crossSegmentPct()).multiply(others);
+            BigDecimal scale = cohortScale(companies).multiply(scenario.seasonality(environment.round()));
+            return own.add(uplift).multiply(scale).setScale(0, RoundingMode.HALF_UP);
+        }
         return poolFor(scenario, spec, environment.round(), companies)
                 .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE)))
                 .setScale(0, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal poolFor(Scenario scenario, Scenario.ProductSpec spec, int round, int companies) {
-        BigDecimal scale = BigDecimal.valueOf(Math.max(companies, 1))
+    private static BigDecimal cohortScale(int companies) {
+        return BigDecimal.valueOf(Math.max(companies, 1))
                 .divide(BigDecimal.valueOf(REFERENCE_COMPANIES), 6, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal poolFor(Scenario scenario, Scenario.ProductSpec spec, int round, int companies) {
         return units(nz(spec.baseDemand())
                 .multiply(scenario.seasonality(round))
-                .multiply(scale));
+                .multiply(cohortScale(companies)));
     }
 
     private double attractiveness(Scenario scenario, String productCode, TeamInput team, Plan plan) {

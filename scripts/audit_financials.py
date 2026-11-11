@@ -67,6 +67,15 @@ def div(a, b, scale=6) -> D:
     return ZERO if b == 0 else (a / b).quantize(D(1).scaleb(-scale), ROUND_HALF_UP)
 
 
+def frozen_effects(raw) -> list:
+    """The class effects a run froze at the draw (D84). psycopg gives jsonb as list or text."""
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        raw = json.loads(raw or "[]")
+    return raw or []
+
+
 def java_roll(team_id: int, round_number: int, code: str) -> D:
     """The CHANCE curve's seeded threshold: SHA-256 of team:round:project, first 53 bits."""
     digest = hashlib.sha256(f"{team_id}:{round_number}:{code}".encode()).digest()
@@ -145,7 +154,14 @@ class Run:
         self.baseline_share = D(str((self.params.get("baselineCompetitor") or {}).get("share", 0)))
         self.products = {r["code"]: r for r in cur.execute(
             "select code, base_price, base_unit_cost, base_quality, base_demand, units_per_worker, "
-            "income_elasticity, trend_affinity from product where scenario_key = %s",
+            "income_elasticity, trend_affinity, target_segment, cross_segment_pct "
+            "from product where scenario_key = %s",
+            (self.scenario_key,)).fetchall()}
+        # D81: the customer classes are the unit of economic reaction. Their absence (a template
+        # written before V31) means every product falls back to its own demand pool.
+        self.segments = {r["code"]: r for r in cur.execute(
+            "select code, base_size, base_purchasing_power, income_elasticity, trend_affinity "
+            "from customer_segment where scenario_key = %s",
             (self.scenario_key,)).fetchall()}
         self.channels = {r["code"]: r for r in cur.execute(
             "select code, reach_weight, brand_alpha from channel where scenario_key = %s",
@@ -163,12 +179,12 @@ class Run:
                 "where run_id = %s and action = 'CASH_ADJUST' and amount is not null", (self.id,)
         ).fetchall():
             self.adjustments[(row["team_id"], row["round_number"])] += D(row["amount"])
+        # D84: the run froze what each drawn card does. Read the run's own numbers, never the
+        # template's — editing a template must not change a run that has already played.
         self.fired = cur.execute(
-            "select event_code, starts_round, duration_months from run_environment_event "
+            "select event_code, starts_round, duration_months, demand_multiplier, cost_multiplier, "
+            "wage_multiplier, target_product, effects from run_environment_event "
             "where run_id = %s", (self.id,)).fetchall()
-        self.events = {r["code"]: r for r in cur.execute(
-            "select code, demand_multiplier, cost_multiplier, wage_multiplier, target_product "
-            "from environment_event where scenario_key = %s", (self.scenario_key,)).fetchall()}
         self.teams = {}
         for team_row in cur.execute(
                 "select id, cash, brand_score, machine_workers, status, cumulative_revenue, "
@@ -207,28 +223,59 @@ class Run:
         cost = D(base["cost_index"])
         wage = D(base["wage_index"])
         trend = D(base["trend_strength"] or 0)
+
+        # D81/D82: size and purchasing power are per class; a product without a class keeps the
+        # legacy pool and its own elasticity.
+        size_raw = {}
+        power = {}
+        for code, segment in self.segments.items():
+            elastic = D(str(float(demand) ** float(D(segment["income_elasticity"] or 1))))
+            trend_factor = ONE + trend * D(segment["trend_affinity"] or 0)
+            size_raw[code] = D(segment["base_size"]) * elastic * trend_factor
+            power[code] = D(segment["base_purchasing_power"] or 1)
         by_product = {code: ONE for code in self.products}
+
         for fired in self.fired:
             if not (fired["starts_round"] <= round_number
                     < fired["starts_round"] + fired["duration_months"]):
                 continue
-            event = self.events.get(fired["event_code"])
-            if event is None:
-                continue
-            cost = cost * D(event["cost_multiplier"])
-            wage = wage * D(event["wage_multiplier"])
-            target = event["target_product"]
-            if target and target in by_product:
-                by_product[target] = by_product[target] * D(event["demand_multiplier"])
-            elif not target:
-                demand = demand * D(event["demand_multiplier"])
+            cost = cost * D(fired["cost_multiplier"] or 1)
+            wage = wage * D(fired["wage_multiplier"] or 1)
+            market = D(fired["demand_multiplier"] or 1)
+            if market != ONE:
+                target = fired["target_product"]
+                if target and target in by_product:
+                    by_product[target] = by_product[target] * market
+                elif not target:
+                    for code in size_raw:
+                        size_raw[code] = size_raw[code] * market
+            for effect in frozen_effects(fired["effects"]):
+                segment = effect["segmentCode"]
+                if segment in size_raw:
+                    size_raw[segment] = size_raw[segment] * D(str(effect["sizeMultiplier"]))
+                    power[segment] = power[segment] * D(str(effect["purchasingPowerMultiplier"]))
+
+        segments = {}
+        for code, segment in self.segments.items():
+            base_size = D(segment["base_size"])
+            index = ONE if base_size == 0 else (size_raw[code] / base_size).quantize(SIX, ROUND_HALF_UP)
+            segments[code] = (index, power[code].quantize(SIX, ROUND_HALF_UP))
+
         for code, product in self.products.items():
-            elastic = D(str(float(demand) ** float(D(product["income_elasticity"] or 1))))
-            trend_factor = ONE + trend * D(product["trend_affinity"] or 0)
-            by_product[code] = (by_product[code] * elastic * trend_factor).quantize(SIX, ROUND_HALF_UP)
+            target = product["target_segment"]
+            if target in segments:
+                index, pp = segments[target]
+                by_product[code] = (index * pp / D(self.segments[target]["base_purchasing_power"] or 1)
+                                    ).quantize(SIX, ROUND_HALF_UP)
+            else:
+                elastic = D(str(float(demand) ** float(D(product["income_elasticity"] or 1))))
+                trend_factor = ONE + trend * D(product["trend_affinity"] or 0)
+                by_product[code] = (by_product[code] * elastic * trend_factor
+                                    ).quantize(SIX, ROUND_HALF_UP)
         return {"round": round_number, "demand": demand.quantize(INDEX, ROUND_HALF_UP),
                 "cost": cost.quantize(INDEX, ROUND_HALF_UP), "wage": wage.quantize(INDEX, ROUND_HALF_UP),
-                "trend": trend.quantize(MONEY, ROUND_HALF_UP), "by_product": by_product}
+                "trend": trend.quantize(MONEY, ROUND_HALF_UP), "by_product": by_product,
+                "segments": segments}
 
     # ---------------------------------------------------------------- R&D effects
     def effects(self, team: Team) -> dict:
@@ -377,8 +424,28 @@ def pool_for(run: Run, code: str, round_number: int, companies: int) -> D:
 
 
 def whole_pool(run: Run, code: str, env: dict, companies: int) -> D:
+    spec = run.products[code]
+    target = spec["target_segment"]
+    if target in env["segments"]:
+        # D85: the class's purchasable demand plus the stated share of the other classes'.
+        season = seasonality(run, env["round"])
+        scale = div(D(max(companies, 1)), D(REFERENCE_COMPANIES)) * season
+        index, pp = env["segments"][target]
+        own = units(D(run.segments[target]["base_size"]) * index * pp)
+        others = ZERO
+        for other, (other_index, other_pp) in env["segments"].items():
+            if other == target:
+                continue
+            others += units(D(run.segments[other]["base_size"]) * other_index * other_pp)
+        uplift = D(spec["cross_segment_pct"] or 0) * others
+        return ((own + uplift) * scale).quantize(D(1), ROUND_HALF_UP)
     return (pool_for(run, code, env["round"], companies)
             * env["by_product"].get(code, ONE)).quantize(D(1), ROUND_HALF_UP)
+
+
+def seasonality(run: Run, round_number: int) -> D:
+    values = run.params.get("seasonality") or [1]
+    return D(values[(round_number - 1) % max(1, len(values))])
 
 
 def reach(run: Run, body: dict) -> float:

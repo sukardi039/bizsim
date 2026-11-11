@@ -32,8 +32,10 @@ Every figure the engine computes, in the order the engine computes it.
 | demand index | `run_round_economy.demand_index` × active events' demand multipliers |
 | cost index | `…cost_index` × active events' cost multipliers |
 | wage index | `…wage_index` × active events' wage multipliers |
-| demand per product | `demand_index ^ income_elasticity × (1 + trend_strength × trend_affinity)` × product-targeted event multipliers, 6 dp |
-| an event is active | `starts_round ≤ round < starts_round + duration_months` |
+| class size index | `demand_index ^ class.income_elasticity × (1 + trend_strength × class.trend_affinity)` × active events' size multipliers, 6 dp |
+| class purchasing power | `base_purchasing_power` × active events' purchasing-power multipliers, 6 dp |
+| demand per product | for a product with a class: `size index × purchasing power ÷ base purchasing power`, 6 dp; for a legacy product: `demand_index ^ income_elasticity × (1 + trend_strength × trend_affinity)` × product-targeted event multipliers, 6 dp |
+| an event is active | `starts_round ≤ round < starts_round + duration_months`, read from the run's frozen row (D84) |
 
 ### Planning (per company, per round)
 
@@ -60,7 +62,8 @@ Every figure the engine computes, in the order the engine computes it.
 
 | Quantity | Rule |
 |---|---|
-| pool | `base demand × seasonality × (companies ÷ 10) × demand index for the product`, whole units |
+| pool (product with a class) | `units(base_size × size index × purchasing power) + cross_segment_pct × Σ_{k≠s} units(base_size_k × size index_k × pp_k)`, then × `seasonality × companies ÷ 10`, whole units (D85) |
+| pool (legacy product) | `base demand × seasonality × (companies ÷ 10) × demand index for the product`, whole units |
 | cohort target | `round(pool × (1 − baseline competitor share))` |
 | attractiveness | `(reference price ÷ price) ^ price elasticity × (quality ÷ reference quality) ^ quality elasticity × (brand ÷ 50) ^ brand elasticity × max(reach, 0.01) ^ marketing elasticity × R&D attractiveness multiplier` |
 | reach | `√(Σ channel spend × channel weight ÷ reference spend)` |

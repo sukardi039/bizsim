@@ -586,7 +586,8 @@ public class RoundService {
             projects.add(row);
         }
         body.put("rndProjects", projects);
-        body.put("market", environment.conditions(scenario, runId, run.currentRound()));
+        body.put("market", environment.conditions(scenario, runId, run.currentRound(),
+                runs.langOf(runId)));
         body.put("marketReportCost", scenario.params().marketReportCost());
         // D15: the form shows the quality input only when this template sells the mechanic, and it
         // must know the price per point to show what a purchase would cost.
@@ -618,7 +619,8 @@ public class RoundService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("purchasedForRound", round.number());
         body.put("cost", scenario.params().marketReportCost());
-        body.put("current", environment.conditions(scenario, runId, round.number()));
+        body.put("current", environment.conditions(scenario, runId, round.number(),
+                runs.langOf(runId)));
         body.put("forecast", environment.forecast(scenario, runId, round.number()));
         return body;
     }

@@ -231,3 +231,63 @@ Product owner answered `docs/OPEN_QUESTIONS.md` on 2026-11-02. These are rulings
     trainees in order; a profile's product line becomes the company's `company_product` rows.
     Deliberately **no roster-status column**: "not yet in a session" is derivable from having no
     seat, and a second stored flag would eventually disagree with the seats it describes.
+
+## Domain rulings — 2026-11-11 (the market environment is an economic model)
+
+The market used to move through one demand index per round and one income elasticity per product.
+That is a dial, not an economy: there are no customers in it, so "a recession hurts premium more"
+was a number in a row rather than a consequence of who the buyers are. The trainer's requirement:
+the market environment must be the **result** of economic events acting on **classes of potential
+customer**, each product sells into one class's purchasing power plus a share of the other classes,
+and the model must arrive as initial data that can be copied and edited.
+
+**D81 — The customer class is the unit of economic reaction; the product is the unit of
+competition.** Three classes (`customer_segment`, seeded as mass / middle / affluent) exist per
+template. A product names the class it is made for (`product.target_segment`) and the share of the
+other classes' market it also serves (`product.cross_segment_pct`). `income_elasticity` and
+`trend_affinity` move from the product to the class, because they describe a customer, not a SKU. A
+product with no target class keeps the pre-D81 pool (`base_demand` × demand index), so a template
+written before this ruling plays exactly as it did.
+
+**D82 — An economic event acts on classes, never on products.** `environment_event_effect` gives one
+row per (event, class) with a **size** multiplier (how many buyers there are) and a **purchasing
+power** multiplier (what each of them can spend). The card also carries a `category` (supply shock,
+financial crisis, inflation, technology, demand shock, policy) so the workbench can say *inflation*
+rather than "demand ×0.9". The old market-wide `demand_multiplier` and `target_product` stay for
+backward compatibility only; the shipped deck sets the multiplier to 1.000 and drives everything
+through class effects.
+
+**D83 — The environment description is stored once per language, beside the mechanic.** An economic
+environment a player cannot read is not an environment. `environment_text` holds the name and a
+short description for a class, an event and a cycle position, in `en` and `zh`; a run reads its
+class's language (`run.lang`), and the workbench shows the round narrative followed by the
+descriptions of the events that have already started. This deliberately does **not** duplicate the
+weather as one set per language the way D64 does for the R&D catalogue: a project is a *choice*
+offered to the class, so the set itself must exist in its language; an event is a fact the class
+cannot choose, and two weather systems that can drift apart would be a defect, not a translation.
+
+**D84 — A run's weather is frozen, including what each card does.** The draw already fixed which
+cards fire and when; `run_environment_event` now also stores their multipliers and their class
+effects, and `run_round_economy` stores the round's narrative in both languages. Before this,
+editing an event's numbers on a template silently changed a class that had already played, which
+contradicts D18's promise that a run keeps its own economy — the words are part of that weather
+because a player reads them. Customer classes are the opposite: they are read live every round, so
+the classes of a template that already has sessions are refused for edit (`409 template.in_use`)
+exactly like its product catalogue — copy the template to change them.
+
+**D85 — The market of a product is its class's purchasing power plus a share of the others'.**
+
+```
+class size (units)      = base_size × seasonality × cohort scale
+                          × demand_index(r) ^ class.income_elasticity
+                          × (1 + trend_strength(r) × class.trend_affinity)
+                          × product of active events' size multipliers
+class purchasing power  = base_purchasing_power × product of active events' pp multipliers
+market of product j     = size_s × pp_s + cross_segment_pct_j × Σ_{k≠s} (size_k × pp_k)
+```
+
+Share within that market is unchanged (price, quality, brand, reach, D34 whole-piece allocation):
+the change is what the denominator *is*. Money is still not modelled directly — purchasing power is
+an index on the class's unit pool, and price elasticity is what makes an over-priced product lose
+share inside it. Competitive positions therefore add up to the class's affordable demand, not to a
+number a trainer typed.

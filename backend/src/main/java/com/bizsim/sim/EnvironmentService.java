@@ -1,5 +1,7 @@
 package com.bizsim.sim;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -11,17 +13,22 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
 /**
- * The economy (rulings D18, D19): a cycle template expanded into this run's rounds, an event deck
- * drawn once per run, a consumer-trend signal, and the forecast a trainee can buy.
+ * The economy (rulings D18, D19, D81-D84): a cycle template expanded into this run's rounds, an
+ * event deck drawn once per run, a consumer-trend signal, and the forecast a trainee can buy.
  *
- * <p>Demand does not move uniformly. Each product has an income elasticity and a trend affinity, so
- * the same downturn and the same shift in consumer taste hit the basic and the premium line
- * differently — that is the lesson, and it is two numbers per product rather than per-scenario code.
+ * <p>D81 changed what moves. Before, an event multiplied a product's demand. Now the market is made
+ * of <strong>customer classes</strong>, and an event moves two numbers per class: how many buyers
+ * there are ({@code size}) and what each of them can spend ({@code purchasingPower}). A product
+ * inherits the weather of the class it serves, so "premium demand collapses in a recession" is not a
+ * special case in code — it is the premium class's effect row.
+ *
+ * <p>The round's numbers are frozen when the run is created (the timeline and the draw). The draw
+ * also freezes what each card does, so editing a template cannot reach back into a class that has
+ * already played.
  */
 @Service
 public class EnvironmentService {
@@ -29,12 +36,21 @@ public class EnvironmentService {
     private static final BigDecimal ONE = BigDecimal.ONE;
 
     /**
-     * The economy as the engine consumes it: market-wide indices plus one already-resolved demand
-     * multiplier per product, so the engine needs to know nothing about elasticities, trends or
-     * events.
+     * One class of customer as this round sees it: the size multiplier relative to its base (the
+     * demand index, the trend and active events already applied) and its purchasing-power index.
+     */
+    public record SegmentState(String code, String name, BigDecimal sizeIndex,
+                               BigDecimal purchasingPower) {
+    }
+
+    /**
+     * The economy as the engine consumes it: market-wide indices, one already-resolved state per
+     * customer class, and one demand multiplier per product for legacy templates that still size a
+     * product directly.
      */
     public record RoundEnvironment(int round, BigDecimal demandIndex, BigDecimal costIndex,
                                    BigDecimal wageIndex, BigDecimal trendStrength, String trendLabel,
+                                   Map<String, SegmentState> segments,
                                    Map<String, BigDecimal> demandByProduct,
                                    List<String> activeEvents) {
 
@@ -44,14 +60,32 @@ public class EnvironmentService {
                 multipliers.put(code, ONE);
             }
             return new RoundEnvironment(round, ONE, ONE, ONE, BigDecimal.ZERO, null,
-                    multipliers, List.of());
+                    Map.of(), multipliers, List.of());
+        }
+
+        public BigDecimal segmentSize(String code) {
+            SegmentState state = segments.get(code);
+            return state == null ? ONE : state.sizeIndex();
+        }
+
+        public BigDecimal segmentPurchasingPower(String code) {
+            SegmentState state = segments.get(code);
+            return state == null ? ONE : state.purchasingPower();
         }
     }
 
-    private final JdbcTemplate jdbc;
+    /** A card that is firing this round, with the numbers frozen at the draw. */
+    private record Resolved(Scenario.EventSpec spec, int startsRound, BigDecimal demandMultiplier,
+                            BigDecimal costMultiplier, BigDecimal wageMultiplier,
+                            String targetProduct, List<Scenario.EventEffect> effects) {
+    }
 
-    public EnvironmentService(JdbcTemplate jdbc) {
+    private final JdbcTemplate jdbc;
+    private final ObjectMapper json;
+
+    public EnvironmentService(JdbcTemplate jdbc, ObjectMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
     // ------------------------------------------------------------------ setup
@@ -80,22 +114,25 @@ public class EnvironmentService {
 
             jdbc.update("""
                     insert into run_round_economy (run_id, round_number, demand_index, cost_index,
-                                                   wage_index, trend_strength, trend_label)
-                    values (?, ?, ?, ?, ?, ?, ?)
+                                                   wage_index, trend_strength, trend_label,
+                                                   description, description_zh, label_zh)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     on conflict (run_id, round_number) do nothing
                     """, runId, round,
                     nz(template.demandIndex()).multiply(demandFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.costIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.wageIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.trendStrength()).setScale(2, RoundingMode.HALF_UP),
-                    template.trendLabel());
+                    template.trendLabel(), template.description(), template.descriptionZh(),
+                    template.labelZh());
         }
     }
 
     /**
      * Decides which deck entries fire in this run, and when. Called once, when the run is created, so
      * the schedule is frozen: the facilitator can look it up in the debrief and nobody can re-roll it
-     * by restarting the app.
+     * by restarting the app. The card's numbers are frozen here too (D84) — a template edit after the
+     * draw must not change a class that is already playing.
      */
     public List<String> scheduleEvents(Scenario scenario, long runId) {
         List<String> scheduled = new ArrayList<>();
@@ -108,13 +145,33 @@ public class EnvironmentService {
                     * (span + 1));
             int start = Math.min(event.earliestRound() + offset, event.latestRound());
             jdbc.update("""
-                    insert into run_environment_event (run_id, event_code, starts_round, duration_months)
-                    values (?, ?, ?, ?)
+                    insert into run_environment_event (run_id, event_code, starts_round, duration_months,
+                                                       demand_multiplier, cost_multiplier,
+                                                       wage_multiplier, target_product, effects)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                     on conflict (run_id, event_code) do nothing
-                    """, runId, event.code(), start, event.durationMonths());
+                    """, runId, event.code(), start, event.durationMonths(),
+                    nz(event.demandMultiplier()), nz(event.costMultiplier()),
+                    nz(event.wageMultiplier()), event.targetProduct(), effectsJson(event.effects()));
             scheduled.add(event.code());
         }
         return scheduled;
+    }
+
+    private String effectsJson(List<Scenario.EventEffect> effects) {
+        try {
+            List<Map<String, Object>> rows = new ArrayList<>();
+            for (Scenario.EventEffect effect : effects == null ? List.<Scenario.EventEffect>of() : effects) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("segmentCode", effect.segmentCode());
+                row.put("sizeMultiplier", effect.sizeMultiplier());
+                row.put("purchasingPowerMultiplier", effect.purchasingPowerMultiplier());
+                rows.add(row);
+            }
+            return json.writeValueAsString(rows);
+        } catch (Exception e) {
+            throw new IllegalStateException("cannot freeze event effects", e);
+        }
     }
 
     // ------------------------------------------------------------------ the round
@@ -123,55 +180,111 @@ public class EnvironmentService {
         Scenario.RoundSpec base = runRound(runId, round)
                 .or(() -> templateAt(scenario, Math.max(1, round)))
                 .orElse(new Scenario.RoundSpec(round, ONE, ONE, ONE, BigDecimal.ZERO, "Stable",
-                        "neutral"));
+                        "neutral", null, null, null));
 
         BigDecimal demand = nz(base.demandIndex());
         BigDecimal cost = nz(base.costIndex());
         BigDecimal wage = nz(base.wageIndex());
         BigDecimal trend = nz(base.trendStrength());
 
-        Map<String, BigDecimal> byProduct = new LinkedHashMap<>();
+        // Sizes are absolute unit counts at reference conditions; purchasing power is an index.
+        Map<String, BigDecimal> size = new LinkedHashMap<>();
+        Map<String, BigDecimal> power = new LinkedHashMap<>();
+        for (Scenario.SegmentSpec segment : scenario.segments()) {
+            double elastic = Math.pow(demand.doubleValue(), nz(segment.incomeElasticity()).doubleValue());
+            BigDecimal trendFactor = ONE.add(trend.multiply(nz(segment.trendAffinity())));
+            size.put(segment.code(), nz(segment.baseSize())
+                    .multiply(BigDecimal.valueOf(elastic)).multiply(trendFactor));
+            power.put(segment.code(), nz(segment.basePurchasingPower()));
+        }
+
+        // Legacy product-level multipliers, kept for a template that sized demand per product.
+        Map<String, BigDecimal> legacyDemand = new LinkedHashMap<>();
         for (Scenario.ProductSpec product : scenario.products()) {
-            byProduct.put(product.code(), ONE);
+            legacyDemand.put(product.code(), ONE);
         }
 
         List<String> active = new ArrayList<>();
-        for (Scenario.EventSpec event : activeEvents(scenario, runId, round)) {
-            active.add(event.code());
+        for (Resolved event : activeEvents(scenario, runId, round)) {
+            active.add(event.spec().code());
             cost = cost.multiply(nz(event.costMultiplier()));
             wage = wage.multiply(nz(event.wageMultiplier()));
-            if (event.targetProduct() == null || event.targetProduct().isBlank()) {
-                demand = demand.multiply(nz(event.demandMultiplier()));
-            } else if (byProduct.containsKey(event.targetProduct())) {
-                byProduct.put(event.targetProduct(), byProduct.get(event.targetProduct())
-                        .multiply(nz(event.demandMultiplier())));
+
+            // The pre-D82 mechanism: a card may still multiply the whole market, or one product.
+            BigDecimal marketDemand = nz(event.demandMultiplier());
+            if (marketDemand.compareTo(ONE) != 0) {
+                if (event.targetProduct() == null || event.targetProduct().isBlank()) {
+                    for (String code : size.keySet()) {
+                        size.put(code, size.get(code).multiply(marketDemand));
+                    }
+                } else if (legacyDemand.containsKey(event.targetProduct())) {
+                    legacyDemand.put(event.targetProduct(),
+                            legacyDemand.get(event.targetProduct()).multiply(marketDemand));
+                }
+            }
+
+            // D82: the card's actual reach — two numbers per customer class.
+            for (Scenario.EventEffect effect : event.effects()) {
+                if (size.containsKey(effect.segmentCode())) {
+                    size.put(effect.segmentCode(), size.get(effect.segmentCode())
+                            .multiply(nz(effect.sizeMultiplier())));
+                    power.put(effect.segmentCode(), power.get(effect.segmentCode())
+                            .multiply(nz(effect.purchasingPowerMultiplier())));
+                }
             }
         }
 
+        Map<String, SegmentState> segments = new LinkedHashMap<>();
+        for (Scenario.SegmentSpec segment : scenario.segments()) {
+            BigDecimal baseSize = nz(segment.baseSize());
+            BigDecimal multiplier = baseSize.signum() == 0 ? ONE
+                    : size.get(segment.code()).divide(baseSize, 6, RoundingMode.HALF_UP);
+            segments.put(segment.code(), new SegmentState(segment.code(), segment.name(),
+                    multiplier.setScale(6, RoundingMode.HALF_UP),
+                    power.get(segment.code()).setScale(6, RoundingMode.HALF_UP)));
+        }
+
+        // The published demand multiplier per product, from the class it serves where there is one.
+        Map<String, BigDecimal> byProduct = new LinkedHashMap<>();
         for (Scenario.ProductSpec product : scenario.products()) {
-            double elastic = Math.pow(demand.doubleValue(), nz(product.incomeElasticity()).doubleValue());
-            BigDecimal trendFactor = ONE.add(trend.multiply(nz(product.trendAffinity())));
-            byProduct.put(product.code(), byProduct.get(product.code())
-                    .multiply(BigDecimal.valueOf(elastic))
-                    .multiply(trendFactor)
-                    .setScale(6, RoundingMode.HALF_UP));
+            BigDecimal multiplier;
+            Optional<Scenario.SegmentSpec> segment = scenario.segmentOf(product);
+            if (segment.isPresent()) {
+                SegmentState state = segments.get(segment.get().code());
+                BigDecimal basePower = nz(segment.get().basePurchasingPower());
+                multiplier = state == null ? ONE
+                        : state.sizeIndex().multiply(state.purchasingPower())
+                                .divide(basePower, 6, RoundingMode.HALF_UP);
+            } else {
+                double elastic = Math.pow(demand.doubleValue(),
+                        nz(product.incomeElasticity()).doubleValue());
+                BigDecimal trendFactor = ONE.add(trend.multiply(nz(product.trendAffinity())));
+                multiplier = BigDecimal.valueOf(elastic).multiply(trendFactor)
+                        .multiply(legacyDemand.getOrDefault(product.code(), ONE));
+            }
+            byProduct.put(product.code(), multiplier.setScale(6, RoundingMode.HALF_UP));
         }
 
         return new RoundEnvironment(round, demand.setScale(3, RoundingMode.HALF_UP),
                 cost.setScale(3, RoundingMode.HALF_UP), wage.setScale(3, RoundingMode.HALF_UP),
-                trend.setScale(2, RoundingMode.HALF_UP), base.trendLabel(), byProduct,
+                trend.setScale(2, RoundingMode.HALF_UP), base.trendLabel(), segments, byProduct,
                 List.copyOf(active));
     }
 
     /** Descriptions of the events that have already started — public knowledge by then. */
-    public List<Map<String, Object>> activeEventDetails(Scenario scenario, long runId, int round) {
+    public List<Map<String, Object>> activeEventDetails(Scenario scenario, long runId, int round,
+                                                        String lang) {
+        boolean zh = "zh".equals(lang);
         List<Map<String, Object>> details = new ArrayList<>();
-        for (Scenario.EventSpec event : activeEvents(scenario, runId, round)) {
+        for (Resolved event : activeEvents(scenario, runId, round)) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("code", event.code());
-            row.put("name", event.name());
-            row.put("description", event.description());
-            row.put("startedRound", startOf(runId, event.code()));
+            row.put("code", event.spec().code());
+            row.put("name", zh ? orElse(event.spec().nameZh(), event.spec().name())
+                    : event.spec().name());
+            row.put("description", zh ? orElse(event.spec().descriptionZh(), event.spec().description())
+                    : event.spec().description());
+            row.put("category", event.spec().category());
+            row.put("startedRound", event.startsRound());
             details.add(row);
         }
         return details;
@@ -194,7 +307,7 @@ public class EnvironmentService {
             Scenario.RoundSpec base = runRound(runId, target)
                     .or(() -> templateAt(scenario, Math.max(1, target)))
                     .orElse(new Scenario.RoundSpec(target, ONE, ONE, ONE, BigDecimal.ZERO,
-                            "Stable", "neutral"));
+                            "Stable", "neutral", null, null, null));
 
             BigDecimal demand = noisy(nz(base.demandIndex()), runId, round, step, "demand", band);
             Map<String, Object> row = new LinkedHashMap<>();
@@ -214,29 +327,91 @@ public class EnvironmentService {
         return rows;
     }
 
-    public Map<String, Object> conditions(Scenario scenario, long runId, int round) {
+    /**
+     * The market environment a player reads in the workbench (D83): the round's narrative, the
+     * classes with their current size and purchasing power, and the events that are already known.
+     */
+    public Map<String, Object> conditions(Scenario scenario, long runId, int round, String lang) {
         RoundEnvironment environment = forRound(scenario, runId, round);
+        boolean zh = "zh".equals(lang);
+        Scenario.RoundSpec frozen = runRound(runId, round).orElse(null);
+        Scenario.RoundSpec template = templateAt(scenario, Math.max(1, round)).orElse(null);
+        // The run froze its words with its numbers (D84). A run drawn before that has none, so the
+        // narrative falls back to the template position it was drawn from.
+        Scenario.RoundSpec words = frozen != null && frozen.description() != null ? frozen : template;
+
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("round", round);
         body.put("demandIndex", environment.demandIndex());
         body.put("costIndex", environment.costIndex());
         body.put("wageIndex", environment.wageIndex());
         body.put("trendStrength", environment.trendStrength());
-        body.put("trendLabel", environment.trendLabel());
+        body.put("trendLabel", words != null && zh ? orElse(words.labelZh(), words.trendLabel())
+                : environment.trendLabel());
         body.put("outlook", outlook(environment.demandIndex()));
-        body.put("events", activeEventDetails(scenario, runId, round));
+        List<Map<String, Object>> events = activeEventDetails(scenario, runId, round, lang);
+        body.put("events", events);
+
+        List<Map<String, Object>> segments = new ArrayList<>();
+        Map<String, String> productOf = new LinkedHashMap<>();
+        for (Scenario.ProductSpec product : scenario.products()) {
+            if (product.targetSegment() != null) {
+                productOf.put(product.targetSegment(), product.code());
+            }
+        }
+        for (Scenario.SegmentSpec segment : scenario.segments()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("code", segment.code());
+            row.put("name", zh ? orElse(segment.nameZh(), segment.name()) : segment.name());
+            row.put("product", productOf.get(segment.code()));
+            row.put("baseSize", nz(segment.baseSize()));
+            row.put("sizeIndex", environment.segmentSize(segment.code()));
+            row.put("purchasingPower", environment.segmentPurchasingPower(segment.code()));
+            row.put("description", zh ? orElse(segment.descriptionZh(), segment.description())
+                    : segment.description());
+            segments.add(row);
+        }
+        body.put("segments", segments);
+        body.put("headline", words != null && zh ? orElse(words.labelZh(), words.trendLabel())
+                : environment.trendLabel());
+        body.put("description", marketDescription(words, events, zh));
         return body;
+    }
+
+    /** The brief narrative: what the economy is doing this month, in the reader's language. */
+    private static String marketDescription(Scenario.RoundSpec base, List<Map<String, Object>> events,
+                                            boolean zh) {
+        StringBuilder text = new StringBuilder();
+        if (base != null) {
+            String roundText = zh ? orElse(base.descriptionZh(), base.description()) : base.description();
+            if (roundText != null && !roundText.isBlank()) {
+                text.append(roundText.trim());
+            }
+        }
+        for (Map<String, Object> event : events) {
+            Object description = event.get("description");
+            if (description != null && !String.valueOf(description).isBlank()) {
+                if (text.length() > 0) {
+                    text.append(' ');
+                }
+                text.append(String.valueOf(description).trim());
+            }
+        }
+        return text.length() == 0 ? null : text.toString();
     }
 
     // ------------------------------------------------------------------ internals
 
     private Optional<Scenario.RoundSpec> runRound(long runId, int round) {
         return jdbc.query("""
-                select demand_index, cost_index, wage_index, trend_strength, trend_label
+                select demand_index, cost_index, wage_index, trend_strength, trend_label,
+                       description, description_zh, label_zh
                 from run_round_economy where run_id = ? and round_number = ?
                 """, (rs, i) -> new Scenario.RoundSpec(round, rs.getBigDecimal("demand_index"),
                 rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
-                rs.getBigDecimal("trend_strength"), rs.getString("trend_label"), null),
+                rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
+                null, rs.getString("description"), rs.getString("description_zh"),
+                rs.getString("label_zh")),
                 runId, round).stream().findFirst();
     }
 
@@ -244,19 +419,52 @@ public class EnvironmentService {
         return scenario.rounds().stream().filter(spec -> spec.round() == position).findFirst();
     }
 
-    private List<Scenario.EventSpec> activeEvents(Scenario scenario, long runId, int round) {
-        Set<String> codes = new HashSet<>();
+    /**
+     * The draw, read from the run. A row written before D84 carries the old market-wide multipliers
+     * and no effects, so an old run keeps the behaviour it was drawn under.
+     */
+    private List<Resolved> activeEvents(Scenario scenario, long runId, int round) {
+        Map<String, Scenario.EventSpec> specs = new LinkedHashMap<>();
+        for (Scenario.EventSpec spec : scenario.events()) {
+            specs.put(spec.code(), spec);
+        }
+        List<Resolved> resolved = new ArrayList<>();
         jdbc.query("""
-                select event_code from run_environment_event
+                select event_code, starts_round, demand_multiplier, cost_multiplier, wage_multiplier,
+                       target_product, effects::text as effects
+                from run_environment_event
                 where run_id = ? and ? between starts_round and starts_round + duration_months - 1
-                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> codes.add(rs.getString(1)),
-                runId, round);
-        return scenario.events().stream().filter(event -> codes.contains(event.code())).toList();
+                order by starts_round, event_code
+                """, rs -> {
+            Scenario.EventSpec spec = specs.get(rs.getString("event_code"));
+            if (spec == null) {
+                return;
+            }
+            resolved.add(new Resolved(spec, rs.getInt("starts_round"),
+                    rs.getBigDecimal("demand_multiplier"), rs.getBigDecimal("cost_multiplier"),
+                    rs.getBigDecimal("wage_multiplier"), rs.getString("target_product"),
+                    readEffects(rs.getString("effects"))));
+        }, runId, round);
+        return resolved;
     }
 
-    private Integer startOf(long runId, String code) {
-        return jdbc.query("select starts_round from run_environment_event where run_id = ? and event_code = ?",
-                (rs, i) -> rs.getInt(1), runId, code).stream().findFirst().orElse(null);
+    private List<Scenario.EventEffect> readEffects(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        try {
+            List<Map<String, Object>> rows = json.readValue(raw, new TypeReference<>() {
+            });
+            List<Scenario.EventEffect> effects = new ArrayList<>();
+            for (Map<String, Object> row : rows) {
+                effects.add(new Scenario.EventEffect(String.valueOf(row.get("segmentCode")),
+                        new BigDecimal(String.valueOf(row.get("sizeMultiplier"))),
+                        new BigDecimal(String.valueOf(row.get("purchasingPowerMultiplier")))));
+            }
+            return effects;
+        } catch (Exception e) {
+            throw new IllegalStateException("run " + " has unreadable frozen event effects", e);
+        }
     }
 
     private static BigDecimal noisy(BigDecimal value, long runId, int round, int step, String kind,
@@ -274,6 +482,10 @@ public class EnvironmentService {
             return "CONTRACTING";
         }
         return "STEADY";
+    }
+
+    private static String orElse(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private static BigDecimal nz(BigDecimal value) {

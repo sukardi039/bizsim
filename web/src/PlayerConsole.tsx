@@ -591,6 +591,66 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         )}
       </div>
 
+      {/* D83: the market environment, in plain words. The economy is not a mystery dial — the
+          player is told which customers exist, what this round did to them, and why. */}
+      <section className="card market-environment">
+        <div className="run-head">
+          <h2>{t("player.marketEnvironment")}</h2>
+          <span className="muted">
+            {context.market.headline ?? context.market.trendLabel} ·{" "}
+            {t(`market.outlook.${context.market.outlook}`)}
+          </span>
+        </div>
+        {context.market.description && <p>{context.market.description}</p>}
+        <table>
+          <thead>
+            <tr>
+              <th>{t("player.customerClass")}</th>
+              <th>{t("player.product")}</th>
+              <th className="num">{t("player.classSize")}</th>
+              <th className="num">{t("player.purchasingPower")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(context.market.segments ?? []).map((segment) => (
+              <tr key={segment.code}>
+                <td>
+                  {segment.name}
+                  {segment.description && (
+                    <div className="muted">
+                      <small>{segment.description}</small>
+                    </div>
+                  )}
+                </td>
+                <td>{segment.product ?? "—"}</td>
+                <td className="num">
+                  {plain(Math.round(segment.baseSize * segment.sizeIndex))}
+                  <div className="muted">
+                    <small>×{plain(segment.sizeIndex)}</small>
+                  </div>
+                </td>
+                <td className="num">
+                  ×{plain(segment.purchasingPower)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {context.market.events.length > 0 && (
+          <ul className="forecast">
+            {context.market.events.map((event) => (
+              <li key={event.code}>
+                {event.category && event.category !== "OTHER" && (
+                  <span className="muted">{t(`category.${event.category}`)} · </span>
+                )}
+                <strong>{event.name}</strong>
+                {event.description ? ` — ${event.description}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section className="card">
         <h2>{t("player.production")}</h2>
         <table>

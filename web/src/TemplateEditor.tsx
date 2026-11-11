@@ -7,6 +7,7 @@ import {
   type TemplateProduct,
   type TemplateProject,
   type TemplateRound,
+  type TemplateSegment,
 } from "./api";
 import { describeError } from "./errors";
 import { useI18n } from "./i18n";
@@ -52,7 +53,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
   const { t, number: fmt, money } = useI18n();
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
   const [tab, setTab] = useState<
-    "settings" | "environment" | "events" | "products" | "channels" | "projects"
+    "settings" | "environment" | "segments" | "events" | "products" | "channels" | "projects"
   >("settings");
   const [settings, setSettings] = useState<Record<string, string>>({});
   /** D15: a mechanic is a switch on the template, not a code path every class must live with. */
@@ -64,6 +65,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
   const [channels, setChannels] = useState<TemplateChannel[]>([]);
   const [projects, setProjects] = useState<TemplateProject[]>([]);
   const [events, setEvents] = useState<TemplateEvent[]>([]);
+  /** D81: the customer classes the economy moves; each product serves one. */
+  const [segments, setSegments] = useState<TemplateSegment[]>([]);
   const [salaries, setSalaries] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -87,6 +90,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     setSalaries(Object.fromEntries(FUNCTIONS.map((f) => [f, String(pay[f] ?? "")])));
     setStaff(Object.fromEntries(FUNCTIONS.map((f) => [f, String(headcount[f] ?? "")])));
     setEvents(next.events ?? []);
+    setSegments(next.segments ?? []);
     setRounds(next.environment);
     setProducts(next.products ?? []);
     setChannels(next.channels ?? []);
@@ -188,6 +192,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
         trendStrength: 0,
         trendLabel: "",
         note: "",
+        description: "",
+        descriptionZh: "",
       },
     ]);
   };
@@ -239,6 +245,9 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
             onClick={() => setTab("environment")}
           >
             {t("editor.environment")}
+          </button>
+          <button className={tab === "segments" ? "active" : ""} onClick={() => setTab("segments")}>
+            {t("editor.segments")}
           </button>
           <button className={tab === "events" ? "active" : ""} onClick={() => setTab("events")}>
             {t("editor.events")}
@@ -345,6 +354,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th className="num">{t("field.trendStrength")}</th>
                   <th>{t("field.trendLabel")}</th>
                   <th>{t("field.note")}</th>
+                  <th>{t("field.description")}</th>
+                  <th>{t("field.descriptionZh")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -393,6 +404,22 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                         disabled={locked}
                       />
                     </td>
+                    <td>
+                      <input
+                        value={row.description ?? ""}
+                        placeholder={t("editor.marketDescriptionPlaceholder")}
+                        onChange={(e) => editRound(index, { description: e.target.value })}
+                        disabled={locked}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={row.descriptionZh ?? ""}
+                        placeholder={t("editor.marketDescriptionPlaceholder")}
+                        onChange={(e) => editRound(index, { descriptionZh: e.target.value })}
+                        disabled={locked}
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -406,6 +433,81 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               </button>
               <button type="button" onClick={removeRound} disabled={locked || rounds.length <= 1}>
                 {t("editor.removeRound")}
+              </button>
+              <button className="primary" type="submit" disabled={locked || busy}>
+                {busy ? t("editor.saving") : t("editor.save")}
+              </button>
+            </div>
+          </form>
+        ) : tab === "segments" ? (
+          <form onSubmit={(event) => saveCatalogue(event, () => api.saveTemplateSegments(templateKey, segments))}>
+            <p className="muted">{t("editor.segmentsHint")}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>{t("field.code")}</th>
+                  <th>{t("field.name")}</th>
+                  <th>{t("field.nameZh")}</th>
+                  <th>{t("field.description")}</th>
+                  <th>{t("field.descriptionZh")}</th>
+                  <th className="num">{t("field.baseSize")}</th>
+                  <th className="num">{t("field.purchasingPower")}</th>
+                  <th className="num">{t("field.incomeElasticity")}</th>
+                  <th className="num">{t("field.trendAffinity")}</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {segments.map((row, index) => {
+                  const edit = (patch: Partial<TemplateSegment>) =>
+                    setSegments((c) => c.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+                  return (
+                    <tr key={index}>
+                      <td><input value={row.code} disabled={locked} onChange={(e) => edit({ code: e.target.value })} /></td>
+                      <td><input value={row.name} disabled={locked} onChange={(e) => edit({ name: e.target.value })} /></td>
+                      <td><input value={row.nameZh ?? ""} disabled={locked} onChange={(e) => edit({ nameZh: e.target.value })} /></td>
+                      <td><input value={row.description ?? ""} disabled={locked} onChange={(e) => edit({ description: e.target.value })} /></td>
+                      <td><input value={row.descriptionZh ?? ""} disabled={locked} onChange={(e) => edit({ descriptionZh: e.target.value })} /></td>
+                      <td><input className="num" value={String(row.baseSize)} disabled={locked} onChange={(e) => edit({ baseSize: Number(e.target.value) })} /></td>
+                      <td><input className="num" value={String(row.basePurchasingPower)} disabled={locked} onChange={(e) => edit({ basePurchasingPower: Number(e.target.value) })} /></td>
+                      <td><input className="num" value={String(row.incomeElasticity)} disabled={locked} onChange={(e) => edit({ incomeElasticity: Number(e.target.value) })} /></td>
+                      <td><input className="num" value={String(row.trendAffinity)} disabled={locked} onChange={(e) => edit({ trendAffinity: Number(e.target.value) })} /></td>
+                      <td>
+                        <button type="button" className="ghost" disabled={locked || segments.length <= 1}
+                          title={t("editor.removeThisRow")}
+                          aria-label={t("editor.removeThisRow")}
+                          onClick={() => setSegments((c) => c.filter((_, at) => at !== index))}>
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="buttons">
+              <button
+                type="button"
+                disabled={locked}
+                onClick={() =>
+                  setSegments((c) => [
+                    ...c,
+                    {
+                      code: "",
+                      name: "",
+                      nameZh: "",
+                      description: "",
+                      descriptionZh: "",
+                      baseSize: 1000,
+                      basePurchasingPower: 1,
+                      incomeElasticity: 1,
+                      trendAffinity: 0,
+                      sortOrder: c.length + 1,
+                    },
+                  ])
+                }
+              >
+                {t("editor.addRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
@@ -429,6 +531,15 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th className="num">{t("field.costMultiplier")}</th>
                   <th className="num">{t("field.wageMultiplier")}</th>
                   <th>{t("field.targetProduct")}</th>
+                  <th>{t("field.category")}</th>
+                  <th>{t("field.nameZh")}</th>
+                  <th>{t("field.descriptionZh")}</th>
+                  {segments.map((segment) => (
+                    <th key={segment.code} className="num">
+                      {segment.code}
+                      <div className="muted"><small>{t("field.eventEffect")}</small></div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -459,6 +570,51 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                           ))}
                         </select>
                       </td>
+                      <td>
+                        <select
+                          value={row.category ?? "OTHER"}
+                          disabled={locked}
+                          onChange={(e) => edit({ category: e.target.value })}
+                        >
+                          {["SUPPLY_SHOCK", "FINANCIAL_CRISIS", "INFLATION", "TECHNOLOGY",
+                            "DEMAND_SHOCK", "POLICY", "OTHER"].map((category) => (
+                            <option key={category} value={category}>{t(`category.${category}`)}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td><input value={row.nameZh ?? ""} disabled={locked} onChange={(e) => edit({ nameZh: e.target.value })} /></td>
+                      <td><input value={row.descriptionZh ?? ""} disabled={locked} onChange={(e) => edit({ descriptionZh: e.target.value })} /></td>
+                      {segments.map((segment) => {
+                        const effect = (row.effects ?? []).find((x) => x.segmentCode === segment.code);
+                        const change = (patch: { sizeMultiplier?: number; purchasingPowerMultiplier?: number }) => {
+                          const rest = (row.effects ?? []).filter((x) => x.segmentCode !== segment.code);
+                          const next = {
+                            segmentCode: segment.code,
+                            sizeMultiplier: effect?.sizeMultiplier ?? 1,
+                            purchasingPowerMultiplier: effect?.purchasingPowerMultiplier ?? 1,
+                            ...patch,
+                          };
+                          edit({ effects: [...rest, next] });
+                        };
+                        return (
+                          <td key={segment.code} className="num">
+                            <input
+                              className="num"
+                              title={t("field.sizeMultiplier")}
+                              value={String(effect?.sizeMultiplier ?? 1)}
+                              disabled={locked}
+                              onChange={(e) => change({ sizeMultiplier: Number(e.target.value) })}
+                            />
+                            <input
+                              className="num"
+                              title={t("field.purchasingPowerMultiplier")}
+                              value={String(effect?.purchasingPowerMultiplier ?? 1)}
+                              disabled={locked}
+                              onChange={(e) => change({ purchasingPowerMultiplier: Number(e.target.value) })}
+                            />
+                          </td>
+                        );
+                      })}
                       <td>
                         <button type="button" className="ghost" disabled={locked || events.length <= 1}
                           title={t("editor.removeThisRow")}
@@ -491,6 +647,10 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                       costMultiplier: 1,
                       wageMultiplier: 1,
                       targetProduct: null,
+                      category: "OTHER",
+                      nameZh: "",
+                      descriptionZh: "",
+                      effects: [],
                     },
                   ])
                 }
@@ -517,6 +677,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th className="num">{t("field.unitsPerWorker")}</th>
                   <th className="num">{t("field.incomeElasticity")}</th>
                   <th className="num">{t("field.trendAffinity")}</th>
+                  <th>{t("field.targetSegment")}</th>
+                  <th className="num">{t("field.crossSegmentPct")}</th>
                   <th />
                 </tr>
               </thead>
@@ -532,6 +694,19 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={String(row.unitsPerWorker)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, unitsPerWorker: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.incomeElasticity)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, incomeElasticity: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.trendAffinity)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, trendAffinity: Number(e.target.value) } : r))} /></td>
+                    <td>
+                      <select
+                        value={row.targetSegment ?? ""}
+                        disabled={locked}
+                        onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, targetSegment: e.target.value || null } : r))}
+                      >
+                        <option value="">{t("editor.legacyPool")}</option>
+                        {segments.map((segment) => (
+                          <option key={segment.code} value={segment.code}>{segment.code}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td><input className="num" value={String(row.crossSegmentPct ?? 0)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, crossSegmentPct: Number(e.target.value) } : r))} /></td>
                                         <td>
                         <button type="button" className="ghost" disabled={locked || products.length <= 1}
                           title={t("editor.removeThisRow")}
@@ -545,7 +720,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               </tbody>
             </table>
             <div className="buttons">
-              <button type="button" disabled={locked} onClick={() => setProducts((c) => [...c, { code: "", name: "", basePrice: 1, baseUnitCost: 1, baseQuality: 50, baseDemand: 100, unitsPerWorker: 40, incomeElasticity: 1, trendAffinity: 0 }])}>
+              <button type="button" disabled={locked} onClick={() => setProducts((c) => [...c, { code: "", name: "", basePrice: 1, baseUnitCost: 1, baseQuality: 50, baseDemand: 100, unitsPerWorker: 40, incomeElasticity: 1, trendAffinity: 0, targetSegment: null, crossSegmentPct: 0 }])}>
                 {t("editor.addRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>

@@ -333,6 +333,23 @@ export interface TemplateRound {
   trendStrength: number;
   trendLabel: string;
   note: string;
+  /** D83: the brief market-environment narrative the workbench shows. */
+  description?: string | null;
+  descriptionZh?: string | null;
+}
+
+/** One class of potential customer (D81). */
+export interface TemplateSegment {
+  code: string;
+  name: string;
+  nameZh?: string | null;
+  description?: string | null;
+  descriptionZh?: string | null;
+  baseSize: number;
+  basePurchasingPower: number;
+  incomeElasticity: number;
+  trendAffinity: number;
+  sortOrder: number;
 }
 
 export interface TemplateDetail {
@@ -344,6 +361,7 @@ export interface TemplateDetail {
   editable: boolean;
   settings: Record<string, unknown>;
   environment: TemplateRound[];
+  segments: TemplateSegment[];
   products: TemplateProduct[];
   channels: TemplateChannel[];
   projects: TemplateProject[];
@@ -353,6 +371,10 @@ export interface TemplateDetail {
 export interface TemplateProduct {
   code: string;
   name: string;
+  /** D81: the customer class this product serves; null = legacy pool. */
+  targetSegment?: string | null;
+  /** D81: share of the other classes' market this product also competes for. */
+  crossSegmentPct?: number;
   basePrice: number;
   baseUnitCost: number;
   baseQuality: number;
@@ -390,6 +412,13 @@ export interface TemplateEvent {
   code: string;
   name: string;
   description: string;
+  /** D82: what kind of shock this is — the workbench prints it. */
+  category?: string;
+  /** D83: the Chinese label and text of the same card (the mechanic is stored once). */
+  nameZh?: string | null;
+  descriptionZh?: string | null;
+  /** D82: what the card does to each customer class. */
+  effects?: { segmentCode: string; sizeMultiplier: number; purchasingPowerMultiplier: number }[];
   earliestRound: number;
   latestRound: number;
   probability: number;
@@ -487,7 +516,26 @@ export interface DecisionFormContext {
     trendStrength: number;
     trendLabel: string;
     outlook: string;
-    events: unknown[];
+    events: {
+      code: string;
+      name: string;
+      description?: string | null;
+      category?: string | null;
+      startedRound?: number | null;
+    }[];
+    /** D81: the customer classes with the round's size index and purchasing power. */
+    segments: {
+      code: string;
+      name: string;
+      product?: string | null;
+      baseSize: number;
+      sizeIndex: number;
+      purchasingPower: number;
+      description?: string | null;
+    }[];
+    /** D83: the published narrative for this round. */
+    headline?: string | null;
+    description?: string | null;
   };
   marketReportCost: number;
   /** D15: whether this template sells quality upgrades, and at what price per point. */
@@ -707,6 +755,11 @@ export const api = {
     request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/environment`, {
       method: "PUT",
       body: JSON.stringify({ rounds }),
+    }),
+  saveTemplateSegments: (key: string, segments: TemplateSegment[]) =>
+    request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/segments`, {
+      method: "PUT",
+      body: JSON.stringify({ segments }),
     }),
   saveTemplateProducts: (key: string, products: TemplateProduct[]) =>
     request<TemplateDetail>(`/templates/${encodeURIComponent(key)}/products`, {

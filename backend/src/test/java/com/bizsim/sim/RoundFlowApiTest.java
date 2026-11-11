@@ -652,6 +652,10 @@ class RoundFlowApiTest extends PostgresTestBase {
      */
     @Test
     void a_finished_project_does_not_block_the_next_round() throws Exception {
+        // The R&D lifecycle, not the weather: a run can legitimately be drawn a cost shock that
+        // drains the bank over three months, so this test plays a calm economy (as its neighbour
+        // does). The deck's own behaviour is covered by EnvironmentTest.
+        jdbc.update("delete from run_environment_event where run_id = ?", runId);
         openRound();
         // RND-P1-COST costs 300M over 3 months: 100M a month completes it as round 3 is computed.
         for (int month = 1; month <= 3; month++) {
@@ -954,10 +958,18 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         assertThat((BigDecimal) one.get("capacity_cost")).isEqualByComparingTo("120000000");
         assertThat((BigDecimal) one.get("machine_workers")).isEqualByComparingTo("3");
-        // Cash only: the purchase changes the bank, never the profit line.
-        assertThat((BigDecimal) one.get("profit")).isEqualByComparingTo((BigDecimal) two.get("profit"));
+        // Cash only: the purchase changes the bank, never the profit line. The two companies are
+        // identical, so the only difference demand allocation may produce is one whole piece going
+        // to one of them on the largest-remainder tie-break (D34). Cash follows sales, so the bank
+        // difference is the 120M purchase less that one piece's *revenue* (not its margin).
+        BigDecimal revenueGap = ((BigDecimal) one.get("revenue"))
+                .subtract((BigDecimal) two.get("revenue"));
+        assertThat(((BigDecimal) one.get("profit")).subtract((BigDecimal) two.get("profit")).abs())
+                .as("machines cost cash, not profit")
+                .isLessThanOrEqualTo(new BigDecimal("1000000"));
         assertThat(((BigDecimal) two.get("cash_after")).subtract((BigDecimal) one.get("cash_after")))
-                .isEqualByComparingTo("120000000");
+                .as("the 120M purchase, less the revenue of one whole piece")
+                .isEqualByComparingTo(new BigDecimal("120000000").subtract(revenueGap));
         // Installed for next month, so this month plans with the staff it already had.
         assertThat((BigDecimal) one.get("capacity_available")).isEqualByComparingTo("30");
 
@@ -1038,7 +1050,8 @@ class RoundFlowApiTest extends PostgresTestBase {
 
     private Map<String, Object> statement(int round, long teamId) {
         return jdbc.queryForMap("""
-                select s.capacity_cost, s.capacity_available, s.profit, s.cash_after, t.machine_workers
+                select s.capacity_cost, s.capacity_available, s.profit, s.revenue, s.cash_after,
+                       t.machine_workers
                 from round_statement s
                 join team t on t.id = s.team_id
                 join round r on r.id = s.round_id

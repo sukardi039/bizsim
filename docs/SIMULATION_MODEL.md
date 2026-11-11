@@ -145,7 +145,13 @@ brand = brand × (1 − decay) + Σ_c α_c × sqrt(spend_c)      capped 0..100
 - `decay` ≈ 0.10/month, `α_c` per channel, both scenario data.
 - Marketing must be paid **every month** to hold brand — that is the intended lesson.
 
-### 5.4 Environment — the economy moves market size (D18)
+### 5.4 Environment — economic events move customer classes (D18, D81–D85)
+
+The market is made of **classes of potential customer**, not of products. Each class has a size
+(units it can afford in a reference round) and a purchasing power index; each product names the
+class it is made for and the share of the other classes' demand it also competes for. Economic
+events — an oil crisis, inflation, a technology slump — never touch a product directly: they move a
+class's size and/or purchasing power, and every product serving that class inherits the change.
 
 ```
 position p = ((r - 1) mod cycleLength) + 1        cycle k = (r - 1) / cycleLength
@@ -153,10 +159,13 @@ demand_index(r) = template[p].demand × (1 + cycleDemandDrift)^k
 cost_index(r)   = template[p].cost   × (1 + cycleCostDrift)^k
 wage_index(r)   = template[p].wage   × (1 + cycleCostDrift)^k
 
-market size for j = base_j × seasonality × companies/10
-                    × demand_index(r) ^ income_elasticity_j
-                    × (1 + trend_strength(r) × trend_affinity_j)
-                    × (demand multiplier of any event targeting j)
+class size (units)      = base_size × seasonality × companies/10
+                          × demand_index(r) ^ class.income_elasticity
+                          × (1 + trend_strength(r) × class.trend_affinity)
+                          × product of active events' size multipliers
+class purchasing power  = base_purchasing_power × product of active events' pp multipliers
+
+market of product j     = size_s × pp_s + cross_segment_pct_j × Σ_{k≠s} (size_k × pp_k)
 unit material cost = base cost × cost_index(r) × (event cost multipliers)
 payroll            = salary × headcount × wage_index(r) × (event wage multipliers)
 ```
@@ -165,17 +174,27 @@ payroll            = salary × headcount × wage_index(r) × (event wage multipl
   are neutral (1.0). A run chooses `cycles` at creation (default 2) and may pass an explicit `rounds`
   to stretch the session; the template is expanded into `run_round_economy` and frozen, so two runs
   may cover different numbers of cycles without touching the scenario.
-- `income_elasticity` and `trend_affinity` live on the product: 0.40 / 1.00 / 1.80 and
-  −0.50 / 0.00 / +0.50 in scenario #1. Elasticity is the economic cycle; affinity is the consumer
-  trend, so a "trading down" year moves demand from premium to basic without any per-product
-  forecast being produced.
-  A 10% fall in the demand index costs the premium line 18% of its market and the basic line 4%.
-  That is the "different customer groups react differently" requirement, in one number per product.
-- The event deck lives in `environment_event`. Each card has a window, a probability, a duration and
-  three multipliers (optionally targeted at one product). At run creation, `EnvironmentService`
-  draws each card with `Seed.uniform(runId:env:code)`; if it fires, the start round is drawn inside
-  the window and frozen in `run_environment_event`. Trainees cannot see the deck or the draw; the
-  debrief can, and a replay of the run produces the same schedule.
+- **`customer_segment`** holds the classes (mass / middle / affluent in scenario #1), including
+  `income_elasticity` and `trend_affinity`: these describe a customer, not a SKU, so a downturn and a
+  trend are the same mechanism acting on the same object. A 10% fall in the demand index costs the
+  affluent class 18% of its market and the mass class 4%.
+- **`product.target_segment`** names the class a product serves and **`product.cross_segment_pct`**
+  the share of the other classes' purchasable demand it also serves. A product with no target keeps
+  the pre-D81 pool (`base_demand × demand_index`) so old templates play exactly as before.
+- **`environment_event`** is the deck: a window, a probability, a duration, a `category` (supply
+  shock, financial crisis, inflation, technology, demand shock, policy) and a row per affected class
+  in **`environment_event_effect`** — `size_multiplier` and `purchasing_power_multiplier`. A missing
+  row means "this event does not move that class". The pre-D81 market-wide `demand_multiplier` and
+  `target_product` survive only for old templates; the shipped deck sets the multiplier to 1.000.
+- At run creation, `EnvironmentService` draws each card with `Seed.uniform(runId:env:code)`; if it
+  fires, the start round is drawn inside the window and **the card's numbers and class effects are
+  frozen into `run_environment_event`** (D84), so editing the template afterwards cannot reach back
+  into a class that has already played. Trainees cannot see the deck or the draw; the debrief can,
+  and a replay of the run produces the same schedule.
+- **Words belong to the mechanic.** `environment_text` stores a name and a short description per
+  object (class, event, cycle position) in `en` and `zh`; a run reads its class's language and the
+  workbench shows the round narrative followed by the descriptions of events that have started. The
+  mechanic is stored once — only the text is translated (D83).
 - **Paid market review.** `marketReport: true` in the monthly decision costs
   `marketReportCost`; `GET /teams/{id}/market-report` then returns current indices, the active events
   that have already started, and `forecastHorizon` rounds of forecast with ±`forecastBand` noise.
@@ -295,6 +314,12 @@ round_statement (round_id, team_id, revenue, cogs, payroll, marketing, rnd, fixe
 
 `cost_basis` records the inventory basis the row was computed under (D80), so a statement issued last
 term still says what it meant after the template it came from was edited.
+
+`V31__market_environment.sql` adds the customer side of the model (D81–D84): `customer_segment`,
+`environment_event_effect`, `environment_text`, `product.target_segment`, `product.cross_segment_pct`,
+`environment_event.category`, and the frozen per-run multipliers/effects on `run_environment_event`.
+It is all scenario data: the shipped `standard-v1` carries the default classes and six event cards, a
+template copies them with the rest of its catalogue, and a builder edits the copy.
 
 `round_result.score` keeps the headline numbers for the scoreboard; `round_statement` keeps the
 line-item detail the PDF needs. Splitting them means the scoreboard query stays cheap and the

@@ -74,7 +74,7 @@ This is where a simulation is designed. There is one shipped template,
 Everything below is edited **on your copy**. Press **Save** at the bottom of each tab. A banner
 confirms *"Saved. New simulations from this template use these values."*
 
-### 3.2 The six tabs
+### 3.2 The seven tabs
 
 **Settings** — the class-level numbers.
 
@@ -97,26 +97,41 @@ you set, and the level persists across rounds up to 100. A template written befo
 no switch and therefore behaves exactly as it did.
 
 **Environment** — the round-by-round timeline. One row per round: *demand index*, *cost index*,
-*wage index* (1.00 = normal), *trend strength*, *trend label* (free text, shown to trainees), *note*.
+*wage index* (1.00 = normal), *trend strength*, *trend label* (free text, shown to trainees), *note*,
+and the **description** (English and Chinese) that the workbench prints as the round's narrative.
 Use **Add a row** / **Remove the last row** to change the length, then **Save** (saved whole).
+
+**Customer classes** — the three groups of potential customer (D81). Each row is a class: code, name
+(English and Chinese), description (English and Chinese), *customers* (base units per round, sized
+for ten companies), *purchasing power* (1.000 = the class affords that base), *income elasticity*
+(how hard a downturn hits the class) and *trend affinity* (how much a consumer trend moves it). An
+economic event never touches a product directly: it moves a class's customers and purchasing power,
+and every product serving that class inherits the change. A class that a product points at cannot be
+removed, and a template with sessions on it refuses edits — copy the template instead.
 
 **Events** — the event deck: surprises drawn once per run.
 
 | Column | Meaning |
 |---|---|
-| Code | unique short id, e.g. `EV-FUEL-SPIKE` |
-| Name / Description | what the class sees |
+| Code | unique short id, e.g. `EV-OIL-CRISIS` |
+| Name / Description | what the class sees (English) |
+| Name (Chinese) / Description (Chinese) | the same words in Chinese, shown when the class runs in Chinese |
+| Kind of shock | supply shock, financial crisis, inflation, technology, demand shock, policy, other — printed in the workbench |
 | From round / To round | the window in which it can be drawn |
 | Chance | probability 0.00–1.00 inside that window |
 | Months | how long the effect lasts (1–12) |
-| Demand ×, Cost ×, Wage × | multipliers while it is active (1.00 = no change) |
-| Target | one product code, or *all products* |
+| Demand ×, Cost ×, Wage × | market-wide legacy multipliers (1.00 = no change); leave at 1.00 and use the class columns |
+| Target | one product code, or *all products* — legacy only |
+| per class | two numbers: **customers multiplier** and **purchasing power multiplier** for that class |
 
 Leave the deck empty for a calm economy. **Save** replaces the whole deck. The server refuses
-duplicate codes, a probability outside 0–1, `From` > `To`, and non-positive multipliers.
+duplicate codes, a probability outside 0–1, `From` > `To`, non-positive multipliers, a class named
+twice in one card, and an effect on a class the template does not have.
 
 **Products** — one row per product: code, name, price, unit cost, quality, base demand, units per
-worker, income elasticity (how much a downturn hits this line), trend affinity.
+worker, income elasticity, trend affinity, **customer class** (which class the product is made for;
+blank = the legacy demand pool) and **cross-segment %** (the share of the other classes' demand the
+product also competes for).
 
 **Channels** — code, name, reach weight, brand effect (how much brand helps in that channel).
 
@@ -433,6 +448,15 @@ package's class list and publishes a new package; the facilitator cannot seat yo
 The **round clock** is on your screen while a round is open: *12:34 left in this round*, turning red
 under a minute, and *Paused at 12:34* while your facilitator has stopped time. It counts down on its
 own — you do not need to reload.
+
+**Market environment.** Above the decision form is a card that explains the economy you are selling
+into: a sentence on what this round is doing, then one row per **class of potential customer** —
+which product serves it, how many customers there are now, and their purchasing power (×1.00 is
+normal). Under it, the economic events that have already started are listed with their kind — an oil
+crisis, inflation, a technology slump — and one sentence each. Economic events move the *classes*,
+not your products directly, so a premium line suffers in a recession because its customers are the
+ones postponing purchases, and the card is where you can see that happening. The words are in the
+language your class runs in (English or Chinese).
 
 | What it means | Who fixes it |
 |---|---|

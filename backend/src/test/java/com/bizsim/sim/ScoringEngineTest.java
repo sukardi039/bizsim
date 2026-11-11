@@ -195,7 +195,7 @@ class ScoringEngineTest {
     void the_environment_scales_the_market_and_the_input_costs() {
         // Half the demand, double the material cost: the two knobs must reach different places.
         EnvironmentService.RoundEnvironment harsh = new EnvironmentService.RoundEnvironment(1,
-                bd("0.5"), bd("2.0"), ONE, ZERO, null, Map.of("P", bd("0.5")), List.of());
+                bd("0.5"), bd("2.0"), ONE, ZERO, null, Map.of(), Map.of("P", bd("0.5")), List.of());
 
         ScoringEngine.TeamOutcome outcome = engine.compute(scenario(), harsh,
                 List.of(team(decision(bd("100"), ZERO), bd("1000000"), "ACTIVE", active("PRJ"), ZERO)))
@@ -235,6 +235,24 @@ class ScoringEngineTest {
                 .multiply(BigDecimal.ONE.subtract(BigDecimal.valueOf(baseline)))
                 .setScale(0, java.math.RoundingMode.HALF_UP);
         assertThat(total).isEqualByComparingTo(served);
+    }
+
+    @Test
+    void a_products_market_is_its_class_plus_the_stated_share_of_the_others() {
+        // D85: each product competes for its own class's purchasable demand, plus a stated slice of
+        // the other classes'. Mass: 1,000 buyers at 0.5 x 0.8 = 400 pieces. Affluent: 200 at 1.0.
+        Scenario scenario = segmentScenario();
+        EnvironmentService.RoundEnvironment environment = new EnvironmentService.RoundEnvironment(1,
+                ONE, ONE, ONE, ZERO, "Stable",
+                Map.of("SEG-BASIC", new EnvironmentService.SegmentState("SEG-BASIC", "Mass",
+                                bd("0.500000"), bd("0.800000")),
+                        "SEG-PREMIUM", new EnvironmentService.SegmentState("SEG-PREMIUM", "Affluent",
+                                ONE, ONE)),
+                Map.of(), List.of());
+
+        // Mass product: 1,000 x 0.5 x 0.8 = 400. Affluent product: 200 x 1.0, plus 10% of the mass
+        // class's 400 = 240.
+        assertThat(engine.marketPool(scenario, environment, 10)).isEqualByComparingTo("640");
     }
 
     // ------------------------------------------------------------------ fixtures
@@ -305,9 +323,28 @@ class ScoringEngineTest {
                         bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01"),
                         false, ZERO, false, 0, false),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
-                        bd("10000"), bd("10"), ONE, ZERO)),
+                        bd("10000"), bd("10"), ONE, ZERO, null, ZERO)),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
-                List.of(project), List.of(), List.of());
+                List.of(project), List.of(), List.of(), List.of());
+    }
+
+    /**
+     * Two products, one per class. Params are the single-product fixture's: only the classes and the
+     * products matter to the market formula.
+     */
+    private static Scenario segmentScenario() {
+        Scenario base = scenario();
+        return new Scenario(base.key(), base.params(),
+                List.of(new Scenario.ProductSpec("PA", "Mass", bd("100"), bd("40"), bd("50"),
+                                bd("1000"), bd("10"), ONE, ZERO, "SEG-BASIC", ZERO),
+                        new Scenario.ProductSpec("PB", "Affluent", bd("100"), bd("40"), bd("50"),
+                                bd("200"), bd("10"), ONE, ZERO, "SEG-PREMIUM", bd("0.10"))),
+                base.channels(), base.projects(), base.rounds(),
+                List.of(new Scenario.SegmentSpec("SEG-BASIC", "Mass", null, null, null,
+                                bd("1000"), ONE, ONE, ZERO, 1),
+                        new Scenario.SegmentSpec("SEG-PREMIUM", "Affluent", null, null, null,
+                                bd("200"), ONE, ONE, ZERO, 2)),
+                base.events());
     }
 
     private static Scenario scenarioWithQuality() {
@@ -322,7 +359,7 @@ class ScoringEngineTest {
                 p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
                 true, bd("60000000"), false, 0, false);
         return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
-                base.rounds(), base.events());
+                base.rounds(), base.segments(), base.events());
     }
 
     private static DecisionPayload qualityDecision(BigDecimal invest) {
@@ -392,7 +429,7 @@ class ScoringEngineTest {
                 p.forecastBand(), p.cycles(), p.cycleLength(), p.cycleDemandDrift(), p.cycleCostDrift(),
                 p.qualityUpgrade(), p.qualityCostPerPoint(), p.autoWorkers(), p.guidedRounds(), weighted);
         return new Scenario(base.key(), q, base.products(), base.channels(), base.projects(),
-                base.rounds(), base.events());
+                base.rounds(), base.segments(), base.events());
     }
 
     /** 100 units on the shelf that cost 30 each; today's unit cost is 40. */
