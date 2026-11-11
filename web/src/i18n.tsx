@@ -92,7 +92,7 @@ const en: Dict = {
     "You are not an admin: you can add trainees, but staff accounts (facilitator, builder, admin) and role changes are an administrator's job.",
 
   "login.title": "bizsim",
-  "login.subtitle": "Facilitator console",
+  "login.subtitle": "Business simulation platform",
   "login.tenant": "Tenant",
   "login.email": "Email",
   "login.password": "Password",
@@ -662,7 +662,7 @@ const zh: Dict = {
   "people.adminOnly": "您不是管理员：可以添加学员，但员工账号（教师、构建者、管理员）与角色变更需由管理员操作。",
 
   "login.title": "bizsim",
-  "login.subtitle": "教师控制台",
+  "login.subtitle": "商业模拟平台",
   "login.tenant": "机构代码",
   "login.email": "邮箱",
   "login.password": "密码",
