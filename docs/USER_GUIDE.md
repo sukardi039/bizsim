@@ -365,8 +365,10 @@ Under the scoreboard, for any computed round:
    - **Revenue** — revenue for the round, and units lost to stock-outs
    - **Cost** — cost of goods sold, payroll, marketing, R&D, fixed cost, stock holding,
      hiring/firing, capacity, market review, then **Total cost**
-   - **Result** — opening cash (the balance the round started from), profit, any stock and capacity
-     movement, then cash after the round, brand after the round, capacity used, market share
+   - **Result** — opening cash (the balance the round started from), profit, any **stock and capacity
+     movement** (cash tied up in stock built this month and in machines bought — neither is a cost, so
+     neither touches profit), then cash after the round, brand after the round, capacity used, market
+     share
 
    **Opening cash + profit + stock/capacity movement = cash after the round**, and each round opens
    exactly where the previous one closed — that is the continuity line. The same breakdown is shown

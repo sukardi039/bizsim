@@ -95,7 +95,11 @@ function draftFrom(context: DecisionFormContext): Draft {
     rnd,
     quality,
     manpower: saved?.manpower?.production ?? context.staff.PRODUCTION ?? 0,
-    capacity: saved?.capacityPurchase ?? 0,
+    // The API speaks money (D77): the stored figure is what the machines cost, the field shows how
+    // many. Converting here keeps the form in machines and the contract in currency.
+    capacity: saved?.capacityPurchase
+      ? Number(saved.capacityPurchase) / Math.max(1, context.machineCostPerWorker)
+      : 0,
     marketReport: saved?.marketReport ?? false,
   };
 }
@@ -117,7 +121,9 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
     quality: context.qualityUpgrade
       ? context.products.map((p) => ({ product: p.code, invest: draft.quality[p.code] ?? 0 }))
       : [],
-    capacityPurchase: draft.capacity,
+    // D77: `capacityPurchase` is money, not a count — the engine divides by the machine cost to get
+    // the workers of capacity added, so sending the count bought nothing and charged single units.
+    capacityPurchase: draft.capacity * context.machineCostPerWorker,
     marketReport: draft.marketReport,
   };
 }

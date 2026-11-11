@@ -930,6 +930,62 @@ class RoundFlowApiTest extends PostgresTestBase {
                 """, cash, profit, teamId, runId);
     }
 
+    /**
+     * D77: buying machines costs money and buys one worker of capacity each, and it is cash rather
+     * than a cost — which is exactly why it shows up in the statement as 库存与产能变动. Sent as a
+     * *count* (what the console used to send) it bought nothing and charged single currency units;
+     * this is the test that was missing. Machines are installed for the **next** month: the engine
+     * plans with the ones the company already owns, so a purchase today cannot fix today's capacity.
+     */
+    @Test
+    void buying_machines_charges_its_cost_and_adds_capacity_but_never_touches_profit() throws Exception {
+        openRound();
+        Map<String, Object> withMachines = new java.util.LinkedHashMap<>(payload(600, 150, 30, 0L, 30, 0));
+        withMachines.put("capacityPurchase", 3L * 40_000_000L);
+        submit(playerOneToken, teamOne, withMachines).andExpect(status().isOk());
+        submit(playerTwoToken, teamTwo, payload(600, 150, 30, 0L, 30, 0)).andExpect(status().isOk());
+
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+
+        Map<String, Object> one = statement(1, teamOne);
+        Map<String, Object> two = statement(1, teamTwo);
+
+        assertThat((BigDecimal) one.get("capacity_cost")).isEqualByComparingTo("120000000");
+        assertThat((BigDecimal) one.get("machine_workers")).isEqualByComparingTo("3");
+        // Cash only: the purchase changes the bank, never the profit line.
+        assertThat((BigDecimal) one.get("profit")).isEqualByComparingTo((BigDecimal) two.get("profit"));
+        assertThat(((BigDecimal) two.get("cash_after")).subtract((BigDecimal) one.get("cash_after")))
+                .isEqualByComparingTo("120000000");
+        // Installed for next month, so this month plans with the staff it already had.
+        assertThat((BigDecimal) one.get("capacity_available")).isEqualByComparingTo("30");
+
+        // ...and next month the machines are on the floor.
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+        submit(playerOneToken, teamOne, payload(0, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        submit(playerTwoToken, teamTwo, payload(0, 0, 0, 0L, 30, 0)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                        .header("Authorization", "Bearer " + facilitatorToken))
+                .andExpect(status().isOk());
+
+        assertThat((BigDecimal) statement(2, teamOne).get("capacity_available"))
+                .as("30 production staff + 3 machines installed last month").isEqualByComparingTo("33");
+        assertThat((BigDecimal) statement(2, teamTwo).get("capacity_available")).isEqualByComparingTo("30");
+    }
+
+    private Map<String, Object> statement(int round, long teamId) {
+        return jdbc.queryForMap("""
+                select s.capacity_cost, s.capacity_available, s.profit, s.cash_after, t.machine_workers
+                from round_statement s
+                join team t on t.id = s.team_id
+                join round r on r.id = s.round_id
+                where r.run_id = ? and r.number = ? and s.team_id = ?
+                """, runId, round, teamId);
+    }
+
     /** What the console does between rounds: compute the open one, then open the next (D57). */
     private void advance() throws Exception {
         mvc.perform(post("/api/runs/" + runId + "/rounds/close")

@@ -165,6 +165,10 @@ public class DebriefExportService {
             throw ProblemException.notFound("run.not_found", "no such run");
         }
         String scenarioKey = (String) meta.get(0).get("scenarioKey");
+        // D77: `capacityPurchase` is money; the sheet shows machines, so it divides by this.
+        BigDecimal machineCost = jdbc.queryForObject(
+                "select (definition->>'machineCostPerWorker')::numeric from scenario where key = ?",
+                BigDecimal.class, scenarioKey);
 
         List<ProductColumn> products = jdbc.query(
                 "select code, name from product where scenario_key = ? order by code",
@@ -237,7 +241,7 @@ public class DebriefExportService {
         for (Map<String, Object> raw : rows) {
             int round = (Integer) raw.get("round");
             computedAt.putIfAbsent(round, (Instant) raw.get("computedAt"));
-            byRound.computeIfAbsent(round, key -> new ArrayList<>()).add(toRow(raw, products));
+            byRound.computeIfAbsent(round, key -> new ArrayList<>()).add(toRow(raw, products, machineCost));
         }
 
         List<RoundReport> rounds = new ArrayList<>();
@@ -252,7 +256,7 @@ public class DebriefExportService {
         return new Report(runId, title, scenarioKey, teamFilter == null, products, rounds);
     }
 
-    private Row toRow(Map<String, Object> raw, List<ProductColumn> products) {
+    private Row toRow(Map<String, Object> raw, List<ProductColumn> products, BigDecimal machineCost) {
         DecisionPayload decision = parse((String) raw.get("payload"));
         Map<String, BigDecimal> units = new LinkedHashMap<>();
         Map<String, BigDecimal> prices = new LinkedHashMap<>();
@@ -269,6 +273,10 @@ public class DebriefExportService {
         BigDecimal quality = decision == null ? BigDecimal.ZERO : decision.qualityTotal();
         int staff = decision == null ? 0 : decision.productionTarget().orElse(0);
         BigDecimal machines = decision == null ? BigDecimal.ZERO : decision.capacityPurchaseOrZero();
+        // D77: the stored figure is money — a column headed "machines" must show a count.
+        if (machineCost != null && machineCost.signum() > 0) {
+            machines = machines.divide(machineCost, 0, java.math.RoundingMode.HALF_UP);
+        }
         boolean review = decision != null && decision.marketReportRequested();
 
         @SuppressWarnings("unchecked")
