@@ -236,6 +236,25 @@ tenant starts with the shipped `standard-v1` template and the global company pro
 nothing else.
 
 
+## Deferred (not ruled) — 11 Nov 2026: development report calibration and archive
+
+The report shipped (D76) and the product owner called it sufficient for now. Two things were left
+open deliberately, not forgotten.
+
+**1. The band thresholds are judgement calls.** They live as constants in `EvaluationReportService`
+and are recorded in D76: 5% profit margin for "strong", 3 / 2 months of running costs in cash, 5×
+revenue per unit of marketing, 80% / 60% capacity utilisation, 40% / 20% gross margin, share movement
+above zero for "strong". They are defensible, but they are the author's view of a well-run term, not
+the trainer's. Changing them is a one-line edit and no migration; what is needed is a statement of
+what a strong term looks like in this course.
+
+**2. Nothing is archived.** The report is generated on demand from `round_statement`, so it always
+agrees with the console and needs no schema. The consequence is that there is no frozen copy: after a
+reset (D58), or if the session is recomputed, the same company's report will read differently — and a
+trainee who was given a PDF cannot be shown the data it came from. Preserving a copy per trainee at
+the end of term needs a stored document (a table plus the rendered bytes) and a rule for when it is
+taken; that is a separate decision.
+
 ## Sign-off
 
 ```
