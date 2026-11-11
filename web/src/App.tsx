@@ -88,9 +88,12 @@ function useRunStream(runId: number | null, onEvent: (type: string, data: any) =
 
 function Login({ onDone }: { onDone: () => void }) {
   const { t } = useI18n();
-  const [tenantCode, setTenant] = useState("demo");
-  const [email, setEmail] = useState("trainer@demo.test");
-  const [secret, setSecret] = useState("demo1234");
+  // No pre-filled credentials: a demo tenant is a development convenience, and on a real deployment
+  // a form that arrives filled in with "demo / trainer@demo.test" reads as if it were the product's
+  // account. The fields start empty; the browser may still remember them (autocomplete below).
+  const [tenantCode, setTenant] = useState("");
+  const [email, setEmail] = useState("");
+  const [secret, setSecret] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
