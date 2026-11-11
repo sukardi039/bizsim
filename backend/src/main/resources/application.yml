@@ -38,7 +38,7 @@ spring:
 bizsim:
   # Reported by GET /api/version. The migration history is the real deploy fingerprint; this string
   # is for humans and should be bumped when a release is cut.
-  version: 0.10.0
+  version: 0.10.1
   db:
     # Create the empty database on first start if it is missing. The schema itself is always
     # Flyway's job (classpath:db/migration). Set false where the app role has no CREATEDB right.

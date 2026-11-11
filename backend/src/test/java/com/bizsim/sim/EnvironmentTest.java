@@ -128,6 +128,52 @@ class EnvironmentTest extends PostgresTestBase {
                 .isEqualByComparingTo("0.938");
     }
 
+    @Test
+    void the_deck_carries_the_stock_market_and_seasonal_cards() {
+        Scenario scenario = scenarios.load("standard-v1");
+
+        assertThat(scenario.events()).extracting(Scenario.EventSpec::code)
+                .contains("EV-BULL-RUN", "EV-MARKET-CRASH", "EV-HOLIDAY-SEASON");
+
+        Scenario.EventSpec bull = event(scenario, "EV-BULL-RUN");
+        Scenario.EventSpec crash = event(scenario, "EV-MARKET-CRASH");
+        Scenario.EventSpec holiday = event(scenario, "EV-HOLIDAY-SEASON");
+
+        // The kind of shock is what the workbench prints, and it is worth its own category.
+        assertThat(bull.category()).isEqualTo("MARKETS");
+        assertThat(crash.category()).isEqualTo("MARKETS");
+        assertThat(holiday.category()).isEqualTo("DEMAND_SHOCK");
+
+        // Both languages, beside the mechanic (D83).
+        assertThat(bull.nameZh()).isEqualTo("股市牛市");
+        assertThat(crash.nameZh()).isEqualTo("股市崩盘");
+        assertThat(holiday.nameZh()).isEqualTo("节庆旺季");
+        assertThat(crash.descriptionZh()).contains("股价大幅下跌");
+        assertThat(holiday.descriptionZh()).contains("节庆旺季带动各阶层零售需求");
+
+        // Every card moves all three classes, and a crash lands hardest on the affluent one.
+        assertThat(bull.effects()).hasSize(3);
+        assertThat(crash.effects()).hasSize(3);
+        assertThat(holiday.effects()).hasSize(3);
+        assertThat(effect(crash, "SEG-PREMIUM").sizeMultiplier())
+                .isLessThan(effect(crash, "SEG-BASIC").sizeMultiplier());
+        assertThat(effect(bull, "SEG-PREMIUM").sizeMultiplier())
+                .isGreaterThan(effect(bull, "SEG-BASIC").sizeMultiplier());
+        // A holiday season is broad demand, strongest at the mass end.
+        assertThat(effect(holiday, "SEG-BASIC").sizeMultiplier())
+                .isGreaterThan(effect(holiday, "SEG-PREMIUM").sizeMultiplier());
+    }
+
+    private static Scenario.EventSpec event(Scenario scenario, String code) {
+        return scenario.events().stream().filter(spec -> spec.code().equals(code))
+                .findFirst().orElseThrow();
+    }
+
+    private static Scenario.EventEffect effect(Scenario.EventSpec event, String segment) {
+        return event.effects().stream().filter(e -> e.segmentCode().equals(segment))
+                .findFirst().orElseThrow();
+    }
+
     // ---------------------------------------------------------------- D81-D85: the class is the unit
 
     @Test

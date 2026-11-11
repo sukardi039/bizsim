@@ -577,7 +577,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                           onChange={(e) => edit({ category: e.target.value })}
                         >
                           {["SUPPLY_SHOCK", "FINANCIAL_CRISIS", "INFLATION", "TECHNOLOGY",
-                            "DEMAND_SHOCK", "POLICY", "OTHER"].map((category) => (
+                            "DEMAND_SHOCK", "POLICY", "MARKETS", "OTHER"].map((category) => (
                             <option key={category} value={category}>{t(`category.${category}`)}</option>
                           ))}
                         </select>

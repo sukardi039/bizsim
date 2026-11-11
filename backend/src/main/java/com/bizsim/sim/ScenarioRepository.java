@@ -289,7 +289,7 @@ public class ScenarioRepository {
     }
 
     public static final List<String> EVENT_CATEGORIES = List.of("SUPPLY_SHOCK", "FINANCIAL_CRISIS",
-            "INFLATION", "TECHNOLOGY", "DEMAND_SHOCK", "POLICY", "OTHER");
+            "INFLATION", "TECHNOLOGY", "DEMAND_SHOCK", "POLICY", "MARKETS", "OTHER");
 
     /** Upserts one language's words for one object. A blank value deletes the row rather than storing "". */
     private void saveWords(String key, String refType, String refCode, String name, String description) {

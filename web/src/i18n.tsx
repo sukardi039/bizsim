@@ -422,6 +422,7 @@ const en: Dict = {
   "category.TECHNOLOGY": "Technology",
   "category.DEMAND_SHOCK": "Demand shock",
   "category.POLICY": "Policy",
+  "category.MARKETS": "Markets",
   "category.OTHER": "Other",
 
   "editor.events": "Events",
@@ -1018,6 +1019,7 @@ const zh: Dict = {
   "category.TECHNOLOGY": "技术",
   "category.DEMAND_SHOCK": "需求冲击",
   "category.POLICY": "政策",
+  "category.MARKETS": "资本市场",
   "category.OTHER": "其他",
 
   "editor.events": "事件",

@@ -116,7 +116,7 @@ removed, and a template with sessions on it refuses edits — copy the template 
 | Code | unique short id, e.g. `EV-OIL-CRISIS` |
 | Name / Description | what the class sees (English) |
 | Name (Chinese) / Description (Chinese) | the same words in Chinese, shown when the class runs in Chinese |
-| Kind of shock | supply shock, financial crisis, inflation, technology, demand shock, policy, other — printed in the workbench |
+| Kind of shock | supply shock, financial crisis, inflation, technology, demand shock, policy, **markets**, other — printed in the workbench |
 | From round / To round | the window in which it can be drawn |
 | Chance | probability 0.00–1.00 inside that window |
 | Months | how long the effect lasts (1–12) |

@@ -318,7 +318,7 @@ term still says what it meant after the template it came from was edited.
 `V31__market_environment.sql` adds the customer side of the model (D81–D84): `customer_segment`,
 `environment_event_effect`, `environment_text`, `product.target_segment`, `product.cross_segment_pct`,
 `environment_event.category`, and the frozen per-run multipliers/effects on `run_environment_event`.
-It is all scenario data: the shipped `standard-v1` carries the default classes and six event cards, a
+It is all scenario data: the shipped `standard-v1` carries the default classes and nine event cards, a
 template copies them with the rest of its catalogue, and a builder edits the copy.
 
 `round_result.score` keeps the headline numbers for the scoreboard; `round_statement` keeps the
