@@ -192,6 +192,50 @@ Raised while explaining how share is allocated; the product owner asked to revis
 
 Reference: `docs/SIMULATION_MODEL.md` §5, `ScoringEngine.allocateDemand()`, `ScenarioCalibrationTest`.
 
+## Deferred (not ruled) — 11 Nov 2026: tenant provisioning (a frontend for creating tenants)
+
+Raised while explaining what a tenant is. The product owner asked to keep the offer and do it later,
+so this is **open, not decided** — nothing changes until it is ruled.
+
+**What exists today.** Multi-tenancy is real at the data layer (every table carries `tenant_id`, the
+token carries `tenantId`, cross-tenant ids answer 404, and the tests run `acme` + `other` in one
+database), but a tenant can only be *created* at boot, one per edit of an environment variable:
+`BIZSIM_BOOTSTRAP_TENANT` (tenant + first ADMIN) or `BIZSIM_INIT_TENANT` (tenant + a played class,
+D72). `POST /api/admin/init-data` runs for the caller's own tenant and cannot create one. So many
+tenants per deployment is possible; provisioning them is an operator ritual.
+
+**Decision A — the provisioning shape.** One of:
+
+- **A1 (proposal):** a **platform endpoint** `POST /api/platform/tenants`, guarded by a credential
+  that is *not* a tenant account (a super-admin secret in the environment, or a separate operator
+  token). A tenant `ADMIN` must never be able to mint tenants — that is the boundary the two-party
+  model rests on (D24), and the endpoint's first test is `403` for every tenant role.
+- **A2:** a CLI flag on boot (`--create-tenant <code> --admin <email>`), operator-only, no HTTP
+  surface.
+- **A3:** keep the environment ritual, documented in `DEPLOYMENT.md` as the supported way.
+
+A frontend for A1 needs two screens and a rule: list tenants (code, name, locale, created, counts of
+accounts/packages/runs), create one (code, name, language, first admin email + initial credential),
+and — undecided — suspend/rename, which change data another tenant depends on.
+
+**Decision B — the isolation promise.** Shared database and process (`tenant_id` scoping) is cheap and
+is what runs today: one backup, one upgrade, one restart for everyone, and one noisy class affects
+another. The alternatives are database-per-tenant or deployment-per-tenant, which are operations
+models rather than schema changes — the same application runs either way. Whatever is chosen has to
+be written in `DEPLOYMENT.md`, because "where is my data and can I get it back on its own" is the
+first question a customer asks.
+
+**Also undecided:** `tenant.code` is a single global namespace, so codes need a naming rule for
+customers (a slug), and the login form will accept any code — a plan is needed for what a prospective
+customer receives (code + admin account + link), since there is no self-service sign-up.
+
+**Verification the work must carry, whichever shape is ruled:** a tenant admin gets `403` on
+provisioning; two tenants created through the new path cannot see each other's packages, templates,
+company profiles or trainees; the created admin can sign in and reach the workbench; and the second
+tenant starts with the shipped `standard-v1` template and the global company profile, read-only, and
+nothing else.
+
+
 ## Sign-off
 
 ```
