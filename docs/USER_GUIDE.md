@@ -479,7 +479,9 @@ own — you do not need to reload.
    refusal, not an empty file.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
-zero"* or *"Not enough cash: the plan needs X, you have Y."*
+zero"* or *"Not enough cash: the plan needs X, you have Y."* A price is the one number the system has
+to bound for you: it must be at most a hundred times the catalogue price, because a price beyond that
+cannot be stored. Nothing realistic comes close — demand collapses long before it.
 
 **Why a loss can end with more cash (D79).** Stock is charged at the price the company actually paid
 for it, so cash and profit only differ for three reasons: stock still on the shelf, machines bought,

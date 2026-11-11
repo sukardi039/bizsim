@@ -453,13 +453,13 @@ public class RoundRepository {
         }
     }
 
-    public void insertStatement(long roundId, ScoringEngine.TeamOutcome outcome) {
+    public void insertStatement(long roundId, ScoringEngine.TeamOutcome outcome, boolean weightedCosting) {
         jdbc.update("""
                 insert into round_statement (round_id, team_id, revenue, cogs, payroll, marketing,
                     rnd_spend, fixed_cost, holding_cost, hiring_cost, capacity_cost, report_cost,
                     quality_cost, opening_cash, profit, cash_after, brand_after, lost_sales,
-                    capacity_used, capacity_available, detail)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                    capacity_used, capacity_available, detail, cost_basis)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?)
                 on conflict (round_id, team_id) do nothing
                 """, roundId, outcome.teamId(), outcome.revenue(), outcome.cogs(), outcome.payroll(),
                 outcome.marketing(), outcome.rndSpend(), outcome.fixedCost(), outcome.holdingCost(),
@@ -467,7 +467,7 @@ public class RoundRepository {
                 outcome.qualitySpend(),
                 outcome.openingCash(), outcome.profit(), outcome.cash(), outcome.brand(),
                 outcome.lostSales(), outcome.capacityUsed(), outcome.capacityAvailable(),
-                detailJson(outcome));
+                detailJson(outcome), weightedCosting ? "WEIGHTED" : "REPLACEMENT");
     }
 
     public void insertResult(long roundId, long teamId, Map<String, Object> score, BigDecimal totalScore) {

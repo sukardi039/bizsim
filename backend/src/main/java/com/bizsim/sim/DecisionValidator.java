@@ -75,6 +75,14 @@ public class DecisionValidator {
                     problems.add(ApiProblem.of("price.not_positive",
                             "price." + row.product() + ": price must be > 0",
                             "product", nullToDash(row.product())));
+                } else if (row.unitPrice().compareTo(ceiling(scenario, row.product())) > 0) {
+                    // A price is the one submitted number cash does not bound. Without a ceiling it
+                    // was stored (jsonb takes anything) and only failed later, when the round was
+                    // computed and numeric(14,2) overflowed — leaving the round OPEN and uncomputable.
+                    problems.add(ApiProblem.of("price.too_high",
+                            "price." + row.product() + ": price must be at most "
+                                    + ceiling(scenario, row.product()).toPlainString(),
+                            "product", nullToDash(row.product())));
                 }
             }
             for (String code : productCodes) {
@@ -181,5 +189,16 @@ public class DecisionValidator {
 
     private static String nullToDash(String value) {
         return value == null || value.isBlank() ? "—" : value;
+    }
+
+    /**
+     * The highest price a product may carry: a hundred times its catalogue price. Generous for any
+     * elasticity experiment (demand collapses long before that) and well inside numeric(14,2), so a
+     * submitted decision can always be computed.
+     */
+    private static java.math.BigDecimal ceiling(Scenario scenario, String code) {
+        Scenario.ProductSpec spec = scenario.productsByCode().get(code);
+        return spec == null ? java.math.BigDecimal.ZERO
+                : spec.basePrice().multiply(new java.math.BigDecimal("100"));
     }
 }

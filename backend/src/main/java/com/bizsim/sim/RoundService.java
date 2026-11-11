@@ -162,7 +162,7 @@ public class RoundService {
                     .add(outcome.lostSales());
 
             rounds.applyOutcome(round.id(), outcome, cumulativeRevenue, cumulativeProfit, lostSalesTotal);
-            rounds.insertStatement(round.id(), outcome);
+            rounds.insertStatement(round.id(), outcome, scenario.params().weightedCosting());
             rounds.insertResult(round.id(), outcome.teamId(),
                     score(scenario, outcome, cumulativeProfit, pool), cumulativeProfit);
         }

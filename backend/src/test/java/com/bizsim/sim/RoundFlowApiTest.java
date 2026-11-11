@@ -1103,7 +1103,19 @@ class RoundFlowApiTest extends PostgresTestBase {
                 // the English text still travels, as a fallback for logs and older clients
                 .andExpect(jsonPath("$.details[0]").isString());
 
-        // Money: the shortfall lines are codes too, so each can be labelled in the reader's language.
+        // A price is the only submitted number cash does not bound, so it has a ceiling: without one
+        // an absurd price was stored happily and only blew up when the round was computed, leaving it
+        // OPEN and uncomputable (found by the accounting audit, D80).
+        Map<String, Object> absurd = new java.util.LinkedHashMap<>(payload(10, 0, 0, 0L, 30, 0));
+        absurd.put("price", List.of(
+                Map.of("product", "P1", "unitPrice", 100_000_001),   // 100x base, plus one
+                Map.of("product", "P2", "unitPrice", 2_500_000),
+                Map.of("product", "P3", "unitPrice", 5_000_000)));
+        submit(playerOneToken, teamOne, absurd)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.problems[0].code").value("price.too_high"));
+
+        // money: the shortfall lines are codes too, so each can be labelled in the reader's language.
         submit(playerOneToken, teamOne, payload(600, 150, 30, 5_000_000_000L, 30, 0))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("decision.cash_shortfall"))

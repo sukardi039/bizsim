@@ -290,8 +290,11 @@ alter table decision add constraint decision_round_team_key unique (round_id, te
 
 -- monthly statement, for the debrief and the audit trail
 round_statement (round_id, team_id, revenue, cogs, payroll, marketing, rnd, fixed, holding,
-                 profit, cash_after, brand_after, jsonb per-product detail)
+                 profit, cash_after, brand_after, cost_basis, jsonb per-product detail)
 ```
+
+`cost_basis` records the inventory basis the row was computed under (D80), so a statement issued last
+term still says what it meant after the template it came from was edited.
 
 `round_result.score` keeps the headline numbers for the scoreboard; `round_statement` keeps the
 line-item detail the PDF needs. Splitting them means the scoreboard query stays cheap and the

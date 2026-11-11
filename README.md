@@ -136,6 +136,22 @@ Tests run against a real PostgreSQL started in-process (Zonky embedded), so `jso
 columns and the Flyway migrations are exercised as they will run in production. No Docker and no
 root are required.
 
+## Audit the computations
+
+The engine has a second, independent implementation to agree with: `scripts/audit_financials.py`
+re-derives every figure of every played round from the decisions, the catalogue and the run's economy,
+and compares it with what the database stores. It shares no code with the engine — a disagreement
+means one of the two is wrong, and the report says which company, which round and by how much.
+
+```bash
+export BIZSIM_DSN="postgresql://user@host:5432/bizsim"
+python scripts/audit_financials.py          # exit 0 = everything reconciles
+python scripts/audit_play.py --rounds 8     # build a deliberately awkward class to audit
+```
+
+`docs/AUDIT.md` lists every computed quantity, the invariants they must satisfy, the coverage and the
+two documented tolerances. Run it after any change to the engine, and keep the output with the release.
+
 ## API so far (S0 → S2)
 
 ```
