@@ -519,7 +519,7 @@ const en: Dict = {
   "packages.blockedLanguage": "choose the class language",
   "packages.classLanguage": "Class language",
   "packages.classLanguageHint":
-    "Seated trainees read the interface in this language. Leave it on the default to let each person keep their own.",
+    "Fixed when the package is published: the class reads its environment and R&D catalogue in this language. The list holds the languages the chosen template carries.",
   "packages.languagePerson": "Follow each trainee's own choice",
   "packages.blockedTitle": "To publish, add:",
   "packages.blockedName": "a package name",
@@ -1118,7 +1118,7 @@ const zh: Dict = {
   "start.mapping": "座位安排",
   "packages.blockedLanguage": "请选择课堂语言",
   "packages.classLanguage": "班级语言",
-  "packages.classLanguageHint": "已安排的学员将使用该语言界面。保持默认则由每位学员使用自己的语言。",
+  "packages.classLanguageHint": "发布时固定：班级以此语言阅读市场环境与研发目录。列表中包含所选模板已有的语言。",
   "packages.languagePerson": "跟随每位学员自己的选择",
   "packages.blockedTitle": "发布前还需：",
   "packages.blockedName": "填写模拟包名称",

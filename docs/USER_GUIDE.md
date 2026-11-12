@@ -235,10 +235,12 @@ class list**.
 1. **Packages** → **Publish a package**.
 2. Give it a name used in class, e.g. *Autumn 2026*.
 3. Choose the **Template** (your edited copy, not the global one).
-4. **Class language** — English, 中文, or *follow each trainee's own choice*. A trainee seated from this
-   package reads the interface in that language for the whole session, whatever their own preference
-   says. Their preference is not overwritten: the class language is scoped to the session and their
-   stored choice is untouched.
+4. **Class language** — the list holds the languages the chosen **Template** actually carries, shown as
+   English (en) / Chinese (zh). Switching the template switches the list, so a template with no Chinese
+   set offers no Chinese. A trainee seated from this package reads the interface, the environment and
+   the R&D catalogue in that language for the whole session, whatever their own preference says. Their
+   preference is not overwritten: the class language is scoped to the session and their stored choice
+   is untouched.
 5. Tick the **Companies** that will compete.
 6. **Class list** — for each company, pick the trainee who will run it (accounts come from **People**).
    One person per company; the same person cannot sit in two competing companies. A seat left open
