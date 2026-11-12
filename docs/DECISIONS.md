@@ -311,9 +311,9 @@ card. The product owner's ruling: do what D64 did for R&D.
   narrative in the run's language (the old `description_zh`/`label_zh` columns are gone).
 - Language codes widen from `('en','zh')` to any two lowercase letters, so a new language is data: the
   builder copies a set (editor → Copy set) and translates it in place. No migration, no code.
-- **The package's class-language list is the languages the chosen template carries** — a plain list,
-  no free-text entry and no "other" option — so a package can never name a set its template lacks. A
-  new language reaches the list by being authored in the template first.
+- **The package's class-language list holds the languages the product ships** — English and Chinese —
+  as a plain dropdown, as before D86. A template may carry further sets (a builder can author them),
+  but a package is not the place to introduce one: the interface has no words for it.
 
 **D87 — A product and a customer class keep one mechanic and take their words per language.** D86
 duplicated cards and cycles because nothing keys on a card's identity. A product is the opposite: its

@@ -42,13 +42,6 @@ export default function PackagesPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tidy, setTidy] = useState<{ id: number; name: string; publishedAt: string }[]>([]);
 
-  /**
-   * The languages the chosen template actually carries (D86/D87): the class language must be one the
-   * template has an environment set for, or the class would read a set that does not exist. Shown as a
-   * plain list — no free-text "other" — so the choice is always visible.
-   */
-  const [templateLangs, setTemplateLangs] = useState<string[]>(["en", "zh"]);
-
   const load = useCallback(async () => {
     // Each list loads on its own. They used to share one Promise.all, so a single failing call
     // emptied the whole form — a builder without the people list lost the template dropdown, and
@@ -83,36 +76,6 @@ export default function PackagesPanel() {
   useEffect(() => {
     void load();
   }, [load]);
-
-  // The class language list comes from the template, so it can only offer sets the template has.
-  useEffect(() => {
-    if (!draft.templateKey) {
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      try {
-        const detail = await api.templateDetail(draft.templateKey);
-        const carried = Array.from(new Set([
-          ...(detail.environment ?? []).map((row) => row.lang || "en"),
-          ...(detail.events ?? []).map((row) => row.lang || "en"),
-        ])).sort();
-        if (!cancelled) {
-          setTemplateLangs(carried.length === 0 ? ["en", "zh"] : carried);
-          setDraft((current) =>
-            carried.includes(current.locale)
-              ? current
-              : { ...current, locale: carried.includes(String(locale)) ? String(locale) : carried[0] },
-          );
-        }
-      } catch {
-        // The list stays as it was; publishing still refuses a language the template lacks.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [draft.templateKey, locale]);
 
   const publish = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -423,15 +386,8 @@ export default function PackagesPanel() {
               value={draft.locale}
               onChange={(e) => setDraft((current) => ({ ...current, locale: e.target.value }))}
             >
-              {templateLangs.map((lang) => (
-                <option key={lang} value={lang}>
-                  {(lang === "en"
-                    ? t("editor.catalogEnglish")
-                    : lang === "zh"
-                      ? t("editor.catalogChinese")
-                      : lang.toUpperCase())} ({lang})
-                </option>
-              ))}
+              <option value="en">{t("editor.catalogEnglish")}</option>
+              <option value="zh">{t("editor.catalogChinese")}</option>
             </select>
             <small className="muted">{t("packages.classLanguageHint")}</small>
           </label>
