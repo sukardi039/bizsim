@@ -96,10 +96,14 @@ any money sent to it is refused**. On, each company may buy quality points for a
 you set, and the level persists across rounds up to 100. A template written before this feature has
 no switch and therefore behaves exactly as it did.
 
-**Environment** — the round-by-round timeline. One row per round: *demand index*, *cost index*,
-*wage index* (1.00 = normal), *trend strength*, *trend label* (free text, shown to trainees), *note*,
-and the **description** (English and Chinese) that the workbench prints as the round's narrative.
-Use **Add a row** / **Remove the last row** to change the length, then **Save** (saved whole).
+**Environment** — the round-by-round timeline. Each row belongs to a **language** (D86), and one
+row is one round of that language's cycle: *language*, *round*, *demand index*, *cost index*, *wage
+index* (1.00 = normal), *trend strength*, *trend label* (free text, shown to trainees), *note*, and
+the **description** the workbench prints as the round's narrative. Every language present must have
+the same number of rounds — the controller refuses a set with a gap. Use **Add a row** / **Remove
+the last row** (they act on the language of the last row) and **Copy from … to …** to duplicate one
+language's cycle into a new language code, then translate it in place. **Save** stores the whole
+timeline.
 
 **Customer classes** — the three groups of potential customer (D81). Each row is a class: code, name
 (English and Chinese), description (English and Chinese), *customers* (base units per round, sized
@@ -107,26 +111,33 @@ for ten companies), *purchasing power* (1.000 = the class affords that base), *i
 (how hard a downturn hits the class) and *trend affinity* (how much a consumer trend moves it). An
 economic event never touches a product directly: it moves a class's customers and purchasing power,
 and every product serving that class inherits the change. A class that a product points at cannot be
-removed, and a template with sessions on it refuses edits — copy the template instead.
+removed, and a template with sessions on it refuses edits — copy the template instead. Classes are
+one mechanic with per-language words, not a set per language.
 
-**Events** — the event deck: surprises drawn once per run.
+**Events** — the event deck: surprises drawn once per run, one **set per language** (D86).
 
 | Column | Meaning |
 |---|---|
-| Code | unique short id, e.g. `EV-OIL-CRISIS` |
-| Name / Description | what the class sees (English) |
-| Name (Chinese) / Description (Chinese) | the same words in Chinese, shown when the class runs in Chinese |
+| Language | which language's deck this card belongs to; a class only ever draws its own |
+| Code | unique short id inside that language, e.g. `EV-OIL-CRISIS` (`…-ZH` in the Chinese set) |
+| Name / Description | what the class sees, in that language |
 | Kind of shock | supply shock, financial crisis, inflation, technology, demand shock, policy, **markets**, other — printed in the workbench |
 | From round / To round | the window in which it can be drawn |
 | Chance | probability 0.00–1.00 inside that window |
 | Months | how long the effect lasts (1–12) |
-| Demand ×, Cost ×, Wage × | market-wide legacy multipliers (1.00 = no change); leave at 1.00 and use the class columns |
+| Demand ×, Cost ×, Wage × | market-wide legacy multipliers (1.00 = no change) |
 | Target | one product code, or *all products* — legacy only |
 | per class | two numbers: **customers multiplier** and **purchasing power multiplier** for that class |
 
-Leave the deck empty for a calm economy. **Save** replaces the whole deck. The server refuses
-duplicate codes, a probability outside 0–1, `From` > `To`, non-positive multipliers, a class named
-twice in one card, and an effect on a class the template does not have.
+Leave the deck empty for a calm economy. **Save** replaces the whole deck (all sets). The server
+refuses duplicate codes within a language, a probability outside 0–1, `From` > `To`, non-positive
+multipliers, a class named twice in one card, and an effect on a class the template does not have.
+
+**Adding a language.** Choose **Copy from** the language you want to start from, type the new code
+(two lowercase letters, e.g. `ms`), press **Copy set**, then edit the copied cards and rounds: names,
+descriptions and the cycle narrative in the new language. The copy keeps every number and every
+class effect, and codes take the new suffix (e.g. `EV-OIL-CRISIS-MS`). A class runs in the language
+of its package, so a new language needs no migration and no code change — only data.
 
 **Products** — one row per product: code, name, price, unit cost, quality, base demand, units per
 worker, income elasticity, trend affinity, **customer class** (which class the product is made for;
@@ -456,7 +467,7 @@ normal). Under it, the economic events that have already started are listed with
 crisis, inflation, a technology slump — and one sentence each. Economic events move the *classes*,
 not your products directly, so a premium line suffers in a recession because its customers are the
 ones postponing purchases, and the card is where you can see that happening. The words are in the
-language your class runs in (English or Chinese).
+language your class runs in.
 
 | What it means | Who fixes it |
 |---|---|

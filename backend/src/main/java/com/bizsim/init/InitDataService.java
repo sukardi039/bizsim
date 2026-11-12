@@ -132,9 +132,9 @@ public class InitDataService {
         int trainees = clamp(p.trainees(), 1, companies);
         int requestedRounds = clamp(p.rounds(), 0, 12);
         String locale = p.locale() == null || p.locale().isBlank() ? "en" : p.locale().trim().toLowerCase(Locale.ROOT);
-        if (!List.of("en", "zh").contains(locale)) {
+        if (!locale.matches("[a-z]{2}")) {
             throw ProblemException.badRequest("init.locale_invalid",
-                    "the class language must be en or zh", "field", "locale");
+                    "the class language is two lowercase letters, e.g. en, zh", "field", "locale");
         }
         String password = p.password() == null || p.password().isBlank() ? DEFAULT_PASSWORD : p.password();
         if (password.length() < 8) {

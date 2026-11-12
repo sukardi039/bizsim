@@ -380,6 +380,24 @@ class PackageApiTest extends PostgresTestBase {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].locale").value("zh"));
 
+        // D86: the language is set before the timeline and the deck are frozen, so round 1 already
+        // reads the Chinese cycle — the narrative, the label and the deck all come from that set.
+        long runId = jdbc.queryForObject("select max(id) from run", Long.class);
+        long teamId = jdbc.queryForObject("select id from team where run_id = ? order by id limit 1",
+                Long.class, runId);
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                        .header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/context")
+                        .header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.market.headline").value("平稳"))
+                .andExpect(jsonPath("$.market.description").value(
+                        org.hamcrest.Matchers.containsString("需求与成本都处于基准水平")));
+        assertThat(jdbc.queryForList(
+                "select event_code from run_environment_event where run_id = ?", String.class, runId))
+                .allSatisfy(code -> assertThat(code).endsWith("-ZH"));
+
         // D66: no language declared is refused — the class language is part of the package, because it
         // decides both the interface and which R&D catalogue the class competes on.
         mvc.perform(post("/api/packages")
@@ -391,14 +409,15 @@ class PackageApiTest extends PostgresTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.locale_required"));
 
-        // Anything else is refused rather than stored and half-honoured.
+        // Anything that is not a two-letter code is refused rather than stored and half-honoured
+        // (D86: a real two-letter language is data, so 'fr' would now be accepted).
         mvc.perform(post("/api/packages")
                         .header("Authorization", "Bearer " + builder)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Bad language", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId),
-                                "locale", "fr"))))
+                                "locale", "fra"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.locale_invalid"));
     }

@@ -117,11 +117,13 @@ public class PackageService {
         String locale = request.locale() == null ? "" : request.locale().trim().toLowerCase();
         if (locale.isBlank()) {
             throw ProblemException.badRequest("package.locale_required",
-                    "choose the class language: English or Chinese", "field", "locale");
+                    "choose the class language", "field", "locale");
         }
-        if (!List.of("en", "zh").contains(locale)) {
+        // D86: any two-letter language is a class language — the environment and the R&D catalogue
+        // carry a set per language, so a new language is data, not a code change.
+        if (!locale.matches("[a-z]{2}")) {
             throw ProblemException.badRequest("package.locale_invalid",
-                    "the class language must be en or zh", "field", "locale");
+                    "the class language is two lowercase letters, e.g. en, zh, ms", "field", "locale");
         }
 
         // The programme's parts (D62). No parts given means one part built from the package's own

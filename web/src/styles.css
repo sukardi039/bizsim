@@ -362,3 +362,8 @@ button.danger:hover { background: rgba(255, 120, 120, .12); }
 
 /* The submission detail unfolds from the company's own line (D67). */
 .detail-row td { background: rgba(255, 255, 255, .03); border-top: none; padding-top: .25rem; }
+
+/* D86: the language of a set, and copying one set into another. */
+.copy-set { display: inline-flex; gap: .4rem; align-items: center; }
+.copy-set label { display: inline-flex; gap: .3rem; align-items: center; font-size: .85rem; }
+.copy-set input, .copy-set select { width: auto; }

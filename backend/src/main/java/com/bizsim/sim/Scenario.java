@@ -43,6 +43,28 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
         return product.targetSegment() == null ? Optional.empty() : segment(product.targetSegment());
     }
 
+    /** The cycle as one language reads it (D86). A run only ever sees its own set. */
+    public List<RoundSpec> roundsOf(String lang) {
+        return rounds.stream().filter(spec -> spec.lang().equals(lang)).toList();
+    }
+
+    /** The cycle position in one language; empty when that language has no such row. */
+    public Optional<RoundSpec> roundAt(String lang, int position) {
+        return rounds.stream()
+                .filter(spec -> spec.lang().equals(lang) && spec.round() == position)
+                .findFirst();
+    }
+
+    /** The deck as one language reads it (D86). */
+    public List<EventSpec> eventsOf(String lang) {
+        return events.stream().filter(spec -> spec.lang().equals(lang)).toList();
+    }
+
+    /** The languages this template actually carries a cycle for. */
+    public List<String> languages() {
+        return rounds.stream().map(RoundSpec::lang).distinct().sorted().toList();
+    }
+
     public Map<String, ProductSpec> productsByCode() {
         return products.stream().collect(Collectors.toMap(ProductSpec::code, p -> p));
     }
@@ -80,31 +102,30 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
     }
 
     /**
-     * The economy for one cycle position. Missing positions fall back to neutral (1.0).
-     *
-     * <p>{@code description}/{@code descriptionZh} are the published narrative a player reads in the
-     * workbench (D83); they never carry mechanics the forecast does not already show.
+     * The economy for one cycle position, in one language (D86). Missing positions fall back to
+     * neutral (1.0). {@code description} is the published narrative a player reads in the workbench;
+     * it never carries mechanics the forecast does not already show.
      */
-    public record RoundSpec(int round, BigDecimal demandIndex, BigDecimal costIndex,
+    public record RoundSpec(String lang, int round, BigDecimal demandIndex, BigDecimal costIndex,
                             BigDecimal wageIndex, BigDecimal trendStrength, String trendLabel,
-                            String note, String description, String descriptionZh, String labelZh) {
+                            String note, String description) {
     }
 
     /**
-     * A card in the event deck. Whether it fires, and when inside its window, is drawn per run from
-     * a seed — unpredictable to trainees, fixed and replayable for the facilitator.
+     * A card in the event deck, in one language (D86). Whether it fires, and when inside its window,
+     * is drawn per run from a seed — unpredictable to trainees, fixed and replayable for the
+     * facilitator.
      *
      * <p>The card itself names no product: it moves each {@link EventEffect affected class}, and the
      * products that serve that class inherit the change (D82). {@code demandMultiplier} and
      * {@code targetProduct} are the pre-D82 mechanism and remain only so an old template keeps its
      * numbers; the shipped deck sets the multiplier to 1.000 and leaves the target null.
      */
-    public record EventSpec(String code, String name, String description, String category,
+    public record EventSpec(String lang, String code, String name, String description, String category,
                             int earliestRound, int latestRound, BigDecimal probability,
                             int durationMonths, BigDecimal demandMultiplier,
                             BigDecimal costMultiplier, BigDecimal wageMultiplier,
-                            String targetProduct, String nameZh, String descriptionZh,
-                            List<EventEffect> effects) {
+                            String targetProduct, List<EventEffect> effects) {
     }
 
     /** One event's effect on one customer class: how many buyers there are, and what they can spend. */

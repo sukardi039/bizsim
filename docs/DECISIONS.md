@@ -291,3 +291,23 @@ the change is what the denominator *is*. Money is still not modelled directly �
 an index on the class's unit pool, and price elasticity is what makes an over-priced product lose
 share inside it. Competitive positions therefore add up to the class's affordable demand, not to a
 number a trainer typed.
+
+**D86 — A language owns its environment: cards and cycle, like the R&D catalogue (revising D83).**
+D83 stored the mechanic once and put only the words in `environment_text`, arguing that two weather
+systems could drift apart. That is right for the customer classes and wrong for the deck: adding a
+third language then means editing rows in two tables, and a translator cannot author a card as a
+card. The product owner's ruling: do what D64 did for R&D.
+
+- `environment_event.lang` and `scenario_round.lang`; a duplicated set carries `<CODE>-<LANG>` codes
+  (R&D uses `-ZH`), its own name, description, narrative — and, for a card, its own effect rows.
+- The run's language, fixed when the session starts (D64), chooses the set. Both the timeline and
+  the draw read only that set; nothing is translated at read time.
+- The draw seeds on the **canonical code** (`EV-INFLATION-ZH` → `EV-INFLATION`), so the same run gets
+  the same weather whichever language its class reads.
+- **Customer classes stay one mechanic with per-language words** (D83 kept here). A class's size and
+  elasticity are the economy; duplicating them per language would let two classes drift apart.
+  `environment_text` now holds only `SEGMENT` rows.
+- `scenario_round.description` replaces the text rows; `run_round_economy.description` is the frozen
+  narrative in the run's language (the old `description_zh`/`label_zh` columns are gone).
+- Language codes widen from `('en','zh')` to any two lowercase letters, so a new language is data: the
+  builder copies a set (editor → Copy set) and translates it in place. No migration, no code.

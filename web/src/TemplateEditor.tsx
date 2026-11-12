@@ -12,6 +12,71 @@ import {
 import { describeError } from "./errors";
 import { useI18n } from "./i18n";
 
+const LANGUAGE_OPTIONS = ["en", "zh"];
+
+/** The language of a set row (D86): two lowercase letters, with the shipped ones offered. */
+function LanguageCell({ value, disabled, onChange }: {
+  value?: string | null;
+  disabled: boolean;
+  onChange: (lang: string) => void;
+}) {
+  return (
+    <input
+      value={value ?? "en"}
+      maxLength={2}
+      size={3}
+      disabled={disabled}
+      list="bizsim-languages"
+      onChange={(e) => onChange(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
+    />
+  );
+}
+
+/**
+ * Duplicates one language set into another (D86) — the way a new language starts from a working
+ * deck instead of ten empty rows. The copy is mechanical: same numbers, same effects, codes suffixed
+ * with the target language; the words are then edited in place.
+ */
+function CopyLanguageSet({ languages, disabled, onCopy }: {
+  languages: string[];
+  disabled: boolean;
+  onCopy: (from: string, to: string) => void;
+}) {
+  const { t } = useI18n();
+  const [from, setFrom] = useState(languages[0] ?? "en");
+  const [to, setTo] = useState("");
+  const known = Array.from(new Set([...languages, ...LANGUAGE_OPTIONS])).sort();
+  return (
+    <span className="copy-set">
+      <label>
+        {t("editor.copyFrom")}
+        <select value={from} disabled={disabled} onChange={(e) => setFrom(e.target.value)}>
+          {known.map((lang) => <option key={lang} value={lang}>{lang}</option>)}
+        </select>
+      </label>
+      <label>
+        {t("editor.copyTo")}
+        <input
+          value={to}
+          maxLength={2}
+          size={3}
+          placeholder="ms"
+          disabled={disabled}
+          onChange={(e) => setTo(e.target.value.toLowerCase().replace(/[^a-z]/g, ""))}
+        />
+      </label>
+      <button
+        type="button"
+        disabled={disabled || to.length !== 2}
+        onClick={() => onCopy(from, to)}
+      >
+        {t("editor.copySet")}
+      </button>
+    </span>
+  );
+}
+
+
 /** Settings the facilitator may change. Anything else in the document is engine calibration. */
 const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
   { field: "rounds", kind: "int" },
@@ -158,6 +223,35 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     }
   };
 
+  /** D86: duplicate one language's cycle into another, keeping the indices and adding the words. */
+  const copyRounds = (from: string, to: string) => {
+    setRounds((current) => {
+      const source = current.filter((row) => row.lang === from);
+      if (source.length === 0) {
+        return current;
+      }
+      return [...current.filter((row) => row.lang !== to),
+        ...source.map((row) => ({ ...row, lang: to, description: row.description ?? "" }))];
+    });
+  };
+
+  /** D86: duplicate one language's deck into another; codes take the target suffix, effects copy. */
+  const copyEvents = (from: string, to: string) => {
+    setEvents((current) => {
+      const source = current.filter((row) => row.lang === from);
+      if (source.length === 0) {
+        return current;
+      }
+      return [...current.filter((row) => row.lang !== to),
+        ...source.map((row) => ({
+          ...row,
+          lang: to,
+          code: `${row.code.replace(/-[A-Z]{2}$/, "")}-${to.toUpperCase()}`,
+          effects: (row.effects ?? []).map((effect) => ({ ...effect })),
+        }))];
+    });
+  };
+
   const saveCatalogue = async (
     event: React.FormEvent,
     call: () => Promise<TemplateDetail>,
@@ -180,12 +274,18 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     setRounds((current) => current.map((row, i) => (i === index ? { ...row, ...patch } : row)));
   };
 
+  /**
+   * D86: rows belong to a language set, so a round is added to the language of the last row (the
+   * set a builder is currently working on), keeping every set the same length.
+   */
   const addRound = () => {
     const last = rounds[rounds.length - 1];
+    const lang = last?.lang ?? "en";
     setRounds((current) => [
       ...current,
       {
-        round: current.length + 1,
+        lang,
+        round: current.filter((row) => row.lang === lang).length + 1,
         demandIndex: last?.demandIndex ?? 1,
         costIndex: last?.costIndex ?? 1,
         wageIndex: last?.wageIndex ?? 1,
@@ -193,7 +293,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
         trendLabel: "",
         note: "",
         description: "",
-        descriptionZh: "",
       },
     ]);
   };
@@ -217,6 +316,9 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
 
   return (
     <>
+      <datalist id="bizsim-languages">
+        {LANGUAGE_OPTIONS.map((lang) => <option key={lang} value={lang} />)}
+      </datalist>
       <section className="card">
         <header className="run-head">
           <div>
@@ -347,6 +449,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
             <table>
               <thead>
                 <tr>
+                  <th>{t("field.language")}</th>
                   <th>{t("editor.round")}</th>
                   <th className="num">{t("field.demandIndex")}</th>
                   <th className="num">{t("field.costIndex")}</th>
@@ -355,12 +458,18 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th>{t("field.trendLabel")}</th>
                   <th>{t("field.note")}</th>
                   <th>{t("field.description")}</th>
-                  <th>{t("field.descriptionZh")}</th>
                 </tr>
               </thead>
               <tbody>
                 {rounds.map((row, index) => (
-                  <tr key={row.round}>
+                  <tr key={`${row.lang}-${row.round}`}>
+                    <td>
+                      <LanguageCell
+                        value={row.lang}
+                        disabled={locked}
+                        onChange={(lang) => editRound(index, { lang })}
+                      />
+                    </td>
                     <td>{row.round}</td>
                     <td>
                       <input
@@ -412,14 +521,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                         disabled={locked}
                       />
                     </td>
-                    <td>
-                      <input
-                        value={row.descriptionZh ?? ""}
-                        placeholder={t("editor.marketDescriptionPlaceholder")}
-                        onChange={(e) => editRound(index, { descriptionZh: e.target.value })}
-                        disabled={locked}
-                      />
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -434,6 +535,11 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               <button type="button" onClick={removeRound} disabled={locked || rounds.length <= 1}>
                 {t("editor.removeRound")}
               </button>
+              <CopyLanguageSet
+                languages={Array.from(new Set(rounds.map((row) => row.lang)))}
+                disabled={locked}
+                onCopy={copyRounds}
+              />
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
               </button>
@@ -520,6 +626,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
             <table>
               <thead>
                 <tr>
+                  <th>{t("field.language")}</th>
                   <th>{t("field.code")}</th>
                   <th>{t("field.name")}</th>
                   <th>{t("field.description")}</th>
@@ -532,8 +639,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <th className="num">{t("field.wageMultiplier")}</th>
                   <th>{t("field.targetProduct")}</th>
                   <th>{t("field.category")}</th>
-                  <th>{t("field.nameZh")}</th>
-                  <th>{t("field.descriptionZh")}</th>
                   {segments.map((segment) => (
                     <th key={segment.code} className="num">
                       {segment.code}
@@ -548,6 +653,13 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     setEvents((c) => c.map((r, i) => (i === index ? { ...r, ...patch } : r)));
                   return (
                     <tr key={index}>
+                      <td>
+                        <LanguageCell
+                          value={row.lang}
+                          disabled={locked}
+                          onChange={(lang) => edit({ lang })}
+                        />
+                      </td>
                       <td><input value={row.code} disabled={locked} onChange={(e) => edit({ code: e.target.value })} /></td>
                       <td><input value={row.name} disabled={locked} onChange={(e) => edit({ name: e.target.value })} /></td>
                       <td><input value={row.description} disabled={locked} onChange={(e) => edit({ description: e.target.value })} /></td>
@@ -582,8 +694,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                           ))}
                         </select>
                       </td>
-                      <td><input value={row.nameZh ?? ""} disabled={locked} onChange={(e) => edit({ nameZh: e.target.value })} /></td>
-                      <td><input value={row.descriptionZh ?? ""} disabled={locked} onChange={(e) => edit({ descriptionZh: e.target.value })} /></td>
                       {segments.map((segment) => {
                         const effect = (row.effects ?? []).find((x) => x.segmentCode === segment.code);
                         const change = (patch: { sizeMultiplier?: number; purchasingPowerMultiplier?: number }) => {
@@ -636,6 +746,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   setEvents((c) => [
                     ...c,
                     {
+                      lang: events[events.length - 1]?.lang ?? "en",
                       code: "",
                       name: "",
                       description: "",
@@ -648,8 +759,6 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                       wageMultiplier: 1,
                       targetProduct: null,
                       category: "OTHER",
-                      nameZh: "",
-                      descriptionZh: "",
                       effects: [],
                     },
                   ])
@@ -657,6 +766,11 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               >
                 {t("editor.addRow")}
               </button>
+              <CopyLanguageSet
+                languages={Array.from(new Set(events.map((row) => row.lang)))}
+                disabled={locked}
+                onCopy={copyEvents}
+              />
               <button className="primary" type="submit" disabled={locked || busy}>
                 {busy ? t("editor.saving") : t("editor.save")}
               </button>

@@ -380,15 +380,23 @@ export default function PackagesPanel() {
             ))}
           </ul>
 
+          <datalist id="bizsim-languages-package">
+            <option value="en" />
+            <option value="zh" />
+          </datalist>
           <label>
             {t("packages.classLanguage")}
-            <select
+            <input
               value={draft.locale}
-              onChange={(e) => setDraft((current) => ({ ...current, locale: e.target.value }))}
-            >
-              <option value="en">{t("editor.catalogEnglish")}</option>
-              <option value="zh">{t("editor.catalogChinese")}</option>
-            </select>
+              maxLength={2}
+              size={4}
+              list="bizsim-languages-package"
+              onChange={(e) =>
+                setDraft((current) => ({
+                  ...current,
+                  locale: e.target.value.toLowerCase().replace(/[^a-z]/g, ""),
+                }))}
+            />
             <small className="muted">{t("packages.classLanguageHint")}</small>
           </label>
 

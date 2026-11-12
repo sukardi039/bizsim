@@ -139,24 +139,15 @@ public class ScenarioRepository {
         }
 
         List<Scenario.RoundSpec> rounds = jdbc.query("""
-                select r.round_number, r.demand_index, r.cost_index, r.wage_index, r.trend_strength,
-                       r.trend_label, r.note,
-                       (select t.description from environment_text t
-                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
-                          and t.ref_code = r.round_number::text and t.lang = 'en') as description,
-                       (select t.description from environment_text t
-                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
-                          and t.ref_code = r.round_number::text and t.lang = 'zh') as description_zh,
-                       (select t.name from environment_text t
-                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
-                          and t.ref_code = r.round_number::text and t.lang = 'zh') as label_zh
-                from scenario_round r where r.scenario_key = ? order by r.round_number
+                select lang, round_number, demand_index, cost_index, wage_index, trend_strength,
+                       trend_label, note, description
+                from scenario_round where scenario_key = ? order by lang, round_number
                 """, (rs, i) -> new Scenario.RoundSpec(
-                        rs.getInt("round_number"), rs.getBigDecimal("demand_index"),
-                        rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
-                        rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
-                        rs.getString("note"), rs.getString("description"),
-                        rs.getString("description_zh"), rs.getString("label_zh")), key);
+                        rs.getString("lang"), rs.getInt("round_number"),
+                        rs.getBigDecimal("demand_index"), rs.getBigDecimal("cost_index"),
+                        rs.getBigDecimal("wage_index"), rs.getBigDecimal("trend_strength"),
+                        rs.getString("trend_label"), rs.getString("note"),
+                        rs.getString("description")), key);
 
         return new Scenario(key, params, products, channels, projects, rounds, segmentsOf(key), eventsOf(key));
     }
@@ -192,25 +183,23 @@ public class ScenarioRepository {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    /** The event deck a builder may edit: the same shape the engine draws from (D18). */
+    /** The event deck a builder may edit: the same shape the engine draws from (D18, D86). */
     public List<Scenario.EventSpec> eventsOf(String key) {
         Map<String, List<Scenario.EventEffect>> effects = effectsOf(key);
-        Map<String, String[]> words = wordsOf(key, "EVENT");
         return jdbc.query("""
-                select code, name, description, category, earliest_round, latest_round, probability,
-                       duration_months, demand_multiplier, cost_multiplier, wage_multiplier,
-                       target_product
-                from environment_event where scenario_key = ? order by code
+                select lang, code, name, description, category, earliest_round, latest_round,
+                       probability, duration_months, demand_multiplier, cost_multiplier,
+                       wage_multiplier, target_product
+                from environment_event where scenario_key = ? order by lang, code
                 """, (rs, i) -> {
                     String code = rs.getString("code");
-                    String[] zh = words.getOrDefault(code, new String[2]);
                     return new Scenario.EventSpec(
-                            code, rs.getString("name"), rs.getString("description"),
-                            rs.getString("category"), rs.getInt("earliest_round"),
-                            rs.getInt("latest_round"), rs.getBigDecimal("probability"),
-                            rs.getInt("duration_months"), rs.getBigDecimal("demand_multiplier"),
-                            rs.getBigDecimal("cost_multiplier"), rs.getBigDecimal("wage_multiplier"),
-                            rs.getString("target_product"), zh[0], zh[1],
+                            rs.getString("lang"), code, rs.getString("name"),
+                            rs.getString("description"), rs.getString("category"),
+                            rs.getInt("earliest_round"), rs.getInt("latest_round"),
+                            rs.getBigDecimal("probability"), rs.getInt("duration_months"),
+                            rs.getBigDecimal("demand_multiplier"), rs.getBigDecimal("cost_multiplier"),
+                            rs.getBigDecimal("wage_multiplier"), rs.getString("target_product"),
                             effects.getOrDefault(code, List.of()));
                 }, key);
     }
@@ -245,26 +234,24 @@ public class ScenarioRepository {
     /**
      * Replaces the whole deck: an event set with a gap or a duplicate code is not a set.
      *
-     * <p>Effects and the Chinese words go with the card. Three tables, one transaction: a card saved
-     * without its effects would fire and do nothing, which is worse than refusing the edit.
+     * <p>D86: a card is one language's card — its words live on the row, so a language owns its own
+     * deck. Effects go with the card: two tables, one transaction, because a card saved without its
+     * effects would fire and do nothing.
      */
     @Transactional
     public void saveEvents(String key, List<Scenario.EventSpec> events) {
-        jdbc.update("""
-                delete from environment_text where scenario_key = ? and ref_type = 'EVENT'
-                """, key);
         jdbc.update("delete from environment_event where scenario_key = ?", key);
         if (events == null) {
             return;
         }
         for (Scenario.EventSpec event : events) {
             jdbc.update("""
-                    insert into environment_event (scenario_key, code, name, description, category,
+                    insert into environment_event (scenario_key, lang, code, name, description, category,
                                                    earliest_round, latest_round, probability,
                                                    duration_months, demand_multiplier, cost_multiplier,
                                                    wage_multiplier, target_product)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, key, event.code(), event.name(), event.description(),
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, lang(event.lang()), event.code(), event.name(), event.description(),
                     category(event.category()), event.earliestRound(), event.latestRound(),
                     event.probability(), event.durationMonths(), event.demandMultiplier(),
                     event.costMultiplier(), event.wageMultiplier(), event.targetProduct());
@@ -278,9 +265,13 @@ public class ScenarioRepository {
                         """, key, event.code(), effect.segmentCode(), effect.sizeMultiplier(),
                         effect.purchasingPowerMultiplier());
             }
-            saveWords(key, "EVENT", event.code(), event.nameZh(), event.descriptionZh());
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
+    }
+
+    /** A language code is two lowercase letters; anything else is 'en', the template's base set. */
+    private static String lang(String value) {
+        return value != null && value.matches("[a-z]{2}") ? value : "en";
     }
 
     /** Only the categories the workbench knows how to print; anything else is a plain shock. */
@@ -442,18 +433,18 @@ public class ScenarioRepository {
                 from rnd_project where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
-                insert into scenario_round (scenario_key, round_number, demand_index, cost_index,
-                                            wage_index, note, trend_strength, trend_label)
-                select ?, round_number, demand_index, cost_index, wage_index, note, trend_strength,
-                       trend_label
+                insert into scenario_round (scenario_key, lang, round_number, demand_index, cost_index,
+                                            wage_index, note, trend_strength, trend_label, description)
+                select ?, lang, round_number, demand_index, cost_index, wage_index, note,
+                       trend_strength, trend_label, description
                 from scenario_round where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
-                insert into environment_event (scenario_key, code, name, description, category,
+                insert into environment_event (scenario_key, lang, code, name, description, category,
                                                earliest_round, latest_round, probability,
                                                duration_months, demand_multiplier, cost_multiplier,
                                                wage_multiplier, target_product)
-                select ?, code, name, description, category, earliest_round, latest_round,
+                select ?, lang, code, name, description, category, earliest_round, latest_round,
                        probability, duration_months, demand_multiplier, cost_multiplier,
                        wage_multiplier, target_product
                 from environment_event where scenario_key = ?
@@ -485,9 +476,9 @@ public class ScenarioRepository {
     // ------------------------------------------------------------------ template editing (S6c)
 
     /** One position of the environment timeline, as the editor sees it. */
-    public record RoundRow(int round, BigDecimal demandIndex, BigDecimal costIndex, BigDecimal wageIndex,
-                           BigDecimal trendStrength, String trendLabel, String note,
-                           String description, String descriptionZh) {
+    public record RoundRow(String lang, int round, BigDecimal demandIndex, BigDecimal costIndex,
+                           BigDecimal wageIndex, BigDecimal trendStrength, String trendLabel,
+                           String note, String description) {
     }
 
     /** The definition keys a facilitator may change. Everything else is engine calibration. */
@@ -525,16 +516,11 @@ public class ScenarioRepository {
 
     public List<RoundRow> environment(String key) {
         return jdbc.query("""
-                select round_number, demand_index, cost_index, wage_index, trend_strength, trend_label, note,
-                       (select t.description from environment_text t
-                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
-                          and t.ref_code = r.round_number::text and t.lang = 'en') as description,
-                       (select t.description from environment_text t
-                        where t.scenario_key = r.scenario_key and t.ref_type = 'ROUND'
-                          and t.ref_code = r.round_number::text and t.lang = 'zh') as description_zh
-                from scenario_round r where r.scenario_key = ? order by r.round_number
-                """, (rs, i) -> new RoundRow(rs.getInt(1), rs.getBigDecimal(2), rs.getBigDecimal(3),
-                rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getString(6), rs.getString(7),
+                select lang, round_number, demand_index, cost_index, wage_index, trend_strength,
+                       trend_label, note, description
+                from scenario_round where scenario_key = ? order by lang, round_number
+                """, (rs, i) -> new RoundRow(rs.getString(1), rs.getInt(2), rs.getBigDecimal(3),
+                rs.getBigDecimal(4), rs.getBigDecimal(5), rs.getBigDecimal(6), rs.getString(7),
                 rs.getString(8), rs.getString(9)), key);
     }
 
@@ -567,32 +553,18 @@ public class ScenarioRepository {
     @Transactional
     public void saveEnvironment(String key, List<RoundRow> rows) {
         jdbc.update("delete from scenario_round where scenario_key = ?", key);
-        jdbc.update("""
-                delete from environment_text where scenario_key = ? and ref_type = 'ROUND'
-                """, key);
         for (RoundRow row : rows) {
+            // D86: a cycle position belongs to a language; its narrative is that language's.
             jdbc.update("""
-                    insert into scenario_round (scenario_key, round_number, demand_index, cost_index,
-                                                wage_index, trend_strength, trend_label, note)
-                    values (?, ?, ?, ?, ?, ?, ?, ?)
-                    """, key, row.round(), row.demandIndex(), row.costIndex(), row.wageIndex(),
-                    row.trendStrength(), row.trendLabel(), row.note());
-            // D83: the brief description a player reads. Both languages are written here so the
-            // workbench can show the class's language without a second edit round.
-            saveRoundWords(key, row, "en", row.trendLabel(), row.description());
-            saveRoundWords(key, row, "zh", row.trendLabel(), row.descriptionZh());
+                    insert into scenario_round (scenario_key, lang, round_number, demand_index,
+                                                cost_index, wage_index, trend_strength, trend_label,
+                                                note, description)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, key, lang(row.lang()), row.round(), row.demandIndex(), row.costIndex(),
+                    row.wageIndex(), row.trendStrength(), row.trendLabel(), row.note(),
+                    row.description());
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
-    }
-
-    private void saveRoundWords(String key, RoundRow row, String lang, String name, String description) {
-        if ((description == null || description.isBlank())) {
-            return;
-        }
-        jdbc.update("""
-                insert into environment_text (scenario_key, ref_type, ref_code, lang, name, description)
-                values (?, 'ROUND', ?, ?, ?, ?)
-                """, key, String.valueOf(row.round()), lang, name, description);
     }
 
     // ------------------------------------------------------------------ catalogue (S6d)

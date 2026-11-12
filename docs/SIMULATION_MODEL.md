@@ -191,10 +191,14 @@ payroll            = salary × headcount × wage_index(r) × (event wage multipl
   frozen into `run_environment_event`** (D84), so editing the template afterwards cannot reach back
   into a class that has already played. Trainees cannot see the deck or the draw; the debrief can,
   and a replay of the run produces the same schedule.
-- **Words belong to the mechanic.** `environment_text` stores a name and a short description per
-  object (class, event, cycle position) in `en` and `zh`; a run reads its class's language and the
-  workbench shows the round narrative followed by the descriptions of events that have started. The
-  mechanic is stored once — only the text is translated (D83).
+- **Words belong to the set.** A cycle position and a card carry their own name, description and
+  narrative, so a language owns a full environment (D86, revising D83): `environment_event.lang` and
+  `scenario_round.lang`, with `<CODE>-<LANG>` codes on the duplicate (R&D's `-ZH` convention). The
+  run's language — fixed at session start (D64) — chooses the set for both the timeline and the draw,
+  and the draw seeds on the canonical code, so the same run gets the same weather in any language.
+  Customer classes keep per-language words only (`environment_text`, `SEGMENT` rows): their size and
+  elasticity are the economy, and duplicating them per language would let two classes drift apart.
+  A new language needs no migration — the builder copies a set in the editor and translates it.
 - **Paid market review.** `marketReport: true` in the monthly decision costs
   `marketReportCost`; `GET /teams/{id}/market-report` then returns current indices, the active events
   that have already started, and `forecastHorizon` rounds of forecast with ±`forecastBand` noise.
@@ -320,6 +324,11 @@ term still says what it meant after the template it came from was edited.
 `environment_event.category`, and the frozen per-run multipliers/effects on `run_environment_event`.
 It is all scenario data: the shipped `standard-v1` carries the default classes and nine event cards, a
 template copies them with the rest of its catalogue, and a builder edits the copy.
+
+`V33__environment_language_sets.sql` gives each language its own environment (D86):
+`environment_event.lang`, `scenario_round.lang`, `scenario_round.description`, the `-ZH` duplicate of
+the shipped deck and cycle, and `environment_text` reduced to customer-class words. Language codes are
+any two lowercase letters, so a new language is data rather than a migration.
 
 `round_result.score` keeps the headline numbers for the scoreboard; `round_statement` keeps the
 line-item detail the PDF needs. Splitting them means the scoreboard query stays cheap and the

@@ -144,12 +144,16 @@ class EnvironmentTest extends PostgresTestBase {
         assertThat(crash.category()).isEqualTo("MARKETS");
         assertThat(holiday.category()).isEqualTo("DEMAND_SHOCK");
 
-        // Both languages, beside the mechanic (D83).
-        assertThat(bull.nameZh()).isEqualTo("股市牛市");
-        assertThat(crash.nameZh()).isEqualTo("股市崩盘");
-        assertThat(holiday.nameZh()).isEqualTo("节庆旺季");
-        assertThat(crash.descriptionZh()).contains("股价大幅下跌");
-        assertThat(holiday.descriptionZh()).contains("节庆旺季带动各阶层零售需求");
+        // D86: the Chinese set is its own cards, not a translation of these.
+        Scenario.EventSpec bullZh = event(scenario, "EV-BULL-RUN-ZH");
+        Scenario.EventSpec crashZh = event(scenario, "EV-MARKET-CRASH-ZH");
+        Scenario.EventSpec holidayZh = event(scenario, "EV-HOLIDAY-SEASON-ZH");
+        assertThat(bullZh.lang()).isEqualTo("zh");
+        assertThat(bullZh.name()).isEqualTo("股市牛市");
+        assertThat(crashZh.name()).isEqualTo("股市崩盘");
+        assertThat(holidayZh.name()).isEqualTo("节庆旺季");
+        assertThat(crashZh.description()).contains("股价大幅下跌");
+        assertThat(holidayZh.description()).contains("节庆旺季带动各阶层零售需求");
 
         // Every card moves all three classes, and a crash lands hardest on the affluent one.
         assertThat(bull.effects()).hasSize(3);
@@ -162,6 +166,77 @@ class EnvironmentTest extends PostgresTestBase {
         // A holiday season is broad demand, strongest at the mass end.
         assertThat(effect(holiday, "SEG-BASIC").sizeMultiplier())
                 .isGreaterThan(effect(holiday, "SEG-PREMIUM").sizeMultiplier());
+    }
+
+    @Test
+    void each_language_owns_a_full_cycle_and_deck_with_identical_mechanics() {
+        Scenario scenario = scenarios.load("standard-v1");
+
+        assertThat(scenario.languages()).containsExactly("en", "zh");
+        assertThat(scenario.roundsOf("en")).hasSameSizeAs(scenario.roundsOf("zh"));
+        for (Scenario.RoundSpec en : scenario.roundsOf("en")) {
+            Scenario.RoundSpec zh = scenario.roundAt("zh", en.round()).orElseThrow();
+            assertThat(zh.demandIndex()).as("round %d demand", en.round())
+                    .isEqualByComparingTo(en.demandIndex());
+            assertThat(zh.costIndex()).isEqualByComparingTo(en.costIndex());
+            assertThat(zh.wageIndex()).isEqualByComparingTo(en.wageIndex());
+            assertThat(zh.trendStrength()).isEqualByComparingTo(en.trendStrength());
+            // The words are the language's own; the narrative is not empty.
+            assertThat(zh.description()).isNotBlank();
+        }
+        // The English cycle keeps its label; the Chinese cycle its own.
+        assertThat(scenario.roundAt("en", 1).orElseThrow().trendLabel()).isEqualTo("Stable");
+        assertThat(scenario.roundAt("zh", 1).orElseThrow().trendLabel()).isEqualTo("平稳");
+
+        // The deck is a set per language, with the same card count and the same reach per card.
+        assertThat(scenario.eventsOf("en")).hasSameSizeAs(scenario.eventsOf("zh"));
+        for (Scenario.EventSpec en : scenario.eventsOf("en")) {
+            Scenario.EventSpec zh = event(scenario, en.code() + "-ZH");
+            assertThat(zh.effects()).as("%s effects", en.code()).hasSameSizeAs(en.effects());
+            assertThat(zh.category()).isEqualTo(en.category());
+            assertThat(zh.probability()).isEqualByComparingTo(en.probability());
+        }
+    }
+
+    /** A run whose class reads the environment in its own language. */
+    private long seedRun(String lang) {
+        long runId = seedRun();
+        jdbc.update("update run set lang = ? where id = ?", lang, runId);
+        return runId;
+    }
+
+    @Test
+    void a_chinese_run_reads_the_chinese_set_and_its_own_narrative() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long runId = seedRun("zh");
+        environment.generateTimeline(scenario, runId, 4);
+
+        Map<String, Object> market = environment.conditions(scenario, runId, 1, "zh");
+
+        assertThat((String) market.get("description")).contains("需求与成本都处于基准水平");
+        assertThat((String) market.get("headline")).isEqualTo("平稳");
+        // The classes are one mechanic with per-language words (D83 kept for classes).
+        assertThat((List<Map<String, Object>>) market.get("segments"))
+                .extracting(row -> row.get("name"))
+                .containsExactly("大众市场", "中端市场", "高端客户");
+    }
+
+    @Test
+    void a_chinese_run_draws_the_chinese_cards_from_the_same_seed() {
+        Scenario scenario = scenarios.load("standard-v1");
+        long chinese = seedRun("zh");
+
+        environment.scheduleEvents(scenario, chinese);
+
+        List<String> drawn = jdbc.queryForList(
+                "select event_code from run_environment_event where run_id = ? order by event_code",
+                String.class, chinese);
+        // Whatever fires is a card of this run's deck, never the English one.
+        assertThat(drawn).allSatisfy(code -> assertThat(code).endsWith("-ZH"));
+        // The draw is seeded on the canonical code, so the same run would fire the same cards in
+        // English: both codes reduce to the same base.
+        assertThat(drawn).allSatisfy(code -> assertThat(EnvironmentService.canonical(code))
+                .doesNotEndWith("-ZH"));
     }
 
     private static Scenario.EventSpec event(Scenario scenario, String code) {
@@ -241,20 +316,14 @@ class EnvironmentTest extends PostgresTestBase {
     @Test
     void the_workbench_reads_the_economy_in_the_class_language() {
         Scenario scenario = scenarios.load("standard-v1");
-        long runId = seedRun();
+        long runId = seedRun("en");
         environment.generateTimeline(scenario, runId, 4);
 
         Map<String, Object> english = environment.conditions(scenario, runId, 1, "en");
-        Map<String, Object> chinese = environment.conditions(scenario, runId, 1, "zh");
 
         assertThat((String) english.get("description"))
                 .contains("Demand and costs are at their baseline");
-        assertThat((String) chinese.get("description"))
-                .contains("需求与成本都处于基准水平");
-        assertThat((String) chinese.get("headline")).isEqualTo("平稳");
-        assertThat((List<Map<String, Object>>) chinese.get("segments"))
-                .extracting(row -> row.get("name"))
-                .containsExactly("大众市场", "中端市场", "高端客户");
+        assertThat((String) english.get("headline")).isEqualTo("Stable");
         assertThat((List<Map<String, Object>>) english.get("segments"))
                 .extracting(row -> row.get("name"))
                 .containsExactly("Mass market", "Middle market", "Affluent buyers");
@@ -267,27 +336,37 @@ class EnvironmentTest extends PostgresTestBase {
     @Test
     void an_active_card_is_described_in_words_the_class_can_read() {
         Scenario scenario = scenarios.load("standard-v1");
-        long runId = seedRun();
-        environment.generateTimeline(scenario, runId, 4);
+        long chinese = seedRun("zh");
+        environment.generateTimeline(scenario, chinese, 4);
+        // D86: a Chinese class is drawn Chinese cards, so the frozen row names the -ZH card.
+        jdbc.update("""
+                insert into run_environment_event (run_id, event_code, starts_round, duration_months,
+                                                   demand_multiplier, cost_multiplier,
+                                                   wage_multiplier, effects)
+                values (?, 'EV-INFLATION-ZH', 1, 3, 1.000, 1.120, 1.080, '[]'::jsonb)
+                """, chinese);
+
+        Map<String, Object> zh = environment.conditions(scenario, chinese, 1, "zh");
+        List<Map<String, Object>> zhEvents = (List<Map<String, Object>>) zh.get("events");
+        assertThat(zhEvents).hasSize(1);
+        assertThat(zhEvents.get(0).get("name")).isEqualTo("通货膨胀");
+        assertThat(zhEvents.get(0).get("category")).isEqualTo("INFLATION");
+        assertThat((String) zh.get("description")).contains("物价上涨快于工资");
+
+        // An English run names the same card in English from its own set.
+        long english = seedRun("en");
+        environment.generateTimeline(scenario, english, 4);
         jdbc.update("""
                 insert into run_environment_event (run_id, event_code, starts_round, duration_months,
                                                    demand_multiplier, cost_multiplier,
                                                    wage_multiplier, effects)
                 values (?, 'EV-INFLATION', 1, 3, 1.000, 1.120, 1.080, '[]'::jsonb)
-                """, runId);
+                """, english);
 
-        Map<String, Object> chinese = environment.conditions(scenario, runId, 1, "zh");
-        Map<String, Object> english = environment.conditions(scenario, runId, 1, "en");
-
-        List<Map<String, Object>> zhEvents = (List<Map<String, Object>>) chinese.get("events");
-        assertThat(zhEvents).hasSize(1);
-        assertThat(zhEvents.get(0).get("name")).isEqualTo("通货膨胀");
-        assertThat(zhEvents.get(0).get("category")).isEqualTo("INFLATION");
-        assertThat((String) chinese.get("description")).contains("物价上涨快于工资");
-
-        List<Map<String, Object>> enEvents = (List<Map<String, Object>>) english.get("events");
+        Map<String, Object> en = environment.conditions(scenario, english, 1, "en");
+        List<Map<String, Object>> enEvents = (List<Map<String, Object>>) en.get("events");
         assertThat(enEvents.get(0).get("name")).isEqualTo("Inflation");
-        assertThat((String) english.get("description")).contains("Prices rise faster than wages");
+        assertThat((String) en.get("description")).contains("Prices rise faster than wages");
     }
 
     // ------------------------------------------------------------------ helpers

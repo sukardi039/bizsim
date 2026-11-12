@@ -326,6 +326,8 @@ export interface MarketForecast {
 }
 
 export interface TemplateRound {
+  /** D86: which language's cycle this row belongs to. */
+  lang: string;
   round: number;
   demandIndex: number;
   costIndex: number;
@@ -333,9 +335,8 @@ export interface TemplateRound {
   trendStrength: number;
   trendLabel: string;
   note: string;
-  /** D83: the brief market-environment narrative the workbench shows. */
+  /** D86: the brief market-environment narrative the workbench shows, in this row's language. */
   description?: string | null;
-  descriptionZh?: string | null;
 }
 
 /** One class of potential customer (D81). */
@@ -409,14 +410,13 @@ export interface TemplateProject {
 }
 
 export interface TemplateEvent {
+  /** D86: which language's deck this card belongs to. */
+  lang: string;
   code: string;
   name: string;
   description: string;
   /** D82: what kind of shock this is — the workbench prints it. */
   category?: string;
-  /** D83: the Chinese label and text of the same card (the mechanic is stored once). */
-  nameZh?: string | null;
-  descriptionZh?: string | null;
   /** D82: what the card does to each customer class. */
   effects?: { segmentCode: string; sizeMultiplier: number; purchasingPowerMultiplier: number }[];
   earliestRound: number;

@@ -83,6 +83,18 @@ public class RunService {
     @Transactional
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles) {
+        return createRun(tenantId, facilitatorId, name, scenarioKey, teams, requestedRounds,
+                requestedCycles, null);
+    }
+
+    /**
+     * The body of run creation. {@code lang} is the environment language (D86): a package passes its
+     * class language so the timeline and the deck are frozen in that language from the first round.
+     */
+    @Transactional
+    public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
+                             List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles,
+                             String lang) {
         if (!runs.scenarioExists(scenarioKey)) {
             throw ProblemException.badRequest("template.unknown", "unknown scenario " + scenarioKey, "template", scenarioKey);
         }
@@ -114,10 +126,14 @@ public class RunService {
         }
 
         long simulationId = runs.insertSimulation(tenantId, name, scenarioKey, facilitatorId);
-        // D64: the catalogue language is fixed when the session starts — the facilitator's own here,
-        // replaced by the package's class language when the session comes from a package.
+        // D64/D86: the environment language is fixed when the session starts — the package's class
+        // language when there is one, otherwise the facilitator's own. It must be set before the
+        // timeline and deck are frozen, or the run reads the wrong set from round 1.
+        String language = lang == null || lang.isBlank()
+                ? users.localeOf(tenantId, facilitatorId)
+                : lang.trim().toLowerCase(java.util.Locale.ROOT);
         long runId = runs.insertRun(tenantId, simulationId, scenarioKey, roundCount, cycles,
-                users.localeOf(tenantId, facilitatorId));
+                language);
         // The economy and the event deck are drawn once, here, and frozen for this run (D18/D19).
         environment.generateTimeline(scenario, runId, roundCount);
         environment.scheduleEvents(scenario, runId);
@@ -145,6 +161,18 @@ public class RunService {
     public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
                                  List<Long> profileIds, List<Long> traineeIds,
                                  Integer requestedRounds, Integer requestedCycles) {
+        return startPrepared(tenantId, facilitatorId, name, templateKey, profileIds, traineeIds,
+                requestedRounds, requestedCycles, null);
+    }
+
+    /**
+     * Starts a session whose language is already known — a package's class language. The language is
+     * set <em>before</em> the timeline and the deck are frozen, so a Chinese class is drawn Chinese
+     * cards from its first round (D86).
+     */
+    public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
+                                 List<Long> profileIds, List<Long> traineeIds,
+                                 Integer requestedRounds, Integer requestedCycles, String lang) {
         // A package's template is a frozen copy, which the library hides on purpose; existence is the
         // right question here, not visibility.
         if (!scenarios.existsForTenant(tenantId, templateKey)) {
@@ -199,7 +227,7 @@ public class RunService {
         }
 
         RunView view = createRun(tenantId, facilitatorId, name, templateKey, teams,
-                requestedRounds, requestedCycles);
+                requestedRounds, requestedCycles, lang);
 
         for (int i = 0; i < chosen.size(); i++) {
             List<String> productLine = chosen.get(i).products();
@@ -305,8 +333,9 @@ public class RunService {
         // Rounds come from the part's template, never from the request: a part is defined by the
         // template the builder published it with (ruling 5 Nov 2026).
         RunView view = startPrepared(tenantId, facilitatorId, name, part.templateKey(),
-                pkg.companyProfileIds(), effective, null, null);
-        // The class language of the package decides the catalogue for every seat in this part.
+                pkg.companyProfileIds(), effective, null, null, pkg.locale());
+        // The class language of the package decides the catalogue and the environment for every seat
+        // in this part. It was already passed to startPrepared; this only records the package.
         jdbc.update("""
                 update run set package_id = ?, part_position = ?,
                                lang = coalesce(?, lang)

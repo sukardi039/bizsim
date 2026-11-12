@@ -99,13 +99,14 @@ public class EnvironmentService {
         if (scenario.rounds().isEmpty()) {
             return;
         }
+        String lang = runLang(runId);
         BigDecimal demandDrift = ONE.add(nz(scenario.params().cycleDemandDrift()));
         BigDecimal costDrift = ONE.add(nz(scenario.params().cycleCostDrift()));
 
         for (int round = 1; round <= rounds; round++) {
             int position = Math.floorMod(round - 1, length) + 1;
             int cycle = (round - 1) / length;
-            Scenario.RoundSpec template = templateAt(scenario, position).orElse(null);
+            Scenario.RoundSpec template = templateAt(scenario, lang, position).orElse(null);
             if (template == null) {
                 continue;
             }
@@ -115,16 +116,15 @@ public class EnvironmentService {
             jdbc.update("""
                     insert into run_round_economy (run_id, round_number, demand_index, cost_index,
                                                    wage_index, trend_strength, trend_label,
-                                                   description, description_zh, label_zh)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                                   description)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
                     on conflict (run_id, round_number) do nothing
                     """, runId, round,
                     nz(template.demandIndex()).multiply(demandFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.costIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.wageIndex()).multiply(costFactor).setScale(3, RoundingMode.HALF_UP),
                     nz(template.trendStrength()).setScale(2, RoundingMode.HALF_UP),
-                    template.trendLabel(), template.description(), template.descriptionZh(),
-                    template.labelZh());
+                    template.trendLabel(), template.description());
         }
     }
 
@@ -133,15 +133,20 @@ public class EnvironmentService {
      * the schedule is frozen: the facilitator can look it up in the debrief and nobody can re-roll it
      * by restarting the app. The card's numbers are frozen here too (D84) — a template edit after the
      * draw must not change a class that is already playing.
+     *
+     * <p>D86: only the run's own language deck is drawn, and the seed uses the <em>canonical</em> code
+     * (the language suffix stripped), so the same run gets the same weather whichever language its
+     * class reads.
      */
     public List<String> scheduleEvents(Scenario scenario, long runId) {
         List<String> scheduled = new ArrayList<>();
-        for (Scenario.EventSpec event : scenario.events()) {
-            if (Seed.uniform(runId + ":env:" + event.code()).compareTo(event.probability()) >= 0) {
+        for (Scenario.EventSpec event : scenario.eventsOf(runLang(runId))) {
+            String seedCode = canonical(event.code());
+            if (Seed.uniform(runId + ":env:" + seedCode).compareTo(event.probability()) >= 0) {
                 continue;
             }
             int span = Math.max(0, event.latestRound() - event.earliestRound());
-            int offset = (int) Math.floor(Seed.uniform(runId + ":env-at:" + event.code()).doubleValue()
+            int offset = (int) Math.floor(Seed.uniform(runId + ":env-at:" + seedCode).doubleValue()
                     * (span + 1));
             int start = Math.min(event.earliestRound() + offset, event.latestRound());
             jdbc.update("""
@@ -156,6 +161,11 @@ public class EnvironmentService {
             scheduled.add(event.code());
         }
         return scheduled;
+    }
+
+    /** `EV-INFLATION-ZH` and `EV-INFLATION` are the same card in two languages (D86). */
+    static String canonical(String code) {
+        return code.replaceFirst("-[A-Z]{2}$", "");
     }
 
     private String effectsJson(List<Scenario.EventEffect> effects) {
@@ -177,10 +187,11 @@ public class EnvironmentService {
     // ------------------------------------------------------------------ the round
 
     public RoundEnvironment forRound(Scenario scenario, long runId, int round) {
+        String lang = runLang(runId);
         Scenario.RoundSpec base = runRound(runId, round)
-                .or(() -> templateAt(scenario, Math.max(1, round)))
-                .orElse(new Scenario.RoundSpec(round, ONE, ONE, ONE, BigDecimal.ZERO, "Stable",
-                        "neutral", null, null, null));
+                .or(() -> templateAt(scenario, lang, Math.max(1, round)))
+                .orElse(new Scenario.RoundSpec(lang, round, ONE, ONE, ONE, BigDecimal.ZERO,
+                        "Stable", "neutral", null));
 
         BigDecimal demand = nz(base.demandIndex());
         BigDecimal cost = nz(base.costIndex());
@@ -274,15 +285,14 @@ public class EnvironmentService {
     /** Descriptions of the events that have already started — public knowledge by then. */
     public List<Map<String, Object>> activeEventDetails(Scenario scenario, long runId, int round,
                                                         String lang) {
-        boolean zh = "zh".equals(lang);
         List<Map<String, Object>> details = new ArrayList<>();
         for (Resolved event : activeEvents(scenario, runId, round)) {
             Map<String, Object> row = new LinkedHashMap<>();
+            // D86: the frozen row points at the card of this run's language, so its words are the
+            // class's words; there is nothing to translate at read time.
             row.put("code", event.spec().code());
-            row.put("name", zh ? orElse(event.spec().nameZh(), event.spec().name())
-                    : event.spec().name());
-            row.put("description", zh ? orElse(event.spec().descriptionZh(), event.spec().description())
-                    : event.spec().description());
+            row.put("name", event.spec().name());
+            row.put("description", event.spec().description());
             row.put("category", event.spec().category());
             row.put("startedRound", event.startsRound());
             details.add(row);
@@ -305,9 +315,9 @@ public class EnvironmentService {
         for (int step = 1; step <= horizon; step++) {
             int target = round + step;
             Scenario.RoundSpec base = runRound(runId, target)
-                    .or(() -> templateAt(scenario, Math.max(1, target)))
-                    .orElse(new Scenario.RoundSpec(target, ONE, ONE, ONE, BigDecimal.ZERO,
-                            "Stable", "neutral", null, null, null));
+                    .or(() -> templateAt(scenario, runLang(runId), Math.max(1, target)))
+                    .orElse(new Scenario.RoundSpec(runLang(runId), target, ONE, ONE, ONE,
+                            BigDecimal.ZERO, "Stable", "neutral", null));
 
             BigDecimal demand = noisy(nz(base.demandIndex()), runId, round, step, "demand", band);
             Map<String, Object> row = new LinkedHashMap<>();
@@ -335,7 +345,7 @@ public class EnvironmentService {
         RoundEnvironment environment = forRound(scenario, runId, round);
         boolean zh = "zh".equals(lang);
         Scenario.RoundSpec frozen = runRound(runId, round).orElse(null);
-        Scenario.RoundSpec template = templateAt(scenario, Math.max(1, round)).orElse(null);
+        Scenario.RoundSpec template = templateAt(scenario, lang, Math.max(1, round)).orElse(null);
         // The run froze its words with its numbers (D84). A run drawn before that has none, so the
         // narrative falls back to the template position it was drawn from.
         Scenario.RoundSpec words = frozen != null && frozen.description() != null ? frozen : template;
@@ -346,8 +356,7 @@ public class EnvironmentService {
         body.put("costIndex", environment.costIndex());
         body.put("wageIndex", environment.wageIndex());
         body.put("trendStrength", environment.trendStrength());
-        body.put("trendLabel", words != null && zh ? orElse(words.labelZh(), words.trendLabel())
-                : environment.trendLabel());
+        body.put("trendLabel", environment.trendLabel());
         body.put("outlook", outlook(environment.demandIndex()));
         List<Map<String, Object>> events = activeEventDetails(scenario, runId, round, lang);
         body.put("events", events);
@@ -372,18 +381,16 @@ public class EnvironmentService {
             segments.add(row);
         }
         body.put("segments", segments);
-        body.put("headline", words != null && zh ? orElse(words.labelZh(), words.trendLabel())
-                : environment.trendLabel());
-        body.put("description", marketDescription(words, events, zh));
+        body.put("headline", environment.trendLabel());
+        body.put("description", marketDescription(words, events));
         return body;
     }
 
-    /** The brief narrative: what the economy is doing this month, in the reader's language. */
-    private static String marketDescription(Scenario.RoundSpec base, List<Map<String, Object>> events,
-                                            boolean zh) {
+    /** The brief narrative: what the economy is doing this month, in the run's language. */
+    private static String marketDescription(Scenario.RoundSpec base, List<Map<String, Object>> events) {
         StringBuilder text = new StringBuilder();
         if (base != null) {
-            String roundText = zh ? orElse(base.descriptionZh(), base.description()) : base.description();
+            String roundText = base.description();
             if (roundText != null && !roundText.isBlank()) {
                 text.append(roundText.trim());
             }
@@ -404,19 +411,24 @@ public class EnvironmentService {
 
     private Optional<Scenario.RoundSpec> runRound(long runId, int round) {
         return jdbc.query("""
-                select demand_index, cost_index, wage_index, trend_strength, trend_label,
-                       description, description_zh, label_zh
+                select demand_index, cost_index, wage_index, trend_strength, trend_label, description
                 from run_round_economy where run_id = ? and round_number = ?
-                """, (rs, i) -> new Scenario.RoundSpec(round, rs.getBigDecimal("demand_index"),
-                rs.getBigDecimal("cost_index"), rs.getBigDecimal("wage_index"),
-                rs.getBigDecimal("trend_strength"), rs.getString("trend_label"),
-                null, rs.getString("description"), rs.getString("description_zh"),
-                rs.getString("label_zh")),
+                """, (rs, i) -> new Scenario.RoundSpec(runLang(runId), round,
+                rs.getBigDecimal("demand_index"), rs.getBigDecimal("cost_index"),
+                rs.getBigDecimal("wage_index"), rs.getBigDecimal("trend_strength"),
+                rs.getString("trend_label"), null, rs.getString("description")),
                 runId, round).stream().findFirst();
     }
 
-    private static Optional<Scenario.RoundSpec> templateAt(Scenario scenario, int position) {
-        return scenario.rounds().stream().filter(spec -> spec.round() == position).findFirst();
+    /** The language this run reads the environment in (D64, D86); 'en' when the run is unknown. */
+    String runLang(long runId) {
+        return jdbc.query("select lang from run where id = ?",
+                        (rs, i) -> rs.getString(1), runId)
+                .stream().findFirst().orElse("en");
+    }
+
+    private static Optional<Scenario.RoundSpec> templateAt(Scenario scenario, String lang, int position) {
+        return scenario.roundAt(lang, position);
     }
 
     /**

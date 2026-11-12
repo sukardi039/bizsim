@@ -451,9 +451,18 @@ public class TemplateController {
                 throw ProblemException.badRequest("template.events_invalid",
                         "every event needs a code and a name", "field", "code");
             }
-            if (!codes.add(event.code())) {
+            String lang = isBlank(event.lang()) ? "en"
+                    : event.lang().trim().toLowerCase(java.util.Locale.ROOT);
+            if (!lang.matches("[a-z]{2}")) {
                 throw ProblemException.badRequest("template.events_invalid",
-                        "duplicate event code " + event.code(), "field", "code", "code", event.code());
+                        "event " + event.code() + ": a language is two lowercase letters",
+                        "field", "lang", "code", event.code());
+            }
+            // D86: a code is unique inside its language — the same card exists once per set.
+            if (!codes.add(lang + ":" + event.code())) {
+                throw ProblemException.badRequest("template.events_invalid",
+                        "duplicate event code " + event.code() + " in " + lang,
+                        "field", "code", "code", event.code());
             }
             if (event.earliestRound() < 1 || event.latestRound() < event.earliestRound()) {
                 throw ProblemException.badRequest("template.events_invalid",
@@ -521,17 +530,27 @@ public class TemplateController {
             throw ProblemException.badRequest("template.environment_invalid",
                     "the environment needs at least one round", "field", "rounds");
         }
-        if (rounds.size() > MAX_ROUNDS) {
-            throw ProblemException.badRequest("template.environment_invalid",
-                    "the environment cannot exceed " + MAX_ROUNDS + " rounds",
-                    "field", "rounds", "max", MAX_ROUNDS);
-        }
-        for (int i = 0; i < rounds.size(); i++) {
-            ScenarioRepository.RoundRow row = rounds.get(i);
-            if (row == null || row.round() != i + 1) {
+        // D86: each language carries its own cycle, numbered 1..n without gaps within that language.
+        Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+        Map<String, java.util.Set<Integer>> seen = new java.util.LinkedHashMap<>();
+        for (ScenarioRepository.RoundRow row : rounds) {
+            if (row == null || row.round() < 1) {
                 throw ProblemException.badRequest("template.environment_invalid",
-                        "rounds must be numbered 1..n without gaps", "field", "round");
+                        "every round needs a position", "field", "round");
             }
+            // A client written before D86 sends no language; that is the base set.
+            String lang = isBlank(row.lang()) ? "en"
+                    : row.lang().trim().toLowerCase(java.util.Locale.ROOT);
+            if (!lang.matches("[a-z]{2}")) {
+                throw ProblemException.badRequest("template.environment_invalid",
+                        "a language is two lowercase letters, not " + row.lang(), "field", "lang");
+            }
+            if (!seen.computeIfAbsent(lang, k -> new java.util.LinkedHashSet<>()).add(row.round())) {
+                throw ProblemException.badRequest("template.environment_invalid",
+                        "round " + row.round() + " appears twice in " + lang,
+                        "field", "round", "round", row.round());
+            }
+            counts.merge(lang, 1, Integer::sum);
             for (String index : List.of("demandIndex", "costIndex", "wageIndex")) {
                 BigDecimal value = switch (index) {
                     case "demandIndex" -> row.demandIndex();
@@ -540,9 +559,41 @@ public class TemplateController {
                 };
                 if (value == null || value.signum() <= 0) {
                     throw ProblemException.badRequest("template.environment_invalid",
-                            index + " must be above zero on round " + row.round(),
+                            index + " must be above zero on round " + row.round() + " (" + lang + ")",
                             "field", index, "round", row.round());
                 }
+            }
+        }
+        for (Map.Entry<String, java.util.Set<Integer>> entry : seen.entrySet()) {
+            int size = entry.getValue().size();
+            for (int position = 1; position <= size; position++) {
+                if (!entry.getValue().contains(position)) {
+                    throw ProblemException.badRequest("template.environment_invalid",
+                            "rounds must be numbered 1..n without gaps (" + entry.getKey()
+                                    + " is missing " + position + ")",
+                            "field", "round", "lang", entry.getKey());
+                }
+            }
+            if (size > MAX_ROUNDS) {
+                throw ProblemException.badRequest("template.environment_invalid",
+                        "the environment cannot exceed " + MAX_ROUNDS + " rounds",
+                        "field", "rounds", "max", MAX_ROUNDS);
+            }
+        }
+        requireSameLength(counts);
+    }
+
+    /** Every language cycle present must be the same length, or one class would run short. */
+    private static void requireSameLength(Map<String, Integer> counts) {
+        int first = -1;
+        for (Map.Entry<String, Integer> entry : counts.entrySet()) {
+            if (first < 0) {
+                first = entry.getValue();
+            } else if (entry.getValue() != first) {
+                throw ProblemException.badRequest("template.environment_invalid",
+                        "every language cycle must be the same length (" + entry.getKey() + " has "
+                                + entry.getValue() + ", another has " + first + ")",
+                        "field", "rounds", "lang", entry.getKey());
             }
         }
     }
