@@ -343,7 +343,6 @@ public class EnvironmentService {
      */
     public Map<String, Object> conditions(Scenario scenario, long runId, int round, String lang) {
         RoundEnvironment environment = forRound(scenario, runId, round);
-        boolean zh = "zh".equals(lang);
         Scenario.RoundSpec frozen = runRound(runId, round).orElse(null);
         Scenario.RoundSpec template = templateAt(scenario, lang, Math.max(1, round)).orElse(null);
         // The run froze its words with its numbers (D84). A run drawn before that has none, so the
@@ -371,13 +370,13 @@ public class EnvironmentService {
         for (Scenario.SegmentSpec segment : scenario.segments()) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", segment.code());
-            row.put("name", zh ? orElse(segment.nameZh(), segment.name()) : segment.name());
+            // D87: the class's words in the run's language, falling back to the authored name.
+            row.put("name", segment.nameIn(lang));
             row.put("product", productOf.get(segment.code()));
             row.put("baseSize", nz(segment.baseSize()));
             row.put("sizeIndex", environment.segmentSize(segment.code()));
             row.put("purchasingPower", environment.segmentPurchasingPower(segment.code()));
-            row.put("description", zh ? orElse(segment.descriptionZh(), segment.description())
-                    : segment.description());
+            row.put("description", segment.descriptionIn(lang));
             segments.add(row);
         }
         body.put("segments", segments);

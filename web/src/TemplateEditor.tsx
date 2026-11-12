@@ -33,10 +33,67 @@ function LanguageCell({ value, disabled, onChange }: {
 }
 
 /**
- * Duplicates one language set into another (D86) — the way a new language starts from a working
- * deck instead of ten empty rows. The copy is mechanical: same numbers, same effects, codes suffixed
- * with the target language; the words are then edited in place.
+ * The words of one object in each language (D87). A product's identity and numbers stay single; only
+ * its name changes with the reader, so the editor edits a small list rather than duplicating the row.
  */
+function TextsCell({ texts, disabled, onChange, withDescription = true }: {
+  texts?: { lang: string; name: string; description?: string | null }[];
+  disabled: boolean;
+  onChange: (texts: { lang: string; name: string; description?: string | null }[]) => void;
+  withDescription?: boolean;
+}) {
+  const { t } = useI18n();
+  const rows = texts ?? [];
+  const update = (at: number, patch: { lang?: string; name?: string; description?: string }) =>
+    onChange(rows.map((row, i) => (i === at ? { ...row, ...patch } : row)));
+  return (
+    <div className="texts-cell">
+      {rows.map((row, at) => (
+        <div key={at} className="text-row">
+          <LanguageCell
+            value={row.lang}
+            disabled={disabled}
+            onChange={(lang) => update(at, { lang })}
+          />
+          <input
+            value={row.name}
+            placeholder={t("field.name")}
+            disabled={disabled}
+            onChange={(e) => update(at, { name: e.target.value })}
+          />
+          {withDescription && (
+            <input
+              value={row.description ?? ""}
+              placeholder={t("field.description")}
+              disabled={disabled}
+              onChange={(e) => update(at, { description: e.target.value })}
+            />
+          )}
+          <button
+            type="button"
+            className="ghost"
+            disabled={disabled}
+            title={t("editor.removeThisRow")}
+            aria-label={t("editor.removeThisRow")}
+            onClick={() => onChange(rows.filter((_, i) => i !== at))}
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="ghost"
+        disabled={disabled}
+        onClick={() => onChange([...rows, { lang: "", name: "", description: "" }])}
+      >
+        {t("editor.addLanguage")}
+      </button>
+    </div>
+  );
+}
+
+
 function CopyLanguageSet({ languages, disabled, onCopy }: {
   languages: string[];
   disabled: boolean;
@@ -553,9 +610,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 <tr>
                   <th>{t("field.code")}</th>
                   <th>{t("field.name")}</th>
-                  <th>{t("field.nameZh")}</th>
                   <th>{t("field.description")}</th>
-                  <th>{t("field.descriptionZh")}</th>
+                  <th>{t("editor.translations")}</th>
                   <th className="num">{t("field.baseSize")}</th>
                   <th className="num">{t("field.purchasingPower")}</th>
                   <th className="num">{t("field.incomeElasticity")}</th>
@@ -571,9 +627,14 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <tr key={index}>
                       <td><input value={row.code} disabled={locked} onChange={(e) => edit({ code: e.target.value })} /></td>
                       <td><input value={row.name} disabled={locked} onChange={(e) => edit({ name: e.target.value })} /></td>
-                      <td><input value={row.nameZh ?? ""} disabled={locked} onChange={(e) => edit({ nameZh: e.target.value })} /></td>
                       <td><input value={row.description ?? ""} disabled={locked} onChange={(e) => edit({ description: e.target.value })} /></td>
-                      <td><input value={row.descriptionZh ?? ""} disabled={locked} onChange={(e) => edit({ descriptionZh: e.target.value })} /></td>
+                      <td>
+                        <TextsCell
+                          texts={row.texts}
+                          disabled={locked}
+                          onChange={(texts) => edit({ texts })}
+                        />
+                      </td>
                       <td><input className="num" value={String(row.baseSize)} disabled={locked} onChange={(e) => edit({ baseSize: Number(e.target.value) })} /></td>
                       <td><input className="num" value={String(row.basePurchasingPower)} disabled={locked} onChange={(e) => edit({ basePurchasingPower: Number(e.target.value) })} /></td>
                       <td><input className="num" value={String(row.incomeElasticity)} disabled={locked} onChange={(e) => edit({ incomeElasticity: Number(e.target.value) })} /></td>
@@ -601,9 +662,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     {
                       code: "",
                       name: "",
-                      nameZh: "",
                       description: "",
-                      descriptionZh: "",
+                      texts: [],
                       baseSize: 1000,
                       basePurchasingPower: 1,
                       incomeElasticity: 1,
@@ -784,6 +844,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 <tr>
                   <th>{t("field.code")}</th>
                   <th>{t("field.name")}</th>
+                  <th>{t("editor.translations")}</th>
                   <th className="num">{t("field.basePrice")}</th>
                   <th className="num">{t("field.baseUnitCost")}</th>
                   <th className="num">{t("field.baseQuality")}</th>
@@ -801,6 +862,14 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <tr key={index}>
                     <td><input value={row.code} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, code: e.target.value } : r))} /></td>
                     <td><input value={row.name} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
+                    <td>
+                      <TextsCell
+                        texts={row.texts}
+                        disabled={locked}
+                        withDescription={false}
+                        onChange={(texts) => setProducts((c) => c.map((r, i) => i === index ? { ...r, texts } : r))}
+                      />
+                    </td>
                     <td><input value={String(row.basePrice)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, basePrice: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.baseUnitCost)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, baseUnitCost: Number(e.target.value) } : r))} /></td>
                     <td><input value={String(row.baseQuality)} disabled={locked} onChange={(e) => setProducts((c) => c.map((r, i) => i === index ? { ...r, baseQuality: Number(e.target.value) } : r))} /></td>
@@ -834,7 +903,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               </tbody>
             </table>
             <div className="buttons">
-              <button type="button" disabled={locked} onClick={() => setProducts((c) => [...c, { code: "", name: "", basePrice: 1, baseUnitCost: 1, baseQuality: 50, baseDemand: 100, unitsPerWorker: 40, incomeElasticity: 1, trendAffinity: 0, targetSegment: null, crossSegmentPct: 0 }])}>
+              <button type="button" disabled={locked} onClick={() => setProducts((c) => [...c, { code: "", name: "", basePrice: 1, baseUnitCost: 1, baseQuality: 50, baseDemand: 100, unitsPerWorker: 40, incomeElasticity: 1, trendAffinity: 0, targetSegment: null, crossSegmentPct: 0, texts: [] }])}>
                 {t("editor.addRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>

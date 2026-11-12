@@ -139,17 +139,47 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
      * <p>{@code baseSize} is units per round for a ten-company run, {@code basePurchasingPower} an
      * index (1.000 = the class affords that base size at the reference price). Both move with the
      * economy: the demand index and trend hit the size, events hit either number.
+     *
+     * <p>{@code texts} is the class's name and description per language (D87); a language without a
+     * row falls back to {@code name}/{@code description}, the words the author wrote.
      */
-    public record SegmentSpec(String code, String name, String nameZh, String description,
-                              String descriptionZh, BigDecimal baseSize,
+    public record SegmentSpec(String code, String name, String description, BigDecimal baseSize,
                               BigDecimal basePurchasingPower, BigDecimal incomeElasticity,
-                              BigDecimal trendAffinity, int sortOrder) {
+                              BigDecimal trendAffinity, int sortOrder, Map<String, Text> texts) {
+
+        public String nameIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            return text == null || text.name() == null || text.name().isBlank() ? name : text.name();
+        }
+
+        public String descriptionIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            if (text != null && text.description() != null && !text.description().isBlank()) {
+                return text.description();
+            }
+            return description;
+        }
+    }
+
+    /** One language's words for an object whose mechanic stays single (D87). */
+    public record Text(String name, String description) {
     }
 
     public record ProductSpec(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
                               BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
                               BigDecimal incomeElasticity, BigDecimal trendAffinity,
-                              String targetSegment, BigDecimal crossSegmentPct) {
+                              String targetSegment, BigDecimal crossSegmentPct,
+                              Map<String, Text> texts) {
+
+        public String nameIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            return text == null || text.name() == null || text.name().isBlank() ? name : text.name();
+        }
+
+        public String descriptionIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            return text == null ? null : text.description();
+        }
     }
 
     public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {

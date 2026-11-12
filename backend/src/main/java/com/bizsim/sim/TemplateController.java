@@ -387,6 +387,34 @@ public class TemplateController {
                         product.code() + ": crossSegmentPct must be between 0 and 1",
                         "field", "crossSegmentPct", "code", product.code());
             }
+            validateTexts(product.texts(), product.code());
+        }
+    }
+
+    /**
+     * D87: a name per language, one row per language, two lowercase letters. A language without a row
+     * is not an error — the workbench falls back to the authored name.
+     */
+    private static void validateTexts(List<ScenarioRepository.TextRow> texts, String subject) {
+        if (texts == null) {
+            return;
+        }
+        Set<String> seen = new java.util.LinkedHashSet<>();
+        for (ScenarioRepository.TextRow text : texts) {
+            if (text == null || isBlank(text.name())) {
+                continue; // an empty row is a row the builder has not filled in yet
+            }
+            String lang = isBlank(text.lang()) ? "" : text.lang().trim().toLowerCase(java.util.Locale.ROOT);
+            if (!lang.matches("[a-z]{2}")) {
+                throw ProblemException.badRequest("template.catalog_invalid",
+                        subject + ": a language is two lowercase letters", "field", "texts.lang",
+                        "code", subject);
+            }
+            if (!seen.add(lang)) {
+                throw ProblemException.badRequest("template.catalog_invalid",
+                        subject + ": " + lang + " appears more than once", "field", "texts.lang",
+                        "code", subject);
+            }
         }
     }
 
@@ -414,6 +442,7 @@ public class TemplateController {
             }
             requirePositive(segment.baseSize(), "baseSize", segment.code());
             requirePositive(segment.basePurchasingPower(), "basePurchasingPower", segment.code());
+            validateTexts(segment.texts(), segment.code());
             if (segment.incomeElasticity() == null || segment.incomeElasticity().signum() < 0) {
                 throw ProblemException.badRequest("template.segments_invalid",
                         segment.code() + ": incomeElasticity must be 0 or more",

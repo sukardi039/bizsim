@@ -101,6 +101,7 @@ public class ScenarioRepository {
                 "WEIGHTED".equalsIgnoreCase(d.path("costBasis").asText("REPLACEMENT")));
 
 
+        Map<String, Map<String, Scenario.Text>> productTexts = productTextsOf(key);
         List<Scenario.ProductSpec> products = jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
                        income_elasticity, trend_affinity, target_segment, cross_segment_pct
@@ -110,7 +111,8 @@ public class ScenarioRepository {
                         rs.getBigDecimal("base_unit_cost"), rs.getBigDecimal("base_quality"),
                         rs.getBigDecimal("base_demand"), rs.getBigDecimal("units_per_worker"),
                         rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity"),
-                        rs.getString("target_segment"), rs.getBigDecimal("cross_segment_pct")), key);
+                        rs.getString("target_segment"), rs.getBigDecimal("cross_segment_pct"),
+                        productTexts.getOrDefault(rs.getString("code"), Map.of())), key);
 
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
@@ -155,32 +157,59 @@ public class ScenarioRepository {
     /**
      * The customer classes of a template (D81). Elasticity and trend affinity live here, not on the
      * product: the class is what an economy moves, and a product inherits its class's weather.
+     *
+     * <p>D87: the class keeps one mechanic and carries its words per language in `environment_text`.
      */
     public List<Scenario.SegmentSpec> segmentsOf(String key) {
+        Map<String, Map<String, Scenario.Text>> texts = segmentTextsOf(key);
         return jdbc.query("""
-                select s.code, s.name, s.base_size, s.base_purchasing_power, s.income_elasticity,
-                       s.trend_affinity, s.sort_order,
-                       (select t.name from environment_text t where t.scenario_key = s.scenario_key
-                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'en') as name_en,
-                       (select t.description from environment_text t where t.scenario_key = s.scenario_key
-                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'en') as description_en,
-                       (select t.name from environment_text t where t.scenario_key = s.scenario_key
-                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'zh') as name_zh,
-                       (select t.description from environment_text t where t.scenario_key = s.scenario_key
-                         and t.ref_type = 'SEGMENT' and t.ref_code = s.code and t.lang = 'zh') as description_zh
-                from customer_segment s where s.scenario_key = ? order by s.sort_order, s.code
-                """, (rs, i) -> new Scenario.SegmentSpec(
-                        rs.getString("code"),
-                        orElse(rs.getString("name_en"), rs.getString("name")),
-                        rs.getString("name_zh"), rs.getString("description_en"),
-                        rs.getString("description_zh"), rs.getBigDecimal("base_size"),
-                        rs.getBigDecimal("base_purchasing_power"),
-                        rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity"),
-                        rs.getInt("sort_order")), key);
+                select code, name, base_size, base_purchasing_power, income_elasticity,
+                       trend_affinity, sort_order
+                from customer_segment where scenario_key = ? order by sort_order, code
+                """, (rs, i) -> {
+            String code = rs.getString("code");
+            Map<String, Scenario.Text> classTexts = texts.getOrDefault(code, Map.of());
+            Scenario.Text base = classTexts.get("en");
+            return new Scenario.SegmentSpec(code, rs.getString("name"),
+                    base == null ? null : base.description(),
+                    rs.getBigDecimal("base_size"), rs.getBigDecimal("base_purchasing_power"),
+                    rs.getBigDecimal("income_elasticity"), rs.getBigDecimal("trend_affinity"),
+                    rs.getInt("sort_order"), classTexts);
+        }, key);
+    }
+
+    /** Every language's words for each customer class of a template. */
+    private Map<String, Map<String, Scenario.Text>> segmentTextsOf(String key) {
+        Map<String, Map<String, Scenario.Text>> bySegment = new LinkedHashMap<>();
+        jdbc.query("""
+                select ref_code, lang, name, description from environment_text
+                where scenario_key = ? and ref_type = 'SEGMENT'
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                bySegment.computeIfAbsent(rs.getString("ref_code"), k -> new LinkedHashMap<>())
+                        .put(rs.getString("lang"), new Scenario.Text(
+                                rs.getString("name"), rs.getString("description"))), key);
+        return bySegment;
+    }
+
+    /** Every language's words for each product of a template (D87). */
+    private Map<String, Map<String, Scenario.Text>> productTextsOf(String key) {
+        Map<String, Map<String, Scenario.Text>> byProduct = new LinkedHashMap<>();
+        jdbc.query("""
+                select product_code, lang, name, description from product_text
+                where scenario_key = ?
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                byProduct.computeIfAbsent(rs.getString("product_code"), k -> new LinkedHashMap<>())
+                        .put(rs.getString("lang"), new Scenario.Text(
+                                rs.getString("name"), rs.getString("description"))), key);
+        return byProduct;
     }
 
     private static String orElse(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     /** The event deck a builder may edit: the same shape the engine draws from (D18, D86). */
@@ -216,19 +245,6 @@ public class ScenarioRepository {
                                         rs.getBigDecimal("size_multiplier"),
                                         rs.getBigDecimal("purchasing_power_multiplier"))), key);
         return byEvent;
-    }
-
-    /** The Chinese {name, description} of every text row of one kind, keyed by ref_code. */
-    private Map<String, String[]> wordsOf(String key, String refType) {
-        Map<String, String[]> words = new LinkedHashMap<>();
-        jdbc.query("""
-                select ref_code, name, description from environment_text
-                where scenario_key = ? and ref_type = ? and lang = 'zh'
-                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
-                        words.put(rs.getString("ref_code"),
-                                new String[]{rs.getString("name"), rs.getString("description")}),
-                key, refType);
-        return words;
     }
 
     /**
@@ -281,21 +297,6 @@ public class ScenarioRepository {
 
     public static final List<String> EVENT_CATEGORIES = List.of("SUPPLY_SHOCK", "FINANCIAL_CRISIS",
             "INFLATION", "TECHNOLOGY", "DEMAND_SHOCK", "POLICY", "MARKETS", "OTHER");
-
-    /** Upserts one language's words for one object. A blank value deletes the row rather than storing "". */
-    private void saveWords(String key, String refType, String refCode, String name, String description) {
-        jdbc.update("""
-                delete from environment_text where scenario_key = ? and ref_type = ? and ref_code = ?
-                  and lang = 'zh'
-                """, key, refType, refCode);
-        if ((name == null || name.isBlank()) && (description == null || description.isBlank())) {
-            return;
-        }
-        jdbc.update("""
-                insert into environment_text (scenario_key, ref_type, ref_code, lang, name, description)
-                values (?, ?, ?, 'zh', ?, ?)
-                """, key, refType, refCode, name, description);
-    }
 
     // ------------------------------------------------------------------ templates
 
@@ -470,6 +471,13 @@ public class ScenarioRepository {
                 select ?, ref_type, ref_code, lang, name, description
                 from environment_text where scenario_key = ?
                 """, key, sourceKey);
+        // D87: a product's name per language is catalogue data too — a copy without it would read as
+        // authored names only, in every language.
+        jdbc.update("""
+                insert into product_text (scenario_key, product_code, lang, name, description)
+                select ?, product_code, lang, name, description
+                from product_text where scenario_key = ?
+                """, key, sourceKey);
 
     }
 
@@ -569,17 +577,21 @@ public class ScenarioRepository {
 
     // ------------------------------------------------------------------ catalogue (S6d)
 
+    /** One language's words as the editor sees them (D87). */
+    public record TextRow(String lang, String name, String description) {
+    }
+
     public record ProductRow(String code, String name, BigDecimal basePrice, BigDecimal baseUnitCost,
                              BigDecimal baseQuality, BigDecimal baseDemand, BigDecimal unitsPerWorker,
                              BigDecimal incomeElasticity, BigDecimal trendAffinity,
-                             String targetSegment, BigDecimal crossSegmentPct) {
+                             String targetSegment, BigDecimal crossSegmentPct,
+                             List<TextRow> texts) {
     }
 
-    /** One customer class as the editor sees it (D81). */
-    public record SegmentRow(String code, String name, String nameZh, String description,
-                             String descriptionZh, BigDecimal baseSize,
+    /** One customer class as the editor sees it (D81, D87). */
+    public record SegmentRow(String code, String name, String description, BigDecimal baseSize,
                              BigDecimal basePurchasingPower, BigDecimal incomeElasticity,
-                             BigDecimal trendAffinity, int sortOrder) {
+                             BigDecimal trendAffinity, int sortOrder, List<TextRow> texts) {
     }
 
     public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
@@ -593,6 +605,7 @@ public class ScenarioRepository {
     }
 
     public List<ProductRow> products(String key) {
+        Map<String, Map<String, Scenario.Text>> texts = productTextsOf(key);
         return jdbc.query("""
                 select code, name, base_price, base_unit_cost, base_quality, base_demand, units_per_worker,
                        income_elasticity, trend_affinity, target_segment, cross_segment_pct
@@ -602,14 +615,28 @@ public class ScenarioRepository {
                 rs.getBigDecimal("base_quality"), rs.getBigDecimal("base_demand"),
                 rs.getBigDecimal("units_per_worker"), rs.getBigDecimal("income_elasticity"),
                 rs.getBigDecimal("trend_affinity"), rs.getString("target_segment"),
-                rs.getBigDecimal("cross_segment_pct")), key);
+                rs.getBigDecimal("cross_segment_pct"),
+                textRows(texts.get(rs.getString("code")))), key);
     }
 
     /** The customer classes the editor may change: economy parameters, not catalogue codes. */
     public List<SegmentRow> segments(String key) {
-        return segmentsOf(key).stream().map(s -> new SegmentRow(s.code(), s.name(), s.nameZh(),
-                s.description(), s.descriptionZh(), s.baseSize(), s.basePurchasingPower(),
-                s.incomeElasticity(), s.trendAffinity(), s.sortOrder())).toList();
+        Map<String, Map<String, Scenario.Text>> texts = segmentTextsOf(key);
+        return segmentsOf(key).stream().map(s -> new SegmentRow(s.code(), s.name(), s.description(),
+                s.baseSize(), s.basePurchasingPower(), s.incomeElasticity(), s.trendAffinity(),
+                s.sortOrder(), textRows(texts.get(s.code())))).toList();
+    }
+
+    /** A language map as an ordered list, so the editor can show and edit one row per language. */
+    private static List<TextRow> textRows(Map<String, Scenario.Text> texts) {
+        if (texts == null || texts.isEmpty()) {
+            return List.of();
+        }
+        return texts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> new TextRow(entry.getKey(), entry.getValue().name(),
+                        entry.getValue().description()))
+                .toList();
     }
 
     public List<ChannelRow> channels(String key) {
@@ -656,6 +683,19 @@ public class ScenarioRepository {
                     row.baseQuality(), row.baseDemand(), row.unitsPerWorker(), row.incomeElasticity(),
                     row.trendAffinity(), row.targetSegment(),
                     row.crossSegmentPct() == null ? BigDecimal.ZERO : row.crossSegmentPct());
+            // D87: the name per language travels with the product; the code and the numbers are one row.
+            jdbc.update("delete from product_text where scenario_key = ? and product_code = ?",
+                    key, row.code());
+            for (TextRow text : row.texts() == null ? List.<TextRow>of() : row.texts()) {
+                if (text == null || isBlank(text.lang()) || isBlank(text.name())) {
+                    continue;
+                }
+                jdbc.update("""
+                        insert into product_text (scenario_key, product_code, lang, name, description)
+                        values (?, ?, ?, ?, ?)
+                        """, key, row.code(), text.lang().trim().toLowerCase(java.util.Locale.ROOT),
+                        text.name(), text.description());
+            }
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }
@@ -664,6 +704,8 @@ public class ScenarioRepository {
      * Replaces the customer classes (D81). The class is the unit the economy moves, so a class edit
      * changes every round of every session on this template — the controller refuses it once the
      * template has runs, exactly like the product catalogue.
+     *
+     * <p>D87: each class's words travel with it, one row per language; size and elasticity stay single.
      */
     @Transactional
     public void saveSegments(String key, List<SegmentRow> rows) {
@@ -688,8 +730,21 @@ public class ScenarioRepository {
                     """, key, row.code(), row.name(), row.baseSize(), row.basePurchasingPower(),
                     row.incomeElasticity(), row.trendAffinity(),
                     row.sortOrder() == 0 ? ++position : row.sortOrder());
-            saveWords(key, "SEGMENT", row.code(), row.nameZh(), row.descriptionZh());
-            if (row.description() != null && !row.description().isBlank()) {
+            for (TextRow text : row.texts() == null ? List.<TextRow>of() : row.texts()) {
+                if (text == null || isBlank(text.lang()) || isBlank(text.name())) {
+                    continue;
+                }
+                jdbc.update("""
+                        insert into environment_text (scenario_key, ref_type, ref_code, lang, name,
+                                                      description)
+                        values (?, 'SEGMENT', ?, ?, ?, ?)
+                        """, key, row.code(), text.lang().trim().toLowerCase(java.util.Locale.ROOT),
+                        text.name(), text.description());
+            }
+            // The base words are the English text when the author did not enter one.
+            boolean hasEnglish = row.texts() != null && row.texts().stream().anyMatch(text ->
+                    text != null && "en".equalsIgnoreCase(text.lang()) && !isBlank(text.name()));
+            if (!hasEnglish && row.description() != null && !row.description().isBlank()) {
                 jdbc.update("""
                         insert into environment_text (scenario_key, ref_type, ref_code, lang, name,
                                                       description)

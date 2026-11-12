@@ -339,13 +339,20 @@ export interface TemplateRound {
   description?: string | null;
 }
 
-/** One class of potential customer (D81). */
+/** One language's words for an object whose mechanic stays single (D87). */
+export interface TemplateText {
+  lang: string;
+  name: string;
+  description?: string | null;
+}
+
+/** One class of potential customer (D81, D87). */
 export interface TemplateSegment {
   code: string;
   name: string;
-  nameZh?: string | null;
   description?: string | null;
-  descriptionZh?: string | null;
+  /** D87: the class's words per language; a missing language falls back to name/description. */
+  texts?: TemplateText[];
   baseSize: number;
   basePurchasingPower: number;
   incomeElasticity: number;
@@ -372,6 +379,8 @@ export interface TemplateDetail {
 export interface TemplateProduct {
   code: string;
   name: string;
+  /** D87: the product's name and description per language; identity and numbers stay single. */
+  texts?: TemplateText[];
   /** D81: the customer class this product serves; null = legacy pool. */
   targetSegment?: string | null;
   /** D81: share of the other classes' market this product also competes for. */

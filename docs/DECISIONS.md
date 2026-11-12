@@ -311,3 +311,23 @@ card. The product owner's ruling: do what D64 did for R&D.
   narrative in the run's language (the old `description_zh`/`label_zh` columns are gone).
 - Language codes widen from `('en','zh')` to any two lowercase letters, so a new language is data: the
   builder copies a set (editor → Copy set) and translates it in place. No migration, no code.
+
+**D87 — A product and a customer class keep one mechanic and take their words per language.** D86
+duplicated cards and cycles because nothing keys on a card's identity. A product is the opposite: its
+code is a foreign key in the economy — decisions name it, `company_product` holds stock against it, a
+company profile lists it, `rnd_project.target_product` points at it. Duplicating products into
+`P1-ZH` would fork that identity, and every decision would have to know which language's code it
+means.
+
+So products and classes follow the customer-class pattern D83 already used:
+
+- `product_text(scenario_key, product_code, lang, name, description)` holds a product's words per
+  language; `product` keeps the single row — code, price, cost, quality, demand, units per worker,
+  target class, cross-segment share. `environment_text` holds the same for a customer class.
+- A missing language falls back to the name the author wrote, so a new class is never blank and a
+  builder translates only what they want to. This keeps the earlier ruling: an authored name is not
+  machine-translated.
+- The workbench reads the run's language: the product table and the class table are shown in it, while
+  the decision still names the **code**, so nothing in the engine changes.
+- The editor edits a small per-row "Translations" list (language + name (+ description)) rather than a
+  duplicated mechanical row, which is what stops the numbers drifting between languages.

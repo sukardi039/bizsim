@@ -249,6 +249,26 @@ class EnvironmentTest extends PostgresTestBase {
                 .findFirst().orElseThrow();
     }
 
+    @Test
+    void a_product_name_is_per_language_and_falls_back_to_the_authored_name() {
+        Scenario scenario = scenarios.load("standard-v1");
+        Scenario.ProductSpec basic = scenario.product("P1").orElseThrow();
+
+        // D87: the code and the numbers are one row; the name is the reader's language.
+        assertThat(basic.nameIn("zh")).isEqualTo("基础款");
+        assertThat(basic.descriptionIn("zh")).contains("大众市场");
+        // No English row is needed — the authored name is the base.
+        assertThat(basic.nameIn("en")).isEqualTo(basic.name());
+        // A language nobody has translated yet still reads, so a new class is never blank.
+        assertThat(basic.nameIn("ms")).isEqualTo(basic.name());
+
+        // Classes work the same way, and their words are already per-language in environment_text.
+        Scenario.SegmentSpec mass = scenario.segment("SEG-BASIC").orElseThrow();
+        assertThat(mass.nameIn("zh")).isEqualTo("大众市场");
+        assertThat(mass.nameIn("ms")).isEqualTo(mass.name());
+        assertThat(mass.descriptionIn("zh")).contains("大众家庭");
+    }
+
     // ---------------------------------------------------------------- D81-D85: the class is the unit
 
     @Test

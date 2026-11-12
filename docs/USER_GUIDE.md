@@ -105,8 +105,8 @@ the last row** (they act on the language of the last row) and **Copy from … to
 language's cycle into a new language code, then translate it in place. **Save** stores the whole
 timeline.
 
-**Customer classes** — the three groups of potential customer (D81). Each row is a class: code, name
-(English and Chinese), description (English and Chinese), *customers* (base units per round, sized
+**Customer classes** — the three groups of potential customer (D81). Each row is a class: code, name,
+description, **translations**, *customers* (base units per round, sized
 for ten companies), *purchasing power* (1.000 = the class affords that base), *income elasticity*
 (how hard a downturn hits the class) and *trend affinity* (how much a consumer trend moves it). An
 economic event never touches a product directly: it moves a class's customers and purchasing power,
@@ -139,10 +139,16 @@ descriptions and the cycle narrative in the new language. The copy keeps every n
 class effect, and codes take the new suffix (e.g. `EV-OIL-CRISIS-MS`). A class runs in the language
 of its package, so a new language needs no migration and no code change — only data.
 
-**Products** — one row per product: code, name, price, unit cost, quality, base demand, units per
-worker, income elasticity, trend affinity, **customer class** (which class the product is made for;
-blank = the legacy demand pool) and **cross-segment %** (the share of the other classes' demand the
-product also competes for).
+**Products** — one row per product: code, name, **translations**, price, unit cost, quality, base
+demand, units per worker, income elasticity, trend affinity, **customer class** (which class the
+product is made for; blank = the legacy demand pool) and **cross-segment %** (the share of the other
+classes' demand the product also competes for).
+
+**Translations** (products and customer classes) — the **Add language** block beside each row holds
+that object's name (and description, for a class) per language: type a two-letter code, the name in
+that language, and press **Save**. The code and every number stay one row — only the words change with
+the reader (D87). A language with no translation shows the name the author wrote, so a new class is
+never blank.
 
 **Channels** — code, name, reach weight, brand effect (how much brand helps in that channel).
 

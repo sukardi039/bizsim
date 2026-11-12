@@ -323,7 +323,7 @@ class ScoringEngineTest {
                         bd("15000000"), 2, bd("0.08"), 2, 4, bd("0.02"), bd("0.01"),
                         false, ZERO, false, 0, false),
                 List.of(new Scenario.ProductSpec("P", "Only", bd("100"), bd("40"), bd("50"),
-                        bd("10000"), bd("10"), ONE, ZERO, null, ZERO)),
+                        bd("10000"), bd("10"), ONE, ZERO, null, ZERO, Map.of())),
                 List.of(new Scenario.ChannelSpec("C", "Channel", ONE, ONE)),
                 List.of(project), List.of(), List.of(), List.of());
     }
@@ -336,14 +336,14 @@ class ScoringEngineTest {
         Scenario base = scenario();
         return new Scenario(base.key(), base.params(),
                 List.of(new Scenario.ProductSpec("PA", "Mass", bd("100"), bd("40"), bd("50"),
-                                bd("1000"), bd("10"), ONE, ZERO, "SEG-BASIC", ZERO),
+                                bd("1000"), bd("10"), ONE, ZERO, "SEG-BASIC", ZERO, Map.of()),
                         new Scenario.ProductSpec("PB", "Affluent", bd("100"), bd("40"), bd("50"),
-                                bd("200"), bd("10"), ONE, ZERO, "SEG-PREMIUM", bd("0.10"))),
+                                bd("200"), bd("10"), ONE, ZERO, "SEG-PREMIUM", bd("0.10"), Map.of())),
                 base.channels(), base.projects(), base.rounds(),
-                List.of(new Scenario.SegmentSpec("SEG-BASIC", "Mass", null, null, null,
-                                bd("1000"), ONE, ONE, ZERO, 1),
-                        new Scenario.SegmentSpec("SEG-PREMIUM", "Affluent", null, null, null,
-                                bd("200"), ONE, ONE, ZERO, 2)),
+                List.of(new Scenario.SegmentSpec("SEG-BASIC", "Mass", null,
+                                bd("1000"), ONE, ONE, ZERO, 1, Map.of()),
+                        new Scenario.SegmentSpec("SEG-PREMIUM", "Affluent", null,
+                                bd("200"), ONE, ONE, ZERO, 2, Map.of())),
                 base.events());
     }
 

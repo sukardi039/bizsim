@@ -367,3 +367,8 @@ button.danger:hover { background: rgba(255, 120, 120, .12); }
 .copy-set { display: inline-flex; gap: .4rem; align-items: center; }
 .copy-set label { display: inline-flex; gap: .3rem; align-items: center; font-size: .85rem; }
 .copy-set input, .copy-set select { width: auto; }
+
+/* D87: one row of words per language, beside a single mechanic. */
+.texts-cell { display: flex; flex-direction: column; gap: .25rem; }
+.text-row { display: flex; gap: .25rem; align-items: center; }
+.text-row input { width: auto; min-width: 6rem; }

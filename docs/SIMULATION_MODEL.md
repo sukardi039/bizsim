@@ -325,6 +325,10 @@ term still says what it meant after the template it came from was edited.
 It is all scenario data: the shipped `standard-v1` carries the default classes and nine event cards, a
 template copies them with the rest of its catalogue, and a builder edits the copy.
 
+`V34__product_text.sql` adds a product's words per language (D87): `product_text` beside the single
+`product` row, with the shipped three named in Chinese. Identity and numbers stay single; only the
+label follows the reader. A missing language falls back to the authored name.
+
 `V33__environment_language_sets.sql` gives each language its own environment (D86):
 `environment_event.lang`, `scenario_round.lang`, `scenario_round.description`, the `-ZH` duplicate of
 the shipped deck and cycle, and `environment_text` reduced to customer-class words. Language codes are

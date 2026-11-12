@@ -534,11 +534,13 @@ public class RoundService {
 
         List<Map<String, Object>> products = new ArrayList<>();
         Map<String, ScoringEngine.ProductState> line = rounds.products(runId).getOrDefault(teamId, Map.of());
+        // D87: the product's code is the identity the decision names; its name is the class's language.
+        String productLang = runs.langOf(runId);
         for (Scenario.ProductSpec spec : scenario.products()) {
             ScoringEngine.ProductState state = line.get(spec.code());
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", spec.code());
-            row.put("name", spec.name());
+            row.put("name", spec.nameIn(productLang));
             row.put("price", state == null ? spec.basePrice() : state.price());
             row.put("unitCost", state == null ? spec.baseUnitCost() : state.unitCost());
             row.put("quality", state == null ? spec.baseQuality() : state.quality());
