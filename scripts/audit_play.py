@@ -242,7 +242,18 @@ def main() -> None:
         return
 
     print(f"run 1: {rounds} rounds, {len(names)} companies")
-    play(1, emails, names, lambda context, number: strategies(context, number), rounds)
+    # `play` takes the seats it drives: one per company, each with the email that signs in for it.
+    # The old call passed bare e-mail lists with a name table, which no longer matches the signature.
+    # The seed seats playerN@<tenant>.test on company N in creation order, and the staff user list
+    # does not carry trainees, so the emails come from that convention rather than an API read.
+    admin = login("admin@" + TENANT + ".test")
+    run = call("/api/runs/1", token=admin)
+    teams = sorted(run["teams"], key=lambda team: team["id"])
+    if len(teams) != len(names):
+        raise SystemExit(f"run 1 seats {len(teams)} companies, expected {len(names)} strategies")
+    seats = [{"id": team["id"], "email": f"player{index + 1}@{TENANT}.test", "name": names[index]}
+             for index, team in enumerate(teams)]
+    play(1, seats, strategies, rounds)
     print("done — now run scripts/audit_financials.py")
 
 

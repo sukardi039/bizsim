@@ -270,6 +270,32 @@ code, name, targetProduct, hiddenCost, hintBand(±%), advantageType, advantageVa
   to ≥ 0 the company goes back to `ACTIVE`. It is never removed from the run and never deleted —
   the debrief needs its history. Ranking: insolvent companies are ordered last, by cash.
 
+## 7a. The three reports on the review page (D88)
+
+The monthly statement already carries every figure the three reports need, so they are read, never
+recomputed (`FinancialStatementsService`):
+
+| Report | Built from | Identity |
+|---|---|---|
+| Profit and loss | revenue, cogs, payroll, marketing, rnd, quality, fixed, holding, hiring, report | revenue − cogs − opex = `profit` |
+| Cash flow | `profit`, closing stock value per product (`detail.stockValues`), `capacity_cost`, `detail.refund` | profit − Δinventory − machines + refund = cash after − cash before |
+| Assets and liabilities | `cash_after`, stock values, cumulative `capacity_cost`, round-1 `opening_cash`, cumulative profit and refunds | assets = liabilities + equity |
+
+Two modelling facts the reports make explicit rather than implied:
+
+- **`capacity_cost` is capitalised.** The engine charges machines to cash and never to profit
+  (ScoringEngine §"profit = revenue − every cost"), so they are an asset at cost. **There is no
+  depreciation**: adding a charge would move profit, prices and every frozen round. R&D is expensed,
+  so no intangible asset exists either.
+- **R&D refunds bypass profit.** `overfunding` defaults to `REFUND`; the money returns to cash when a
+  project completes over-funded, while `profit` keeps charging the request. Equity carries the
+  cumulative refund under its own line so the sheet balances without touching the scoreboard.
+
+A revaluation line appears only when a statement's closing stock value does not equal the next
+round's opening value — a pre-D79 replacement-cost statement, or stored stock that did not persist.
+It is displayed (the cash flow and the equity both name it) rather than absorbed into a total, and a
+**difference** row appears if the sheet still does not balance.
+
 ## 8. KPIs for the debrief (PROPOSED)
 
 | # | KPI | Unit | Source |

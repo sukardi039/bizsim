@@ -334,3 +334,42 @@ So products and classes follow the customer-class pattern D83 already used:
   the decision still names the **code**, so nothing in the engine changes.
 - The editor edits a small per-row "Translations" list (language + name (+ description)) rather than a
   duplicated mechanical row, which is what stops the numbers drifting between languages.
+
+**D88 — The review page carries the three reports, built from stored statements (ruling 17 Nov 2026).**
+The debrief and the trainee's results showed one breakdown of revenue, cost and cash. They now show
+the three documents a manager is judged on, for the selected round:
+
+- **Profit and loss** — revenue − cost of goods sold = **gross profit**; then payroll, marketing, R&D,
+  quality, fixed cost, stock holding, hiring/firing and the market review as operating expenses;
+  **operating profit** is the stored `profit`, to the cent.
+- **Cash flow statement** — indirect: profit, then the change in inventories, gives **net cash from
+  operations**; machines bought and R&D refunds received give **investing**; **financing is zero**
+  because no borrowing is modelled. The net movement must equal closing cash − opening cash.
+- **Assets and liabilities** — cash + inventories + machines at cost = **total assets**;
+  **liabilities are zero** and shown as a line; **paid-in capital** (what the round-1 opening cash
+  was) + **retained earnings** (cumulative profit) + **R&D refunds received** = **total equity**.
+  The report carries a **difference** line, shown only when it is not zero.
+
+Ruled with it:
+
+- **Machines are capitalised, not expensed, and not depreciated.** That is what the engine does:
+  `capacity_cost` leaves the bank and never touches profit. A balance sheet that ignored it would
+  fail to balance, and a depreciation charge would move profit, prices and every frozen round. The
+  reports state the rule on the page instead of leaving it implied.
+- **R&D is expensed**, so no intangible asset is carried; a project's benefit shows up as lower cost
+  or higher quality, not as a balance-sheet item.
+- **R&D refunds sit in equity, with their own line.** The cash returns while `profit` keeps charging
+  the full request, so folding it into profit would change the scoreboard and every stored round.
+  The reports disclose it rather than reconciling it away.
+- **A revaluation line appears only when it must.** On a weighted-average statement the inventory
+  change is exactly what cash paid and profit charged, so no line appears. A pre-D79 replacement-cost
+  statement, or a stored closing stock that did not carry into the next round, leaves a gap; it is
+  shown as **inventory revaluation** (and in equity as a reserve) so the reports still tie, and the
+  **difference** line exposes anything that does not.
+- **One implementation, both roles.** The arithmetic lives in `FinancialStatementsService` and is read
+  at `GET /api/runs/{runId}/teams/{teamId}/financials`, with the same access rule as the statements: a
+  trainee reads their own company, staff read any company of their run. Rows are i18n keys, so the
+  server carries no words and each language is a full set.
+- **Every figure is read, not re-derived** from the template, so a report agrees with the round even
+  after the template is edited, and historical rounds keep their own numbers.
+

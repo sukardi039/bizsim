@@ -457,7 +457,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           return (
             <>
               <h3 className="pick-head">{t("player.resultsRound", { round: row.round })}</h3>
-              <StatementDetail row={row} />
+              <StatementDetail row={row} runId={run.id} teamId={team.id} />
             </>
           );
         })()}

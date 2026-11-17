@@ -422,6 +422,38 @@ Under the scoreboard, for any computed round:
 Every number comes from that round's statements — the debrief cannot disagree with what the engine
 charged.
 
+### 7.4.1 The three reports (profit and loss, cash flow, assets and liabilities)
+
+Under the per-round detail, every company's month ends with three reports for the same round (D88).
+They are read top to bottom, and the trainee sees exactly the same three for their own company (§8).
+
+1. **Profit and loss** — **Revenue**, less **Cost of goods sold**, gives **Gross profit**. Under it
+   sit the operating expenses: payroll, marketing, R&D, quality upgrade, fixed cost, stock holding,
+   hiring and firing, and the market review. Their total is **Operating expenses**, and revenue less
+   all of it is **Operating profit** — the same profit the scoreboard ranks.
+   A note under the table says the thing trainees always ask: *machines bought this month are not an
+   expense; they are on the balance sheet at cost.*
+2. **Cash flow statement** — starts from the round's profit, removes the part of it that was not cash
+   by showing the **change in inventories**, and arrives at **net cash from operations**. **Machines
+   bought** and any **R&D refund received** are investing; **financing is zero** because the model
+   has no borrowing. **Net movement in cash** plus the opening cash equals the closing cash the
+   round detail shows above.
+3. **Assets and liabilities** — **cash + inventories + machines at cost = total assets**;
+   **liabilities** are zero and printed as a line rather than left out; **paid-in capital** (the
+   starting cash), **retained earnings** (profit of every round so far) and any **R&D refunds
+   received** add to **total equity**; and **total liabilities and equity** equals total assets.
+
+Two lines appear only when there is something to say:
+
+- **R&D refunds received** — money returned when a project was over-funded. The cash came back while
+  the profit and loss had already charged the full request, so it sits in equity and is named.
+- **Inventory revaluation** — only on old statements computed before the weighted-average basis
+  (D79), or when stored stock did not carry into the next round. It is shown, never folded away, and
+  a **Difference** line appears whenever the two sides do not agree.
+
+Nothing here is recomputed: each figure is read from the round's stored statement, so an old round
+still reads as it did on the day it was computed.
+
 ### 7.5 Presenting and exporting the debrief
 
 Three buttons sit next to the round selector:
@@ -502,6 +534,9 @@ language your class runs in.
    - **Per product**, the same round broken down by product (opening, produced, demand, sold,
      lost, closing, revenue, COGS) — this is where "which product lost those pieces?" is answered
      for the trainee too.
+   - the **three reports** for that round — profit and loss, cash flow statement, and assets and
+     liabilities — under the detail, exactly as §7.4.1 describes them. They are your own company's
+     books, built from the same stored statement, and nobody else's.
 
    **Competitors' figures and the market share stay on the facilitator's screen**; the trainee sees
    only their own company. Everything comes from the same statement rows the debrief reads.

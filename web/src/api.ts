@@ -248,6 +248,28 @@ export interface StatementRow {
   } | null;
 }
 
+/**
+ * D88: the three reports the review page shows. Every row is a translation key plus an amount, so the
+ * server carries no words; `level` is 0 for a line, 1 for a subtotal and 2 for a total.
+ */
+export interface FinancialRow {
+  key: string;
+  amount: number;
+  level: number;
+}
+
+export interface FinancialRound {
+  round: number;
+  pnl: FinancialRow[];
+  cashFlow: FinancialRow[];
+  balance: FinancialRow[];
+}
+
+export interface Financials {
+  teamId: number;
+  rounds: FinancialRound[];
+}
+
 export interface ScoreRow {
   round: number;
   team_id: number;
@@ -703,6 +725,9 @@ export const api = {
   deleteRun: (runId: number) => request<unknown>(`/runs/${runId}`, { method: "DELETE" }),
   statements: (runId: number, teamId: number) =>
     request<StatementRow[]>(`/runs/${runId}/teams/${teamId}/statements`),
+  /** D88: profit and loss, cash flow and the balance sheet, one entry per computed round. */
+  financials: (runId: number, teamId: number) =>
+    request<Financials>(`/runs/${runId}/teams/${teamId}/financials`),
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>

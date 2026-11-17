@@ -323,6 +323,8 @@ export default function DebriefPanel({
                             row={statement}
                             share={row.market_share}
                             decision={decisions[row.team_id]}
+                            runId={runId}
+                            teamId={row.team_id}
                           />
                         );
                       })()}

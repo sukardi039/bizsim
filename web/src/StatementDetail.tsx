@@ -1,6 +1,7 @@
 import { useI18n } from "./i18n";
 import type { DecisionInput, StatementRow } from "./api";
 import DecisionSummary from "./DecisionSummary";
+import FinancialStatements from "./FinancialStatements";
 
 /**
  * One company's round, grouped as Submission · Revenue · Cost · Result.
@@ -15,11 +16,16 @@ export default function StatementDetail({
   row,
   share,
   decision,
+  runId,
+  teamId,
 }: {
   row: StatementRow;
   share?: number;
   /** The month the company sent, when the caller has it. Omitted by the trainee's own view. */
   decision?: DecisionInput | null;
+  /** The run and company this round belongs to: the three reports are read per company (D88). */
+  runId: number;
+  teamId: number;
 }) {
   const { t, money, number } = useI18n();
 
@@ -218,6 +224,8 @@ export default function StatementDetail({
         </div>
       )}
       </section>
+
+      <FinancialStatements runId={runId} teamId={teamId} round={row.round} />
     </>
   );
 }

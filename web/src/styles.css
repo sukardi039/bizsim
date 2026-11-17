@@ -247,6 +247,19 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   font-weight: 600;
 }
 
+/* D88: the three reports. Stacked rather than side by side — an accountant reads a column of
+   figures top to bottom, and the amounts are wider than a third of the card. */
+.financials .statement { margin-top: 1rem; max-width: 46rem; }
+.financials .statement h5 {
+  margin: 0 0 .3rem;
+  font-size: .8rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.financials .lines .total.grand { font-weight: 700; }
+.financials .note { font-size: .8rem; margin: .4rem 0 0; }
+
 /* ---------------------------------------------------------------- facilitator tools (D12) */
 .check { display: flex; align-items: center; gap: .5rem; margin: .75rem 0 .25rem; }
 .cash-row { display: flex; gap: .35rem; align-items: center; }

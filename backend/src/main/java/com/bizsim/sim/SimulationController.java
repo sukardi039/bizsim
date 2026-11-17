@@ -26,13 +26,16 @@ public class SimulationController {
     private final DebriefExportService debrief;
     private final BotRoundService bots;
     private final EvaluationReportService evaluations;
+    private final FinancialStatementsService financials;
 
     public SimulationController(RoundService rounds, DebriefExportService debrief,
-                                BotRoundService bots, EvaluationReportService evaluations) {
+                                BotRoundService bots, EvaluationReportService evaluations,
+                                FinancialStatementsService financials) {
         this.rounds = rounds;
         this.debrief = debrief;
         this.bots = bots;
         this.evaluations = evaluations;
+        this.financials = financials;
     }
 
     @PostMapping("/teams/{teamId}/decisions")
@@ -57,6 +60,18 @@ public class SimulationController {
     public List<Map<String, Object>> statements(@PathVariable long runId, @PathVariable long teamId) {
         TenantContext.Principal me = TenantContext.require();
         return rounds.statements(me.tenantId(), me.userId(), me.role(), runId, teamId);
+    }
+
+    /**
+     * D88: profit and loss, cash flow and assets-and-liabilities for one company, one entry per
+     * computed round. Built from the statements above, so it carries the same access rule: a trainee
+     * reads their own company, staff read any company of their run.
+     */
+    @GetMapping("/teams/{teamId}/financials")
+    public FinancialStatementsService.Financials financials(@PathVariable long runId,
+                                                            @PathVariable long teamId) {
+        TenantContext.Principal me = TenantContext.require();
+        return financials.financials(me.tenantId(), me.userId(), me.role(), runId, teamId);
     }
 
     /** The paid forecast (D18). 402 until the round's decision buys it. */
