@@ -632,9 +632,12 @@ export interface StandingsRow {
   rank: number;
   teamId: number;
   company: string;
-  /** D75: cash after the round — the figure the rank is built on. */
+  /** D98: the rank is built on cumulative profit; cash travels as information. */
   cash: number;
   profit: number;
+  cumulativeProfit: number;
+  /** D98: cumulative profit as a percentage of paid-in capital plus machines at cost. */
+  roce: number;
   own: boolean;
 }
 

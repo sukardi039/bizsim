@@ -12,6 +12,7 @@ import {
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import FinancialStatements from "./FinancialStatements";
+import PositionMap, { positionsFrom } from "./PositionMap";
 import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
@@ -244,6 +245,31 @@ export default function DebriefPanel({
       </div>
       <p className="muted">{t("debrief.hint")}</p>
       {problem && <p className="error">{problem}</p>}
+
+      {/* D98: the round's competitive picture — price against quality, bubble by share. */}
+      <PositionMap
+        points={positionsFrom(
+          board.map((row) => ({
+            teamId: row.team_id,
+            company: row.company_name,
+            share: Number(row.market_share ?? 0),
+            own: false,
+          })),
+          new Map(
+            board.map((row) => {
+              const entry = statements[row.team_id]?.find((statement) => statement.round === round);
+              return [
+                row.team_id,
+                (entry?.detail?.products ?? []).map((line) => ({
+                  price: Number(line.price ?? 0),
+                  quality: Number(line.quality ?? 0),
+                  sold: Number(line.sold ?? 0),
+                })),
+              ];
+            }),
+          ),
+        )}
+      />
 
       <table>
         <thead>

@@ -881,12 +881,12 @@ class RoundFlowApiTest extends PostgresTestBase {
     // ------------------------------------------------------------------ helpers
 
     /**
-     * D75: the class table ranks by cash after the round, then by that round's profit. Cash and profit
-     * are set so the two orderings disagree — the failure this test is here to catch is a table that
-     * still sorts on profit while showing cash.
+     * D98: the class table ranks by **cumulative profit**; cash is information, not the measure. The
+     * values are set so the two orderings disagree — the failure this test exists to catch is a table
+     * that still sorts on the bank balance while claiming to judge the position.
      */
     @Test
-    void the_class_table_ranks_by_cash_then_by_that_rounds_profit() throws Exception {
+    void the_class_table_ranks_by_cumulative_profit_and_shows_cash_as_information() throws Exception {
         openRound();
         submit(playerOneToken, teamOne, payload(600, 150, 30, 20_000_000L, 30, 0))
                 .andExpect(status().isOk());
@@ -894,21 +894,25 @@ class RoundFlowApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + facilitatorToken))
                 .andExpect(status().isOk());
 
-        // More cash, less profit: liquidity wins.
-        score(teamOne, "1600000000", "10000000");
-        score(teamTwo, "1500000000", "90000000");
+        // Less cash, more cumulative profit: the stronger position wins.
+        score(teamOne, "1000000000", "20000000", "20000000");
+        score(teamTwo, "1600000000", "10000000", "10000000");
 
         JsonNode first = standings();
         assertThat(first).hasSize(2);
         assertThat(first.get(0).get("teamId").asLong()).isEqualTo(teamOne);
         assertThat(first.get(0).get("rank").asInt()).isEqualTo(1);
-        assertThat(first.get(0).get("cash").decimalValue()).isEqualByComparingTo("1600000000");
-        assertThat(first.get(0).get("profit").decimalValue()).isEqualByComparingTo("10000000");
+        assertThat(first.get(0).get("cumulativeProfit").decimalValue())
+                .isEqualByComparingTo("20000000");
+        // The bank balance is still on the row: a facilitator needs liquidity, and the reader needs to
+        // be able to argue with the rank.
+        assertThat(first.get(0).get("cash").decimalValue()).isEqualByComparingTo("1000000000");
+        assertThat(first.get(0).get("roce").isNumber()).isTrue();
         assertThat(first.get(1).get("teamId").asLong()).isEqualTo(teamTwo);
 
-        // Same cash: the round's profit breaks the tie.
-        score(teamOne, "1500000000", "10000000");
-        score(teamTwo, "1500000000", "90000000");
+        // Same cumulative profit: the round's profit breaks the tie.
+        score(teamOne, "1500000000", "10000000", "30000000");
+        score(teamTwo, "1500000000", "90000000", "30000000");
 
         JsonNode second = standings();
         assertThat(second.get(0).get("teamId").asLong()).isEqualTo(teamTwo);
@@ -925,13 +929,14 @@ class RoundFlowApiTest extends PostgresTestBase {
     }
 
     /** Rewrites one company's cash and profit for round 1, to force the ordering under test. */
-    private void score(long teamId, String cash, String profit) {
+    private void score(long teamId, String cash, String profit, String cumulativeProfit) {
         jdbc.update("""
                 update round_result
-                set score = jsonb_set(jsonb_set(score, '{cash}', to_jsonb(?::numeric)),
-                                      '{profit}', to_jsonb(?::numeric))
+                set score = jsonb_set(jsonb_set(jsonb_set(score, '{cash}', to_jsonb(?::numeric)),
+                                                '{profit}', to_jsonb(?::numeric)),
+                                      '{cumulativeProfit}', to_jsonb(?::numeric))
                 where team_id = ? and round_id = (select id from round where run_id = ? and number = 1)
-                """, cash, profit, teamId, runId);
+                """, cash, profit, cumulativeProfit, teamId, runId);
     }
 
     /**

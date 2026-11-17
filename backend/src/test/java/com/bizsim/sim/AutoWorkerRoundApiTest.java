@@ -467,9 +467,11 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].rank").value(1))
                 .andExpect(jsonPath("$[0].company").isString())
-                // D75: the ranking figure travels with the row, because it is what the rank means.
+                // D98: the figures the rank is made of travel with the row.
                 .andExpect(jsonPath("$[0].cash").isNumber())
                 .andExpect(jsonPath("$[0].profit").isNumber())
+                .andExpect(jsonPath("$[0].cumulativeProfit").isNumber())
+                .andExpect(jsonPath("$[0].roce").isNumber())
                 .andReturn();
 
         // D21 stays true for everything else: no share, no stock, no cost lines in the payload. Cash
@@ -479,12 +481,13 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                 .doesNotContain("cogs").doesNotContain("share");
         assertThat(body).contains("\"own\":true");
 
-        // The order is cash first, then the round's profit — not profit alone.
+        // D98: the order is cumulative profit first, then the round's profit — cash is information,
+        // not the measure. A company with a bigger bank balance but weaker cumulative profit loses.
         JsonNode rows = json.readTree(body);
-        assertThat(rows.get(0).get("cash").decimalValue())
-                .isGreaterThanOrEqualTo(rows.get(1).get("cash").decimalValue());
-        if (rows.get(0).get("cash").decimalValue()
-                .compareTo(rows.get(1).get("cash").decimalValue()) == 0) {
+        assertThat(rows.get(0).get("cumulativeProfit").decimalValue())
+                .isGreaterThanOrEqualTo(rows.get(1).get("cumulativeProfit").decimalValue());
+        if (rows.get(0).get("cumulativeProfit").decimalValue()
+                .compareTo(rows.get(1).get("cumulativeProfit").decimalValue()) == 0) {
             assertThat(rows.get(0).get("profit").decimalValue())
                     .isGreaterThanOrEqualTo(rows.get(1).get("profit").decimalValue());
         }

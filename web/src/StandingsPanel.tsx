@@ -21,7 +21,7 @@ export default function StandingsPanel({
   refreshKey?: number;
   onChanged: () => void;
 }) {
-  const { t, money } = useI18n();
+  const { t, money, number: plain } = useI18n();
   const [rows, setRows] = useState<StandingsRow[]>([]);
   const [visible, setVisible] = useState<boolean>(Boolean(run.standingsVisible));
   const [problem, setProblem] = useState<string | null>(null);
@@ -83,6 +83,8 @@ export default function StandingsPanel({
             <tr>
               <th className="num">{t("player.rank")}</th>
               <th>{t("debrief.company")}</th>
+              <th className="num">{t("debrief.cumulative")}</th>
+              <th className="num">{t("debrief.roce")}</th>
               <th className="num">{t("debrief.cash")}</th>
               <th className="num">{t("debrief.profit")}</th>
             </tr>
@@ -92,6 +94,8 @@ export default function StandingsPanel({
               <tr key={row.teamId}>
                 <td className="num">{row.rank}</td>
                 <td>{row.company}</td>
+                <td className="num">{money(Number(row.cumulativeProfit ?? 0))}</td>
+                <td className="num">{plain(Number(row.roce ?? 0), 1)}%</td>
                 <td className="num">{money(Number(row.cash ?? 0))}</td>
                 <td className="num">{money(Number(row.profit ?? 0))}</td>
               </tr>

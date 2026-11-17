@@ -502,6 +502,23 @@ behind a click. Ruled:
   mid-decision is not interrupted by a jump.
 - The three report buttons (D91) follow the same selected round, so they open on the round now shown.
 
+**D98 — The class is judged by profit and capital, and positioned on price and quality (ruling
+17 Nov 2026).** The table ranked by cash, which rewards hoarding and pure liquidation: a company can
+top it by stopping investing. Porter's test of a strategy is the profit a position earns on the capital
+it ties up. Ruled:
+
+- **The trainee table ranks by cumulative profit**, the round's profit breaking a tie; **cash stays on
+  the row as information**, because a facilitator still needs to see liquidity.
+- **ROCE travels with the row**: cumulative profit ÷ (paid-in capital + machines at cost). Paid-in
+  capital is the opening cash of the first computed round; machines are what the company has spent on
+  capacity, since they are capitalised and not depreciated.
+- **A position map sits above the debrief table**: price index against quality index, both relative to
+  the class average (1.00), with the bubble area carrying market share — so "cheap supplier", "premium
+  supplier" and "stuck between" are visible in one glance instead of inferred from a table.
+- Weights come from the units a company actually sold, not its price list: a product it cannot sell
+  must not place it.
+- Both are read from stored statements; no figure is recomputed, and no migration was needed.
+
 **D97 — Each product carries its own market share (ruling 17 Nov 2026).** The company share in the
 scoreboard is `units sold × 100 / pool`, but the per-product table showed no share at all, so a company
 winning one line and losing another could not see it. Ruled:

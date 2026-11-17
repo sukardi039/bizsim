@@ -337,9 +337,9 @@ It is recorded as *by hand*, so the log stays honest.
 
 ### 7.2.3 The class table
 
-**Class standings** on the run page is the exact table the class reads — rank, company, cash after the
-round and that round's profit, **ranked by cash** — and the switch that decides whether they may read
-it. It starts **hidden**: press **Show the class** after
+**Class standings** on the run page is the exact table the class reads — rank, company, cumulative
+profit, ROCE, cash after the round and that round's profit, **ranked by cumulative profit** (D98) —
+and the switch that decides whether they may read it. It starts **hidden**: press **Show the class** after
 reading the debrief, and every computed round is then visible to the trainees; **Hide from the class**
 takes it away again. Both moments are in the audit trail.
 
@@ -409,6 +409,10 @@ Under the scoreboard, for any computed round:
 
    Revenue − Total cost = Profit, on screen, with no line hidden: anything the engine charged that is
    not one of the named lines appears as **Other charges** instead of being folded into a total.
+
+   Above the table, **Where each company sits** places every company on **price against quality**,
+   both relative to the class average (1.00), with the bubble sized by market share (D98). It is the
+   one picture that answers "are we the cheap supplier, the premium one, or stuck between the two?".
 
    Under the three columns, **Per product** breaks the same round down line by line — one row per
    product with **Opening**, **Produced**, **Demand**, **Sold**, **Share**, **Lost**, **Closing**,
@@ -577,8 +581,9 @@ language your class runs in.
    only their own company. Everything comes from the same statement rows the debrief reads.
 
 6. **Class standings** — above your results, once your facilitator has shown it and a round has been
-   computed: rank, company, cash after the round and that round's profit, in that order of importance —
-   **the class is ranked by cash**. Your own line is highlighted. That is all a trainee sees of anyone
+   computed: rank, company, **cumulative profit**, **ROCE**, cash after the round and that round's
+   profit — **the class is ranked by cumulative profit** (D98), with cash shown as information and
+   ROCE as profit on the capital the company was given. Your own line is highlighted. That is all a trainee sees of anyone
    else — no market share, no cost lines, no statements. Your facilitator decides when it appears.
 7. **Development report (PDF)** beside them is your term report: six dimensions — liquidity,
    profitability, market management, operations, pricing and investment — each graded and explained in

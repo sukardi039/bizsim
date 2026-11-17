@@ -505,3 +505,16 @@ button.danger:hover { background: rgba(255, 120, 120, .12); }
 .texts-cell { display: flex; flex-direction: column; gap: .25rem; }
 .text-row { display: flex; gap: .25rem; align-items: center; }
 .text-row input { width: auto; min-width: 6rem; }
+
+/* D98: the position map — price against quality, bubble by share. */
+.position-map { margin: .6rem 0 1rem; }
+.position-map figcaption h3 { margin: 0 0 .15rem; font-size: 1rem; }
+.position-map figcaption p { margin: 0 0 .4rem; font-size: .84rem; max-width: 46rem; }
+.position-map svg { width: min(340px, 100%); height: auto; }
+.position-frame { stroke: var(--line); stroke-width: 1; }
+.position-axis { stroke: var(--line); stroke-width: 1; stroke-dasharray: 3 3; }
+.position-dot { fill: rgba(120, 180, 255, .5); stroke: rgba(150, 200, 255, .9); }
+.position-dot.own { fill: rgba(120, 220, 160, .55); stroke: rgba(140, 240, 180, .95); }
+.position-name { fill: var(--muted); font-size: 8px; }
+.position-share { fill: inherit; font-size: 9px; font-weight: 600; }
+.position-label { fill: var(--muted); font-size: 8px; }

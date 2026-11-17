@@ -463,8 +463,10 @@ public class RoundService {
             view.put("rank", ((Number) row.get("rank")).intValue());
             view.put("teamId", ((Number) row.get("team_id")).longValue());
             view.put("company", row.get("company_name"));
-            // D75: the rank is by cash, so cash is part of the row — a rank a trainee cannot account
-            // for is worse than no rank.
+            // D98: the rank is cumulative profit, so the figures behind it travel with the row — a
+            // rank a trainee cannot account for is worse than no rank. Cash stays as information.
+            view.put("cumulativeProfit", row.get("cumulative_profit"));
+            view.put("roce", row.get("roce"));
             view.put("cash", row.get("cash"));
             view.put("profit", row.get("profit"));
             view.put("own", rounds.userOwnsTeam(userId, ((Number) row.get("team_id")).longValue()));

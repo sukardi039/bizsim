@@ -545,35 +545,54 @@ public class RoundRepository {
     // ------------------------------------------------------------------ reading results
 
     /**
-     * The class as a table a trainee may see (D51/D75): rank, company, cash after the round and that
-     * round's profit — and nothing else. Deliberately its own query rather than a projection of the
-     * scoreboard, so widening this view later is a decision, not an accident.
+     * The class as a table a trainee may see (D51/D75/D98): rank, company, the figures the rank is
+     * made of, and nothing else.
      *
-     * <p>Ranked by **cash after the round**, then by the round's profit (D75): liquidity is the
-     * measure of whether the month's plan was affordable, not the accrual result. Profit is the
-     * tie-break — a company that earned more while holding the same cash planned better — and the
-     * company name makes the order total, so two identical months never swap places between reads.
+     * <p>Ranked by **cumulative profit** (D98), not by the bank balance: a strategy is judged by what
+     * it earned on the capital it tied up, and hoarding cash into a weaker position must not top the
+     * table. The round's profit breaks a tie (planned better this month), the company name makes the
+     * order total. Cash and **return on capital employed** travel with the row, because they are what
+     * a reader needs to argue with the ranking: ROCE = cumulative profit / (paid-in capital + machines
+     * at cost), the capital the company has actually been given.
      */
     public List<Map<String, Object>> standings(long runId, Integer round) {
         return jdbc.queryForList("""
                 with latest as (
                     select coalesce(?::int, (select max(number) from round
                                              where run_id = ? and status = 'COMPUTED')) as number
+                ),
+                opening as (
+                    select s.team_id, s.opening_cash
+                    from round_statement s join round r on r.id = s.round_id
+                    where r.run_id = ?
+                      and r.number = (select min(number) from round where run_id = ?)
+                ),
+                machines as (
+                    select s.team_id, sum(coalesce(s.capacity_cost, 0)) as at_cost
+                    from round_statement s join round r on r.id = s.round_id
+                    where r.run_id = ?
+                    group by s.team_id
                 )
                 select row_number() over (
-                           order by (rr.score->>'cash')::numeric desc,
+                           order by (rr.score->>'cumulativeProfit')::numeric desc,
                                     (rr.score->>'profit')::numeric desc,
                                     t.company_name, t.id) as rank,
                        rr.team_id, t.company_name,
-                       (rr.score->>'cash')::numeric as cash,
-                       (rr.score->>'profit')::numeric as profit
+                       (rr.score->>'cash')::numeric              as cash,
+                       (rr.score->>'profit')::numeric            as profit,
+                       (rr.score->>'cumulativeProfit')::numeric  as cumulative_profit,
+                       coalesce(round((rr.score->>'cumulativeProfit')::numeric * 100
+                                      / nullif(coalesce(o.opening_cash, 0)
+                                               + coalesce(m.at_cost, 0), 0), 2), 0) as roce
                 from round r
                 join latest on latest.number = r.number
                 join round_result rr on rr.round_id = r.id
                 join team t on t.id = rr.team_id
+                left join opening o on o.team_id = rr.team_id
+                left join machines m on m.team_id = rr.team_id
                 where r.run_id = ? and r.status = 'COMPUTED'
                 order by rank
-                """, round, runId, runId);
+                """, round, runId, runId, runId, runId, runId);
     }
 
     /** Is this person seated in this session at all? The gate on anything a trainee may read. */
