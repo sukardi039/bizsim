@@ -7,6 +7,7 @@ import com.lowagie.text.Font;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
+import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.BaseFont;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
@@ -68,7 +69,9 @@ public class DebriefExportService {
                          String share, String brand, String stock, String lostSales, String capacity,
                          String capacityAvailable, String rndCompleted, String status,
                          String resultsSheet, String submissionsSheet, String costSheet,
-                         java.util.List<String> costLineNames) {
+                         java.util.List<String> costLineNames,
+                         /** "en" or "zh": picks the words of the three reports. */
+                         String lang) {
 
         private static final java.util.List<String> COST_KEYS = java.util.List.of(
                 "cogs", "payroll", "marketing", "rnd_spend", "quality_cost", "fixed_cost",
@@ -91,7 +94,8 @@ public class DebriefExportService {
                 "Results", "Submissions", "Cost lines",
                 java.util.List.of("Cost of goods sold", "Payroll", "Marketing", "R&D",
                         "Quality upgrade", "Fixed cost", "Stock holding", "Hiring and firing",
-                        "Capacity", "Market review"));
+                        "Capacity", "Market review"),
+                "en");
 
         static final Labels ZH = new Labels(
                 "模拟 %d · %s · 第 %d–%d 轮", "全班复盘", "公司报告", "第 %s 轮", "结算于",
@@ -106,19 +110,133 @@ public class DebriefExportService {
                 "结果", "提交", "成本明细",
                 java.util.List.of("销货成本", "工资", "营销", "研发",
                         "质量升级", "固定成本", "库存持有", "招聘/解雇",
-                        "产能", "市场报告"));
+                        "产能", "市场报告"),
+                "zh");
 
         public String costName(int index) {
             return costLineNames.get(index);
         }
     }
 
+    /**
+     * The words of the three reports (D88) inside the exported file. The screen gets them from the
+     * console's catalogue; a PDF or a workbook has to carry its own, so this is the same set in the
+     * same two languages — a class reading Chinese prints Chinese.
+     */
+    static final class StatementText {
+
+        final String pnl, cash, balance, block, sheet, statementColumn, sectionColumn, lineColumn,
+                levelColumn, amountColumn;
+        final Map<String, String> lines, sections;
+
+        private StatementText(String pnl, String cash, String balance, String block, String sheet,
+                              String statementColumn, String sectionColumn, String lineColumn,
+                              String levelColumn, String amountColumn,
+                              Map<String, String> lines, Map<String, String> sections) {
+            this.pnl = pnl;
+            this.cash = cash;
+            this.balance = balance;
+            this.block = block;
+            this.sheet = sheet;
+            this.statementColumn = statementColumn;
+            this.sectionColumn = sectionColumn;
+            this.lineColumn = lineColumn;
+            this.levelColumn = levelColumn;
+            this.amountColumn = amountColumn;
+            this.lines = lines;
+            this.sections = sections;
+        }
+
+        static StatementText of(String lang) {
+            return "zh".equalsIgnoreCase(lang) ? ZH : EN;
+        }
+
+        private static Map<String, String> words(String... pairs) {
+            Map<String, String> map = new LinkedHashMap<>();
+            for (int i = 0; i + 1 < pairs.length; i += 2) {
+                map.put(pairs[i], pairs[i + 1]);
+            }
+            return map;
+        }
+
+        static final StatementText EN = new StatementText(
+                "Profit and loss", "Cash flow statement", "Assets and liabilities",
+                "The three statements", "Statements",
+                "Statement", "Section", "Line", "Level", "Amount",
+                words("pnl.revenue", "Revenue", "pnl.cogs", "Cost of goods sold",
+                        "pnl.grossProfit", "Gross profit", "pnl.payroll", "Payroll",
+                        "pnl.marketing", "Marketing", "pnl.rnd", "R&D",
+                        "pnl.quality", "Quality upgrade", "pnl.fixed", "Fixed cost",
+                        "pnl.holding", "Stock holding", "pnl.hiring", "Hiring and firing",
+                        "pnl.report", "Market review", "pnl.operatingTotal", "Total operating expenses",
+                        "pnl.profit", "Operating profit",
+                        "cash.profit", "Profit for the round", "cash.inventory", "Change in inventories",
+                        "cash.revaluation", "Inventory revaluation",
+                        "cash.operatingTotal", "Net cash from operations",
+                        "cash.machines", "Machines bought", "cash.refund", "R&D refund received",
+                        "cash.investingTotal", "Net cash used in investing",
+                        "cash.financing", "Financing", "cash.financingTotal", "Net cash from financing",
+                        "cash.netChange", "Net movement in cash",
+                        "cash.opening", "Cash at the start of the round",
+                        "cash.closing", "Cash at the end of the round",
+                        "balance.cash", "Cash", "balance.inventory", "Inventories",
+                        "balance.machines", "Machines at cost", "balance.assetsTotal", "Total assets",
+                        "balance.liabilities", "Liabilities", "balance.liabilitiesTotal", "Total liabilities",
+                        "balance.capital", "Paid-in capital", "balance.retained", "Retained earnings",
+                        "balance.refunds", "R&D refunds received",
+                        "balance.revaluation", "Inventory revaluation reserve",
+                        "balance.equityTotal", "Total equity",
+                        "balance.totalLiabilitiesEquity", "Total liabilities and equity",
+                        "balance.difference", "Difference"),
+                words("revenue", "Income", "expenses", "Operating expenses",
+                        "operating", "Operating activities", "investing", "Investing activities",
+                        "financing", "Financing activities", "movement", "Cash movement",
+                        "assets", "Assets", "liabilities", "Liabilities", "equity", "Equity"));
+
+        static final StatementText ZH = new StatementText(
+                "利润表", "现金流量表", "资产与负债",
+                "三张报表", "报表",
+                "报表", "分组", "项目", "层级", "金额",
+                words("pnl.revenue", "营业收入", "pnl.cogs", "销售成本",
+                        "pnl.grossProfit", "毛利", "pnl.payroll", "工资",
+                        "pnl.marketing", "市场营销", "pnl.rnd", "研发",
+                        "pnl.quality", "质量提升", "pnl.fixed", "固定成本",
+                        "pnl.holding", "库存持有成本", "pnl.hiring", "招聘与解雇",
+                        "pnl.report", "市场报告", "pnl.operatingTotal", "营业费用合计",
+                        "pnl.profit", "营业利润",
+                        "cash.profit", "本期利润", "cash.inventory", "存货变动",
+                        "cash.revaluation", "存货重估",
+                        "cash.operatingTotal", "经营活动现金净额",
+                        "cash.machines", "购买机器", "cash.refund", "收到的研发退款",
+                        "cash.investingTotal", "投资活动现金净额",
+                        "cash.financing", "筹资活动", "cash.financingTotal", "筹资活动现金净额",
+                        "cash.netChange", "现金净变动",
+                        "cash.opening", "期初现金",
+                        "cash.closing", "期末现金",
+                        "balance.cash", "现金", "balance.inventory", "存货",
+                        "balance.machines", "机器设备（按成本）", "balance.assetsTotal", "资产合计",
+                        "balance.liabilities", "负债", "balance.liabilitiesTotal", "负债合计",
+                        "balance.capital", "实收资本", "balance.retained", "留存收益",
+                        "balance.refunds", "已收研发退款",
+                        "balance.revaluation", "存货重估储备",
+                        "balance.equityTotal", "所有者权益合计",
+                        "balance.totalLiabilitiesEquity", "负债和所有者权益合计",
+                        "balance.difference", "差额"),
+                words("revenue", "收入", "expenses", "营业费用",
+                        "operating", "经营活动", "investing", "投资活动",
+                        "financing", "筹资活动", "movement", "现金变动",
+                        "assets", "资产", "liabilities", "负债", "equity", "所有者权益"));
+    }
+
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
+    private final FinancialStatementsService financials;
 
-    public DebriefExportService(JdbcTemplate jdbc, ObjectMapper json) {
+    public DebriefExportService(JdbcTemplate jdbc, ObjectMapper json,
+                                FinancialStatementsService financials) {
         this.jdbc = jdbc;
         this.json = json;
+        this.financials = financials;
     }
 
     public record ProductColumn(String code, String name) {
@@ -134,7 +252,9 @@ public class DebriefExportService {
                       BigDecimal cumulativeProfit, BigDecimal cash, BigDecimal share,
                       BigDecimal brand, BigDecimal stock, BigDecimal lostSales,
                       BigDecimal capacityUsed, BigDecimal capacityAvailable, int rndCompleted,
-                      String status, Map<String, BigDecimal> costLines) {
+                      String status, Map<String, BigDecimal> costLines,
+                      /** D88/D13: this round's three statements, from the service the screen reads. */
+                      FinancialStatementsService.Round statements) {
     }
 
     public record RoundReport(int round, Instant computedAt, List<Row> rows) {
@@ -170,9 +290,23 @@ public class DebriefExportService {
                 "select (definition->>'machineCostPerWorker')::numeric from scenario where key = ?",
                 BigDecimal.class, scenarioKey);
 
-        List<ProductColumn> products = jdbc.query(
+        List<ProductColumn> catalogue = jdbc.query(
                 "select code, name from product where scenario_key = ? order by code",
                 (rs, i) -> new ProductColumn(rs.getString("code"), rs.getString("name")), scenarioKey);
+
+        // D89: the sheets list the products the companies in this report actually carry, not the whole
+        // catalogue. A trainee who trades two products gets two product columns, not three with a zero.
+        List<String> carried = jdbc.queryForList("""
+                select distinct cp.product_code
+                from company_product cp join team t on t.id = cp.team_id
+                where t.run_id = ? and (?::bigint is null or t.id = ?::bigint)
+                """, String.class, runId, teamFilter, teamFilter);
+        List<ProductColumn> products = new ArrayList<>();
+        for (ProductColumn product : catalogue) {
+            if (carried.isEmpty() || carried.contains(product.code())) {
+                products.add(product);
+            }
+        }
 
         List<Map<String, Object>> rows = jdbc.query("""
                 select r.number as round_number, rr.computed_at,
@@ -238,10 +372,19 @@ public class DebriefExportService {
 
         Map<Integer, List<Row>> byRound = new LinkedHashMap<>();
         Map<Integer, Instant> computedAt = new LinkedHashMap<>();
+        // D88/D13: the three statements travel with the file, computed by the service the screen
+        // reads — one load per company, then looked up by round.
+        Map<Long, Map<Integer, FinancialStatementsService.Round>> books = new LinkedHashMap<>();
+        for (Map<String, Object> raw : rows) {
+            long teamId = (Long) raw.get("teamId");
+            books.computeIfAbsent(teamId, id -> byRound(financials.forTeam(runId, id)));
+        }
         for (Map<String, Object> raw : rows) {
             int round = (Integer) raw.get("round");
             computedAt.putIfAbsent(round, (Instant) raw.get("computedAt"));
-            byRound.computeIfAbsent(round, key -> new ArrayList<>()).add(toRow(raw, products, machineCost));
+            byRound.computeIfAbsent(round, key -> new ArrayList<>()).add(
+                    toRow(raw, products, machineCost,
+                            books.getOrDefault((Long) raw.get("teamId"), Map.of()).get(round)));
         }
 
         List<RoundReport> rounds = new ArrayList<>();
@@ -256,7 +399,17 @@ public class DebriefExportService {
         return new Report(runId, title, scenarioKey, teamFilter == null, products, rounds);
     }
 
-    private Row toRow(Map<String, Object> raw, List<ProductColumn> products, BigDecimal machineCost) {
+    private static Map<Integer, FinancialStatementsService.Round> byRound(
+            FinancialStatementsService.Financials books) {
+        Map<Integer, FinancialStatementsService.Round> map = new LinkedHashMap<>();
+        for (FinancialStatementsService.Round round : books.rounds()) {
+            map.put(round.round(), round);
+        }
+        return map;
+    }
+
+    private Row toRow(Map<String, Object> raw, List<ProductColumn> products, BigDecimal machineCost,
+                      FinancialStatementsService.Round statements) {
         DecisionPayload decision = parse((String) raw.get("payload"));
         Map<String, BigDecimal> units = new LinkedHashMap<>();
         Map<String, BigDecimal> prices = new LinkedHashMap<>();
@@ -290,7 +443,7 @@ public class DebriefExportService {
                 (BigDecimal) raw.get("share"), (BigDecimal) raw.get("brand"),
                 (BigDecimal) raw.get("stock"), (BigDecimal) raw.get("lostSales"),
                 (BigDecimal) raw.get("capacityUsed"), (BigDecimal) raw.get("capacityAvailable"),
-                (Integer) raw.get("rndCompleted"), (String) raw.get("status"), costs);
+                (Integer) raw.get("rndCompleted"), (String) raw.get("status"), costs, statements);
     }
 
     private DecisionPayload parse(String payload) {
@@ -306,7 +459,8 @@ public class DebriefExportService {
 
     // ------------------------------------------------------------------ PDF
 
-    private record Fonts(Font title, Font subtitle, Font roundHead, Font blockHead, Font head, Font body) {
+    private record Fonts(Font title, Font subtitle, Font roundHead, Font blockHead, Font statementHead,
+                         Font head, Font body, Font boldBody) {
     }
 
     /**
@@ -327,7 +481,8 @@ public class DebriefExportService {
 
             BaseFont face = embedded();
             Fonts fonts = new Fonts(new Font(face, 18), new Font(face, 9), new Font(face, 14),
-                    new Font(face, 10), new Font(face, 8), new Font(face, 8));
+                    new Font(face, 10), new Font(face, 12, Font.BOLD),
+                    new Font(face, 8), new Font(face, 8), new Font(face, 8, Font.BOLD));
 
             document.add(new Paragraph(report.title(), fonts.title()));
             document.add(new Paragraph(String.format(labels.runLine(), report.runId(),
@@ -401,6 +556,128 @@ public class DebriefExportService {
         document.add(submissionTable(report, round, labels, fonts.head, fonts.body));
         document.add(new Paragraph(labels.costBlock(), fonts.blockHead()));
         document.add(costTable(round, labels, fonts.head, fonts.body));
+        statementsBlock(document, round.rows().get(0), labels, fonts);
+    }
+
+    /**
+     * D88 in print: the three statements for one company and one round, read down one column, ruled
+     * the way the console rules them. Company reports only — the class debrief is a projection
+     * document, and its statements are on the screen.
+     */
+    private void statementsBlock(Document document, Row row, Labels labels, Fonts fonts) {
+        FinancialStatementsService.Round statements = row.statements();
+        if (statements == null) {
+            return;
+        }
+        StatementText text = StatementText.of(labels.lang());
+        document.add(new Paragraph(text.block, fonts.blockHead()));
+        // D88: each statement carries its own name inside its table, so the title can never be
+        // orphaned from the figures it introduces when the block breaks across a page.
+        document.add(statementPdf(statements.pnl(), text, fonts, text.pnl));
+        document.add(statementPdf(statements.cashFlow(), text, fonts, text.cash));
+        balanceTables(document, statements.balance(), text, fonts, text.balance);
+    }
+
+    /** One statement as a two-column table: its title, its sections, then the figures. */
+    private PdfPTable statementPdf(List<FinancialStatementsService.Row> rows, StatementText text,
+                                   Fonts fonts, String title) {
+        PdfPTable table = new PdfPTable(2);
+        table.setWidthPercentage(100);
+        table.setWidths(new float[]{4.6f, 1.5f});
+        table.setSpacingBefore(2);
+        table.setSpacingAfter(5);
+        table.setHeaderRows(0);
+        // A statement is read as one block; a page break inside it would split a subtotal from the
+        // lines it summarises.
+        table.setKeepTogether(true);
+
+        if (title != null) {
+            PdfPCell head = new PdfPCell(new Phrase(title, fonts.statementHead()));
+            head.setColspan(2);
+            head.setBorder(Rectangle.NO_BORDER);
+            head.setPaddingLeft(0);
+            head.setPaddingBottom(2);
+            table.addCell(head);
+        }
+
+        String section = null;
+        for (FinancialStatementsService.Row line : rows) {
+            if (!line.section().equals(section)) {
+                section = line.section();
+                String name = text.sections.get(section);
+                if (name != null) {
+                    PdfPCell head = new PdfPCell(new Phrase(name, fonts.head()));
+                    head.setColspan(2);
+                    head.setBorder(Rectangle.NO_BORDER);
+                    head.setPaddingTop(6);
+                    head.setPaddingLeft(0);
+                    table.addCell(head);
+                }
+            }
+            Font font = line.level() >= 1 ? fonts.boldBody() : fonts.body();
+            int border = line.level() >= 2 ? Rectangle.TOP | Rectangle.BOTTOM
+                    : line.level() == 1 ? Rectangle.TOP : Rectangle.NO_BORDER;
+            PdfPCell label = new PdfPCell(new Phrase(
+                    text.lines.getOrDefault(line.key(), line.key()), font));
+            label.setBorder(border);
+            label.setPaddingTop(3);
+            label.setPaddingBottom(3);
+            label.setPaddingLeft(0);
+            label.setPaddingRight(6);
+            PdfPCell amount = new PdfPCell(new Phrase(grouped(line.amount()), font));
+            amount.setBorder(border);
+            amount.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            amount.setPaddingTop(3);
+            amount.setPaddingBottom(3);
+            table.addCell(label);
+            table.addCell(amount);
+        }
+        return table;
+    }
+
+    /** Assets against liabilities and equity, the two totals level with each other. */
+    private void balanceTables(Document document, List<FinancialStatementsService.Row> rows,
+                               StatementText text, Fonts fonts, String title) {
+        List<FinancialStatementsService.Row> assets = new ArrayList<>();
+        List<FinancialStatementsService.Row> other = new ArrayList<>();
+        List<FinancialStatementsService.Row> difference = new ArrayList<>();
+        for (FinancialStatementsService.Row line : rows) {
+            if ("assets".equals(line.section())) {
+                assets.add(line);
+            } else if ("check".equals(line.section())) {
+                if (line.amount().abs().compareTo(new BigDecimal("1")) >= 0) {
+                    difference.add(line);
+                }
+            } else {
+                other.add(line);
+            }
+        }
+
+        PdfPTable outer = new PdfPTable(2);
+        outer.setWidthPercentage(100);
+        outer.setWidths(new float[]{1f, 1f});
+        outer.setSpacingBefore(2);
+        outer.setSpacingAfter(5);
+        outer.setKeepTogether(true);
+        if (title != null) {
+            PdfPCell head = new PdfPCell(new Phrase(title, fonts.statementHead()));
+            head.setColspan(2);
+            head.setBorder(Rectangle.NO_BORDER);
+            head.setPaddingLeft(0);
+            head.setPaddingBottom(2);
+            outer.addCell(head);
+        }
+        for (List<FinancialStatementsService.Row> side : List.of(assets, other)) {
+            PdfPCell cell = new PdfPCell(statementPdf(side, text, fonts, null));
+            cell.setBorder(Rectangle.NO_BORDER);
+            cell.setPadding(0);
+            cell.setPaddingRight(10);
+            outer.addCell(cell);
+        }
+        document.add(outer);
+        if (!difference.isEmpty()) {
+            document.add(statementPdf(difference, text, fonts, null));
+        }
     }
 
     private void pageHead(Document document, String heading, String subheading, Fonts fonts,
@@ -642,6 +919,7 @@ public class DebriefExportService {
             summarySheet(workbook, report, labels, head);
             submissionSheet(workbook, report, labels, head);
             costSheet(workbook, report, labels, head);
+            statementsSheet(workbook, report, labels, head);
 
             workbook.write(out);
             return out.toByteArray();
@@ -805,6 +1083,54 @@ public class DebriefExportService {
         }
         sizes(sheet, columns.size());
         sheet.setColumnWidth(1, 26 * 256);
+    }
+
+    /**
+     * D88 in the workbook: every line of every statement, one row each, with the statement, the block
+     * and the level beside it so the sheet can be filtered or pivoted like the others. Same numbers as
+     * the console, from the same service.
+     */
+    private void statementsSheet(Workbook workbook, Report report, Labels labels, CellStyle head) {
+        StatementText text = StatementText.of(labels.lang());
+        Sheet sheet = workbook.createSheet(text.sheet);
+        List<String> columns = new ArrayList<>(List.of(labels.roundColumn(), labels.company(),
+                text.statementColumn, text.sectionColumn, text.lineColumn, text.levelColumn,
+                text.amountColumn));
+        writeHeader(sheet, head, columns.toArray(new String[0]));
+
+        int index = 1;
+        for (RoundReport round : report.rounds()) {
+            for (Row row : round.rows()) {
+                if (row.statements() == null) {
+                    continue;
+                }
+                index = writeStatement(sheet, index, round.round(), row.company(), text.pnl,
+                        row.statements().pnl(), text);
+                index = writeStatement(sheet, index, round.round(), row.company(), text.cash,
+                        row.statements().cashFlow(), text);
+                index = writeStatement(sheet, index, round.round(), row.company(), text.balance,
+                        row.statements().balance(), text);
+            }
+        }
+        sizes(sheet, columns.size());
+        sheet.setColumnWidth(1, 26 * 256);
+        sheet.setColumnWidth(2, 24 * 256);
+        sheet.setColumnWidth(4, 30 * 256);
+    }
+
+    private static int writeStatement(Sheet sheet, int index, int round, String company, String title,
+                                      List<FinancialStatementsService.Row> rows, StatementText text) {
+        for (FinancialStatementsService.Row line : rows) {
+            org.apache.poi.ss.usermodel.Row sheetRow = sheet.createRow(index++);
+            sheetRow.createCell(0).setCellValue(round);
+            sheetRow.createCell(1).setCellValue(company);
+            sheetRow.createCell(2).setCellValue(title);
+            sheetRow.createCell(3).setCellValue(text.sections.getOrDefault(line.section(), ""));
+            sheetRow.createCell(4).setCellValue(text.lines.getOrDefault(line.key(), line.key()));
+            sheetRow.createCell(5).setCellValue(line.level());
+            number(sheetRow, 6, line.amount());
+        }
+        return index;
     }
 
     private static void writeHeader(Sheet sheet, CellStyle style, String[] labels) {

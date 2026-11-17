@@ -429,8 +429,8 @@ They are read top to bottom, and the trainee sees exactly the same three for the
 
 1. **Profit and loss** — **Revenue**, less **Cost of goods sold**, gives **Gross profit**. Under it
    sit the operating expenses: payroll, marketing, R&D, quality upgrade, fixed cost, stock holding,
-   hiring and firing, and the market review. Their total is **Operating expenses**, and revenue less
-   all of it is **Operating profit** — the same profit the scoreboard ranks.
+   hiring and firing, and the market review. Their total is **Total operating expenses**, and revenue
+   less all of it is **Operating profit** — the same profit the scoreboard ranks.
    A note under the table says the thing trainees always ask: *machines bought this month are not an
    expense; they are on the balance sheet at cost.*
 2. **Cash flow statement** — starts from the round's profit, removes the part of it that was not cash
@@ -470,13 +470,21 @@ Three buttons sit next to the round selector:
 |---|---|
 | **Present** | a full-screen classroom view of the selected round. Page 1 is the six numbers you read out — profit, cumulative profit, market share, cash, brand, stock — one card per company, labelled with the trainee. Page 2 is the explanation: lost sales, capacity used, R&D completed, status. **← →** change page, **↑ ↓** change round, **Esc** closes. |
 | **Download PDF** | an A4 landscape report of the whole term. It opens with **two summaries** — *Summary by trainee* (one page per company: its rounds, then a Total line) and *Comparison by month* (one page per round, every company side by side) — and then gives the detail behind each month: what each company sent and every cost line. Company and trainee names are rendered as authored, including Chinese. |
-| **Download Excel** | the same numbers as a workbook: **By trainee** (one row per company across the term: rounds, totals, final cash, average share), **Results** (one row per company per round), **Submissions** (the plan per company per round) and **Cost lines**, each with a Round column so the whole term can be filtered or pivoted. |
+| **Download Excel** | the same numbers as a workbook: **By trainee** (one row per company across the term: rounds, totals, final cash, average share), **Results** (one row per company per round), **Submissions** (the plan per company per round), **Cost lines** and **Statements** (every line of every report, with its statement, section, level and amount), each with a Round column so the whole term can be filtered or pivoted. |
 
 Both files are built from the stored results, never a recomputation, so a downloaded report matches
 what the class saw on screen. **The document is written in the language you are using** — switch the
 console to 中文 and the download comes out in Chinese, labels and sheet names included. Company,
 product and trainee names stay exactly as they were entered. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
 hides the console and keeps the cards.
+
+**Where the three statements travel (D88).** The workbook carries them in full on the **Statements**
+sheet, for every company and round. A **trainee's** PDF prints them on each round page, after the cost
+lines, under their own names — profit and loss, cash flow statement, assets and liabilities. The
+**class** PDF does not: it is the projection document for the room, and the statements belong to one
+company at a time — open a company's **Detail** on screen for those, or read them from the workbook.
+The **Submissions** sheet and the PDF's *What you sent* table list the products each company actually
+carries, not the whole catalogue (D89).
 
 ### 7.6 Live
 
@@ -558,9 +566,11 @@ language your class runs in.
    one sentence from your own figures, with what to try next term. It is written in the language of
    your class and it never compares you with a named competitor.
 8. **My results (PDF / Excel)** in the same card gives the trainee their own report — one page
-   per round: that month's summary, then what they sent, then the cost lines — their company only,
-   no market share, no competitor line. A trainee who has not been seated in the session gets a
-   refusal, not an empty file.
+   per round: that month's summary, then what they sent, then the cost lines, then the **three
+   statements** for that round (profit and loss, cash flow statement, assets and liabilities) — their
+   company only, no market share, no competitor line. The Excel file carries the statements too, one
+   row per line on its **Statements** sheet, so the term can be filtered or pivoted. A trainee who has
+   not been seated in the session gets a refusal, not an empty file.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."* A price is the one number the system has

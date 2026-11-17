@@ -41,9 +41,11 @@ public class FinancialStatementsService {
     private static final BigDecimal CENT = new BigDecimal("0.01");
 
     private final RoundService rounds;
+    private final RoundRepository statements;
 
-    public FinancialStatementsService(RoundService rounds) {
+    public FinancialStatementsService(RoundService rounds, RoundRepository statements) {
         this.rounds = rounds;
+        this.statements = statements;
     }
 
     /**
@@ -65,9 +67,21 @@ public class FinancialStatementsService {
      * their own company only, staff for any company of their run.
      */
     public Financials financials(long tenantId, long userId, String role, long runId, long teamId) {
-        List<Map<String, Object>> statements = rounds.statements(tenantId, userId, role, runId, teamId);
+        return build(teamId, rounds.statements(tenantId, userId, role, runId, teamId));
+    }
 
-        List<Round> out = new ArrayList<>(statements.size());
+    /**
+     * The same reports for a caller that has already authorised the read — the debrief export, which
+     * decided the scope before it got here (a trainee's own company, or any company for staff). It is
+     * deliberately separate from {@link #financials}: an endpoint must never reach this one.
+     */
+    public Financials forTeam(long runId, long teamId) {
+        return build(teamId, statements.statements(runId, teamId));
+    }
+
+    private Financials build(long teamId, List<Map<String, Object>> rows) {
+
+        List<Round> out = new ArrayList<>(rows.size());
         BigDecimal inventory = ZERO;
         BigDecimal machinery = ZERO;
         BigDecimal capital = null;
@@ -75,7 +89,7 @@ public class FinancialStatementsService {
         BigDecimal refunds = ZERO;
         BigDecimal reserve = ZERO;
 
-        for (Map<String, Object> row : statements) {
+        for (Map<String, Object> row : rows) {
             int number = roundNumber(row.get("round"));
             BigDecimal revenue = money(row, "revenue");
             BigDecimal cogs = money(row, "cogs");

@@ -186,6 +186,33 @@ class CompanyProductLineTest extends PostgresTestBase {
         }
     }
 
+    @Test
+    void the_workbook_lists_only_the_products_the_company_carries() throws Exception {
+        openRound();
+        JsonNode context = call("GET", "/api/runs/" + runId + "/teams/" + narrowCompany + "/context",
+                narrowPlayer);
+        submit(decision(context, List.of("P1", "P2"), Map.of()), narrowPlayer, narrowCompany);
+        call("POST", "/api/runs/" + runId + "/rounds/close", trainer);
+
+        MvcResult result = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "xlsx")
+                        .header("Authorization", "Bearer " + narrowPlayer))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        try (org.apache.poi.xssf.usermodel.XSSFWorkbook workbook =
+                     new org.apache.poi.xssf.usermodel.XSSFWorkbook(
+                             new java.io.ByteArrayInputStream(
+                                     result.getResponse().getContentAsByteArray()))) {
+            List<String> headers = new ArrayList<>();
+            workbook.getSheet("Submissions").getRow(0)
+                    .forEach(cell -> headers.add(cell.getStringCellValue()));
+            assertThat(headers).contains("P1 units", "P2 units");
+            assertThat(headers).doesNotContain("P3 units", "P3 price", "P3 quality");
+            assertThat(workbook.getSheet("Statements")).as("D88 travels in the workbook").isNotNull();
+        }
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private void openRound() throws Exception {

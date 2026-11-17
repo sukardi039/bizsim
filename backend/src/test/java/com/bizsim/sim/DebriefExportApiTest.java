@@ -123,6 +123,9 @@ class DebriefExportApiTest extends PostgresTestBase {
         assertThat(text).contains("Comparison by month");
         assertThat(text).contains("Cost lines");
         assertThat(text).contains("Revenue").contains("Profit").contains("Cash");
+        // D88 scoping: the class debrief is a projection document — its statements are on the screen,
+        // and only the company report carries them in print.
+        assertThat(text).doesNotContain("The three statements");
     }
 
     @Test
@@ -201,14 +204,20 @@ class DebriefExportApiTest extends PostgresTestBase {
         // D21: no competitor, and no market share, reaches a trainee.
         assertThat(text).doesNotContain("Beta Corp");
         assertThat(text).doesNotContain("Share");
-        // One page per round, each opening with that month's summary (D46).
+        // D88: the three statements travel with the company report, in print.
+        assertThat(text).contains("The three statements");
+        assertThat(text).contains("Profit and loss").contains("Cash flow statement")
+                .contains("Assets and liabilities");
+        assertThat(text).contains("Gross profit").contains("Operating profit");
+        assertThat(text).contains("Net cash from operations").contains("Total assets")
+                .contains("Total liabilities and equity");
+        // One page per round, each opening with that month's summary (D46); the statements flow on.
         PdfReader reader = new PdfReader(body);
-        assertThat(reader.getNumberOfPages()).isEqualTo(2);
+        assertThat(reader.getNumberOfPages()).isGreaterThanOrEqualTo(2);
         String firstPage = new PdfTextExtractor(reader).getTextFromPage(1);
         assertThat(firstPage).contains("Round 1").contains("The month's summary")
                 .contains("What you sent").contains("Cost lines");
-        assertThat(new PdfTextExtractor(reader).getTextFromPage(2))
-                .contains("Round 2").contains("The month's summary");
+        assertThat(text).contains("Round 2").contains("The month's summary");
 
         MvcResult workbookResult = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
                         .param("format", "xlsx")
@@ -224,6 +233,25 @@ class DebriefExportApiTest extends PostgresTestBase {
             List<String> headers = new java.util.ArrayList<>();
             results.getRow(0).forEach(cell -> headers.add(cell.getStringCellValue()));
             assertThat(headers).doesNotContain("Market share %");
+
+            // D88: every line of the three statements, ready to filter or pivot.
+            Sheet statements = workbook.getSheet("Statements");
+            assertThat(statements).isNotNull();
+            List<String> statementHeaders = new java.util.ArrayList<>();
+            statements.getRow(0).forEach(cell -> statementHeaders.add(cell.getStringCellValue()));
+            assertThat(statementHeaders).containsExactly("Round", "Company", "Statement", "Section",
+                    "Line", "Level", "Amount");
+            boolean operatingProfit = false;
+            boolean balanceTotal = false;
+            for (int row = 1; row <= statements.getLastRowNum(); row++) {
+                String line = statements.getRow(row).getCell(4).getStringCellValue();
+                String statement = statements.getRow(row).getCell(2).getStringCellValue();
+                operatingProfit |= "Operating profit".equals(line) && "Profit and loss".equals(statement);
+                balanceTotal |= "Total liabilities and equity".equals(line)
+                        && "Assets and liabilities".equals(statement);
+            }
+            assertThat(operatingProfit).as("the profit and loss travels").isTrue();
+            assertThat(balanceTotal).as("the balance sheet travels").isTrue();
         }
     }
 
@@ -262,6 +290,33 @@ class DebriefExportApiTest extends PostgresTestBase {
         // No locale asked for: English, as before.
         String english = allText(resultPdf(facilitatorToken));
         assertThat(english).contains("What each company sent");
+
+        // D88 in Chinese: the statements are a full set of words, not a translation of the screen.
+        MvcResult zhCompany = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "pdf")
+                        .param("locale", "zh")
+                        .header("Authorization", "Bearer " + playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        String zhText = allText(zhCompany.getResponse().getContentAsByteArray());
+        assertThat(zhText).contains("三张报表").contains("利润表").contains("现金流量表")
+                .contains("资产与负债");
+        assertThat(zhText).contains("营业利润").contains("资产合计")
+                .contains("负债和所有者权益合计");
+
+        MvcResult zhBooks = mvc.perform(get("/api/runs/" + runId + "/debrief/export")
+                        .param("format", "xlsx")
+                        .param("locale", "zh")
+                        .header("Authorization", "Bearer " + playerToken))
+                .andExpect(status().isOk())
+                .andReturn();
+        try (XSSFWorkbook opened = new XSSFWorkbook(
+                new ByteArrayInputStream(zhBooks.getResponse().getContentAsByteArray()))) {
+            Sheet statements = opened.getSheet("报表");
+            assertThat(statements).isNotNull();
+            assertThat(statements.getRow(0).getCell(2).getStringCellValue()).isEqualTo("报表");
+            assertThat(statements.getRow(0).getCell(4).getStringCellValue()).isEqualTo("项目");
+        }
     }
 
     @Test

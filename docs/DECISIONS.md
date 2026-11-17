@@ -400,4 +400,23 @@ Ruled:
 - **Historical statements are not rewritten.** They keep the numbers they were computed with; the fix
   applies to rounds computed from now on.
 
+**D90 — The three reports travel in the exports, and the sheets list the company's own line (ruling
+17 Nov 2026).** The review page carried the statements (D88) while the downloads still showed only
+revenue, cost and profit, so the paper and the screen disagreed. Ruled:
+
+- **The workbook gains a `Statements` sheet** — every line of every statement for every company and
+  round, with Round, Company, Statement, Section, Line, Level and Amount, so it filters and pivots
+  like the other sheets. Both scopes get it.
+- **A trainee's PDF prints the three statements** on each round page, after the cost lines, each under
+  its own name, with the same sections and rulings as the screen.
+- **The class PDF does not.** It is the projection document for the room; the statements belong to one
+  company at a time and are read on screen (a company's Detail) or in the workbook. Printing ten
+  companies × eight rounds of statements would bury the debrief it exists to support.
+- **`Submissions` and the PDF's "What you sent" list the products the company carries**, not the
+  catalogue (D89 applied to the exports): no more always-zero `P3` columns for a two-product company.
+- **Every figure and every word comes from the same services as the screen** — the statements from
+  `FinancialStatementsService`, the labels from a full English and Chinese set inside the export, so a
+  class reading Chinese prints Chinese.
+
+
 
