@@ -120,6 +120,17 @@ class FinancialReportContractTest extends PostgresTestBase {
                 JsonNode stored = statements.get(number);
                 assertThat(stored).as(where + " has a stored statement").isNotNull();
 
+                // D97: every product line carries its share of that product's market, and a share is a
+                // percentage of a pool — never negative, never above the whole market.
+                for (JsonNode product : stored.get("detail").path("products")) {
+                    assertThat(product.has("share"))
+                            .as(where + " " + product.get("product").asText() + " carries a market share")
+                            .isTrue();
+                    assertThat(product.get("share").decimalValue())
+                            .as(where + " " + product.get("product").asText() + " share is a percentage")
+                            .isBetween(BigDecimal.ZERO, new BigDecimal("100"));
+                }
+
                 profitAndLoss(where, round.get("pnl"), stored);
                 cashFlow(where, round.get("cashFlow"), stored);
                 balanceSheet(where, round.get("balance"), stored);

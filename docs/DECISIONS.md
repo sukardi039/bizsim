@@ -502,6 +502,21 @@ behind a click. Ruled:
   mid-decision is not interrupted by a jump.
 - The three report buttons (D91) follow the same selected round, so they open on the round now shown.
 
+**D97 — Each product carries its own market share (ruling 17 Nov 2026).** The company share in the
+scoreboard is `units sold × 100 / pool`, but the per-product table showed no share at all, so a company
+winning one line and losing another could not see it. Ruled:
+
+- **The engine writes `share` on every product line** when it settles a round: `sold × 100 / pool` for
+  that product, the same denominator and rounding (two decimals) as the company share — so the product
+  shares and the scoreboard share tell the same story.
+- **Stored with the statement** (`round_statement.detail.products[].share`), so it is read, never
+  recomputed; rounds computed before this field simply carry no share and the table prints **—**.
+- **Shown in the per-product table** for both roles, and verified by the audit: `audit_financials.py`
+  re-derives each product's pool and compares the stored share, and the report contract test refuses a
+  share outside 0–100.
+- The workbook and the PDF are unchanged: the statements sheet has no per-product rows, and the
+  product lines there are the same stored lines.
+
 
 
 

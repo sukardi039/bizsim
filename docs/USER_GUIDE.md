@@ -411,8 +411,10 @@ Under the scoreboard, for any computed round:
    not one of the named lines appears as **Other charges** instead of being folded into a total.
 
    Under the three columns, **Per product** breaks the same round down line by line — one row per
-   product with **Opening**, **Produced**, **Demand**, **Sold**, **Lost**, **Closing**, **Revenue**
-   and **COGS**. This is the answer to "82 pieces were lost — of which product?" and "0.94 left in
+   product with **Opening**, **Produced**, **Demand**, **Sold**, **Share**, **Lost**, **Closing**,
+   **Revenue** and **COGS**. **Share** is that product's own market share: units sold against the
+   product's whole market pool, on the same denominator as the company share in the scoreboard (D97),
+   so a company can be strong in one line and weak in another and see both. This is the answer to "82 pieces were lost — of which product?" and "0.94 left in
    stock — of which product?": a company that stocked out on one product and kept a little of
    another shows both, separately. The rows add up to the totals above, because they are the same
    stored lines, not a second calculation. Units are whole pieces (D34); the market share stays a
@@ -564,8 +566,9 @@ language your class runs in.
      round instead, until the next result lands;
    - the chosen round in **detail** under Revenue · Cost · Result;
    - **Per product**, the same round broken down by product (opening, produced, demand, sold,
-     lost, closing, revenue, COGS) — this is where "which product lost those pieces?" is answered
-     for the trainee too.
+     **share**, lost, closing, revenue, COGS) — this is where "which product lost those pieces?" and
+     "which product am I actually winning?" are answered for the trainee too. **Share** is that
+     product's percentage of its own market (D97); rounds computed before the field existed show —.
    - the **three reports** for that round — profit and loss, cash flow statement, and assets and
      liabilities — under the detail, exactly as §7.4.1 describes them. They are your own company's
      books, built from the same stored statement, and nobody else's.

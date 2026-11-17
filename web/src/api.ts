@@ -214,6 +214,8 @@ export interface ProductStat {
   quality?: number;
   revenue: number;
   cogs: number;
+  /** D97: units sold as a percentage of this product's market pool. Absent on rounds computed before. */
+  share?: number;
 }
 
 export interface StatementRow {

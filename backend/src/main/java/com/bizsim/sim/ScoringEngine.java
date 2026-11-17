@@ -73,7 +73,9 @@ public class ScoringEngine {
                               /** The cost per unit COGS was charged at: replacement or average (D79). */
                               BigDecimal averageCost,
                               /** What the closing stock cost, at the basis this round used. */
-                              BigDecimal stockValue) {
+                              BigDecimal stockValue,
+                              /** Units sold as a percentage of this product's market pool (D97). */
+                              BigDecimal share) {
     }
 
     public record RndUpdate(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
@@ -148,13 +150,14 @@ public class ScoringEngine {
             plans.add(fitToCash(scenario, team, plan(scenario, environment, team)));
         }
 
+        Map<String, BigDecimal> pools = pools(scenario, environment, teams.size());
         Map<Long, Map<String, Double>> demandByTeam =
-                allocateDemand(scenario, environment, teams, plans);
+                allocateDemand(scenario, environment, teams, plans, pools);
 
         List<TeamOutcome> outcomes = new ArrayList<>();
         for (int i = 0; i < teams.size(); i++) {
             outcomes.add(settle(scenario, environment, teams.get(i), plans.get(i),
-                    demandByTeam.get(teams.get(i).teamId())));
+                    demandByTeam.get(teams.get(i).teamId()), pools));
         }
         return new RoundResult(outcomes);
     }
@@ -347,7 +350,8 @@ public class ScoringEngine {
 
     private Map<Long, Map<String, Double>> allocateDemand(Scenario scenario,
                                                           EnvironmentService.RoundEnvironment environment,
-                                                          List<TeamInput> teams, List<Plan> plans) {
+                                                          List<TeamInput> teams, List<Plan> plans,
+                                                          Map<String, BigDecimal> pools) {
         Map<Long, Map<String, Double>> result = new LinkedHashMap<>();
         for (TeamInput team : teams) {
             result.put(team.teamId(), new LinkedHashMap<>());
@@ -372,7 +376,7 @@ public class ScoringEngine {
             // D34: the market is a whole number of pieces and it is divided in whole pieces. A share
             // of a pool used to be rounded to two decimals, which left companies holding 0.94 of a
             // product while another product stocked out -- numbers nobody can act on.
-            BigDecimal pool = wholePool(scenario, spec, environment, teams.size());
+            BigDecimal pool = pools.getOrDefault(spec.code(), ZERO);
             int n = teams.size();
             // The cohort serves (1 - baselineShare) of the pool; the rest is the market this class
             // never sees. The allocation has to add up to exactly that target in whole pieces.
@@ -418,6 +422,17 @@ public class ScoringEngine {
             }
         }
         return result;
+    }
+
+    /** Each product's market for the round, in whole pieces — allocation and market share agree. */
+    private Map<String, BigDecimal> pools(Scenario scenario,
+                                          EnvironmentService.RoundEnvironment environment,
+                                          int companies) {
+        Map<String, BigDecimal> pools = new LinkedHashMap<>();
+        for (Scenario.ProductSpec spec : scenario.products()) {
+            pools.put(spec.code(), wholePool(scenario, spec, environment, companies));
+        }
+        return pools;
     }
 
     /** Total units demanded across every product in a round, for a cohort of this size. */
@@ -515,7 +530,8 @@ public class ScoringEngine {
     // ------------------------------------------------------------------ settlement
 
     private TeamOutcome settle(Scenario scenario, EnvironmentService.RoundEnvironment environment,
-                               TeamInput team, Plan plan, Map<String, Double> demand) {
+                               TeamInput team, Plan plan, Map<String, Double> demand,
+                               Map<String, BigDecimal> pools) {
         Scenario.Params p = scenario.params();
         int round = environment.round();
         List<ProductLine> lines = new ArrayList<>();
@@ -573,10 +589,16 @@ public class ScoringEngine {
             stockValues.put(spec.code(), closingValue);
             stockValueChange = stockValueChange.add(closingValue.subtract(openingValue));
 
+            // D97: the product's own share of its market, on the same denominator as the scoreboard's
+            // company share — the pool, not just the units the class happened to buy.
+            BigDecimal pool = pools.getOrDefault(spec.code(), ZERO);
+            BigDecimal share = pool.signum() == 0 ? ZERO
+                    : sold.multiply(HUNDRED).divide(pool, 2, RoundingMode.HALF_UP);
+
             lines.add(new ProductLine(spec.code(), units(plan.planned().get(spec.code())), produced,
                     units(opening), demanded, sold, units(closing), units(lost), price, unitCost,
                     units(plan.effectiveQuality().get(spec.code())), lineRevenue, lineCogs,
-                    averageCost.setScale(2, RoundingMode.HALF_UP), closingValue));
+                    averageCost.setScale(2, RoundingMode.HALF_UP), closingValue, share));
         }
 
         // R&D: fixed duration, evaluated at the deadline (D10). Advantages reach the market next month.

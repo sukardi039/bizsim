@@ -177,6 +177,7 @@ export default function StatementDetail({
               <th className="num">{t("debrief.produced")}</th>
               <th className="num">{t("debrief.demand")}</th>
               <th className="num">{t("debrief.sold")}</th>
+              <th className="num">{t("debrief.share")}</th>
               <th className="num">{t("debrief.lost")}</th>
               <th className="num">{t("debrief.closing")}</th>
               <th className="num">{t("debrief.revenue")}</th>
@@ -191,6 +192,11 @@ export default function StatementDetail({
                 <td className="num">{number(Number(line.produced ?? 0), 0)}</td>
                 <td className="num">{number(Number(line.demand ?? 0), 0)}</td>
                 <td className="num">{number(Number(line.sold ?? 0), 0)}</td>
+                <td className="num">
+                  {line.share === undefined || line.share === null
+                    ? "—"
+                    : `${number(Number(line.share), 1)}%`}
+                </td>
                 <td className={Number(line.lost ?? 0) > 0 ? "num negative" : "num"}>
                   {number(Number(line.lost ?? 0), 0)}
                 </td>
@@ -208,6 +214,7 @@ export default function StatementDetail({
               </td>
               <td className="num" colSpan={3} />
               <td className="num">{number(sumOf((line) => line.sold), 0)}</td>
+              <td className="num" />
               <td className="num">{number(sumOf((line) => line.lost), 0)}</td>
               <td className="num">{number(sumOf((line) => line.closingStock), 0)}</td>
               <td className="num">{money(sumOf((line) => line.revenue))}</td>

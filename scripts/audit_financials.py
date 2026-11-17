@@ -795,6 +795,13 @@ def audit_run(cur, run_row, audit: Audit) -> None:
                     audit.check(f"{line['product']} {label}", stored_line[stored_key],
                                 line[computed_key],
                                 tolerance=(D(1) if tie else ULP) if units_field else TOL, where=where)
+                # D97: the product's share of its own pool, on the same denominator as the company
+                # share. Rounds computed before the field existed carry none, and are not failed.
+                if stored_line.get("share") is not None:
+                    pool = whole_pool(run, line["product"], env, len(teams))
+                    expected = div(line["sold"] * D(100), pool) if pool else ZERO
+                    audit.check(f"{line['product']} market share", stored_line["share"], expected,
+                                tolerance=TOL, where=where)
             # The identity the whole product rests on: everything profit charges that cash did not
             # pay, plus everything cash paid that profit did not charge. COGS at the round's basis
             # minus materials at the same basis is the inventory term, whatever the basis is.

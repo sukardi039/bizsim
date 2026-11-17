@@ -147,7 +147,7 @@ public class BotRepository {
                         dec(node, "demand"), dec(node, "sold"), dec(node, "closingStock"),
                         dec(node, "lost"), dec(node, "price"), dec(node, "unitCost"),
                         dec(node, "quality"), dec(node, "revenue"), dec(node, "cogs"),
-                        dec(node, "averageCost"), dec(node, "stockValue")));
+                        dec(node, "averageCost"), dec(node, "stockValue"), dec(node, "share")));
             }
             return lines;
         } catch (Exception e) {
