@@ -489,6 +489,19 @@ is four columns in ~280px, and the figures crowded the labels. Ruled:
   balance table was already a single stacked column of sections).
 - The profit and loss and the cash flow are unaffected: one column per round, unchanged.
 
+**D96 — A computed round opens itself on the trainee's screen (ruling 17 Nov 2026).** The results card
+showed the newest round already, but only because nothing else was selected: a trainee who had clicked
+an earlier round stayed there when the next one was computed, so the round they had just played sat
+behind a click. Ruled:
+
+- **The newest computed round takes the screen by itself**, including while the page is open — the
+  ten-second poll notices the new statement and switches the detail to it.
+- **Reading history still works**: clicking an earlier row selects that round and it stays selected
+  until the next result arrives.
+- **Nothing is scrolled or popped**: the detail is already on the card, under the summary; a class
+  mid-decision is not interrupted by a jump.
+- The three report buttons (D91) follow the same selected round, so they open on the round now shown.
+
 
 
 

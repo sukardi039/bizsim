@@ -283,7 +283,7 @@ const en: Dict = {
   "player.downloadExcel": "My results (Excel)",
   "player.downloadHint": "Every computed round: what you sent, and what it produced. Your company only.",
   "player.resultsHint":
-    "One row per computed round, then the chosen round in detail — the same figures the class debrief shows for this company, including the per-product lines. Competitors' figures stay with the facilitator.",
+    "One row per computed round, and the newest one opens by itself as soon as it is computed — click an earlier round to read it instead. The figures are the ones the class debrief shows for your company, per-product lines included; competitors' figures stay with the facilitator.",
   "player.resultsRound": "Round {round} in detail",
   "debrief.noStatement": "No statement for this round.",
   "player.submit": "Submit round {round}",
@@ -962,7 +962,7 @@ const zh: Dict = {
   "player.downloadHint": "每个已结算轮次：你提交的决策与产生的结果。仅限本公司数据。",
   "player.developmentReport": "经营发展报告（PDF）",
   "debrief.developmentReport": "经营发展报告",
-  "player.resultsHint": "每个已结算轮次一行，下方为所选轮次的明细——与课堂复盘一致，含分产品明细。竞争对手数据由教师掌握。",
+  "player.resultsHint": "每个已结算轮次一行；最新一轮结算后会自动展开，点击更早的轮次可查看该轮。明细与课堂复盘一致，含分产品明细；竞争对手数据由教师掌握。",
   "player.resultsRound": "第 {round} 轮明细",
   "debrief.noStatement": "该轮暂无结算单。",
   "player.submit": "提交第 {round} 轮决策",

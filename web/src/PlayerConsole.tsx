@@ -155,6 +155,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   /** D91: which of the three reports is open in its pop-up, if any. */
   const [openReport, setOpenReport] = useState<StatementKind | null>(null);
   const roundRef = useRef<number | null>(null);
+  /** D96: the newest round already put on screen, so a freshly computed one opens itself. */
+  const latestSeen = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -180,11 +182,18 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       try {
         const history = await api.statements(active.id, mine.id);
         setStatements(history);
-        setResultRound((current) => {
-          const latest = history.length > 0 ? history[history.length - 1].round : null;
-          const stillThere = current !== null && history.some((row) => row.round === current);
-          return stillThere ? current : latest;
-        });
+        const latest = history.length > 0 ? history[history.length - 1].round : null;
+        if (latest !== latestSeen.current) {
+          // A round has just been computed: open its detail without waiting to be asked. Reading an
+          // older round is still possible — clicking a row selects it until the next result lands.
+          latestSeen.current = latest;
+          setResultRound(latest);
+        } else {
+          setResultRound((current) => {
+            const stillThere = current !== null && history.some((row) => row.round === current);
+            return stillThere ? current : latest;
+          });
+        }
       } catch {
         // Results are a convenience: a trainee must still be able to decide if this call fails.
         setStatements([]);

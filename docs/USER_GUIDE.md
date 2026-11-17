@@ -558,7 +558,10 @@ language your class runs in.
 5. **Your results** — once a round is computed, the trainee gets the same summary and detail the
    class debrief shows for their company:
    - a **summary table**, one row per computed round (revenue, cost, profit, cash, lost sales,
-     capacity used) — click a row to choose it;
+     capacity used);
+   - **the newest computed round opens by itself** as soon as it is computed — no click needed, and
+     the page picks it up within ten seconds on its own (D96). Clicking an earlier row reads that
+     round instead, until the next result lands;
    - the chosen round in **detail** under Revenue · Cost · Result;
    - **Per product**, the same round broken down by product (opening, produced, demand, sold,
      lost, closing, revenue, COGS) — this is where "which product lost those pieces?" is answered
