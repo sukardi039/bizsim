@@ -538,3 +538,23 @@ winning one line and losing another could not see it. Ruled:
 
 
 
+
+**D99 — Shared inertia and the three Porter presets (ruled 17 Nov 2026; implementation next).** The
+gap left by D98 is that an advantage is only worth *one month*: the allocator re-contests the whole
+market every round, so a rival's price cut bites immediately and loyalty costs nothing to break. Ruled,
+with the defaults fixed so the work is unambiguous:
+
+- **Inertia**: `share_t = λ · share_{t−1} + (1 − λ) · contest_t`, then whole units by largest remainder
+  as today. λ is a **template** value (`definition.inertia`), default **0.0** — `standard-v1` plays
+  exactly as it does now, and a template that never sets it is unaffected.
+- **Per product, not per company**: a company may hold a loyal line and a failing one, which is the
+  more useful teaching case. The previous share comes from `round_statement.detail.products[].share`
+  (D97), so **no schema change**.
+- **λ = 0.5** in any preset that enables it.
+- **Audit first**: `scripts/audit_financials.py` implements the same blend in its own allocator in the
+  same slice, or every share check fails — that is the work, not an afterthought.
+- **Presets** (cost-led / differentiated / focused) are template **data** cloned from `standard-v1`
+  with overridden elasticities, fixed costs and segment reach, and each ships **only with its
+  calibration table** (two plans, 6 rounds, seeded, winner by cumulative profit) in
+  `docs/SCENARIO_CALIBRATION.md`. A preset that does not invert the winner is a bug, not a preset.
+- **No historical statement changes**: both apply to rounds computed after their release.
