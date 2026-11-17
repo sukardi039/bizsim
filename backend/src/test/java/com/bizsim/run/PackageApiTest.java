@@ -651,7 +651,7 @@ class PackageApiTest extends PostgresTestBase {
         // The library is what the picker reads: nothing of the programme is left in it.
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(5));
     }
 
     /**
@@ -668,8 +668,9 @@ class PackageApiTest extends PostgresTestBase {
         // Only the shipped template is left in the library: the inserted copy is not offered.
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].key").value("standard-v1"));
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[*].key",
+                        org.hamcrest.Matchers.hasItem("standard-v1")));
     }
 
     private long publish(String name) throws Exception {

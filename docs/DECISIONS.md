@@ -604,14 +604,31 @@ catalogue, classes, channels and timeline, with three numbers changed — cloned
 - **The tables ship with the presets** in `docs/SCENARIO_CALIBRATION.md`: two plans, six rounds, the
   profit of each, for each preset.
 
-**Status, 17 Nov 2026 — nothing shipped, and the cost preset is blocked by measurement.** The
-calibration harness (`PresetCalibrationTest`) was written to the rule above and run before any data
-was written. `preset-cost-v1` failed it decisively: with the same unit costs and the same wage bill in
-one template, the discount plan lost **946 M** over eight rounds while the premium plan earned
-**2,022 M**. That is not a tuning miss — no value of the three knobs above changes what a unit costs,
-so the margin ratio (0.44) beats any volume ratio the workforce allows. The finding, the arithmetic
-and the three structural levers that would fix it (a lower `base_unit_cost` in that preset; a
-throughput product; or retiring the claim) are recorded in `OPEN_QUESTIONS.md` under 17 Nov 2026.
-Consequently **no preset migration has been written**: shipping a preset that does not invert its
-winner is the bug this record forbids. `preset-diff-v1` and `preset-focus-v1` are also uncalibrated
-until the cost question is settled, because their numbers were set relative to it.
+**Amendment (ruled 17 Nov 2026, same day): the cost preset also owns its cost base and its market.**
+Measured first, and the first attempt failed hard: with identical unit costs in one template, the
+discount plan lost **946 M** while the premium plan earned **2,022 M**, and no value of the three knobs
+above fixed it — a premium price multiplies a margin the discount plan does not have, and the workforce
+caps the volume it can win. Both sides of `margin × units` had to move, so D100 now allows two further
+data levers in a preset:
+
+- **the mass product's cost base** — `base_unit_cost` 590 k → **430 k** and `units_per_worker` 40 → **48**
+  in `preset-cost-v1`: a cost advantage *and* throughput, which is what cost leadership actually is;
+- **the market the preset serves** — segment `base_size` ×3 in `preset-cost-v1` and `preset-focus-v1`,
+  so a volume plan can reach its capacity and a niche plan can fill a factory.
+
+**Shipped in v0.19.0** (migration `V35`), with the acceptance measured on the shipped rows —
+`PresetCalibrationTest` loads each preset from the database and plays two plans against each other for
+the whole term, no events:
+
+| preset | plan | cumulative profit | revenue |
+|---|---|---|---|
+| `preset-cost-v1` | **COST** (P1 only, 0.92×, full capacity, 12 M marketing) | **+1,968 M** | 7,578 M |
+| | DIFF (all three, 1.25×, quality 35 M, marketing 30 M) | +1,764 M | 7,076 M |
+| `preset-diff-v1` | COST | −1,272 M | 2,312 M |
+| | **DIFF** | **+882 M** | 6,717 M |
+| `preset-focus-v1` | **FOCUS** (P3 only, 1.40×, quality 45 M) | **+1,720 M** | 6,734 M |
+| | DIFF (all three) | +1,242 M | 6,717 M |
+
+Each preset hands the win to the position it is named for, and the tables ship in
+`docs/SCENARIO_CALIBRATION.md`. The presets are data: a builder can copy one and edit it like any other
+template.

@@ -88,7 +88,8 @@ class UserRoleApiTest extends PostgresTestBase {
         String builderToken = loginWith("builder@acme.test", "builder1234");
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builderToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].key").value("standard-v1"));
+                .andExpect(jsonPath("$[*].key",
+                        org.hamcrest.Matchers.hasItem("standard-v1")));
         mvc.perform(post("/api/templates/standard-v1/copy")
                         .header("Authorization", "Bearer " + builderToken))
                 .andExpect(status().isCreated())

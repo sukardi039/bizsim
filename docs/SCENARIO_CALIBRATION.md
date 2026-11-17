@@ -169,3 +169,50 @@ reproduces its schedule exactly, which is what makes the debrief defensible.
 Market review: 15 M per month, two rounds of forecast, ±8% band, and it includes the consumer-trend
 forecast alongside the economic one. On a 2,000 M balance that is 0.75% of starting cash to buy a
 slightly wrong view of next month — cheap enough to try, expensive enough to think about.
+
+## 7. The three Porter presets (D100, v0.19.0)
+
+Shipped beside `standard-v1` by migration `V35`. Each is a full copy of the standard economy with its
+own numbers; each is tuned so that one competitive position pays and another does not. The tables below
+are produced by `PresetCalibrationTest`, which loads the preset **from the database** and plays two
+plain plans against each other for the whole term with no events drawn. The plans differ only in price
+posture, quality spend, marketing and which products the company carries, so what separates them is the
+preset's economy.
+
+### 7.1 What each preset changes
+
+| | `preset-cost-v1` | `preset-diff-v1` | `preset-focus-v1` |
+|---|---|---|---|
+| price elasticity | **2.20** | 1.10 | 1.30 |
+| quality elasticity | 0.30 | **1.40** | 1.00 |
+| brand elasticity | 0.25 | **0.90** | 0.50 |
+| marketing elasticity | 0.35 | **0.90** | 0.60 |
+| fixed cost per round | 40 M | 80 M | 35 M |
+| market (segment base size) | ×3 | shipped | ×3 |
+| cross-class business | shipped | shipped | **none** (`cross_segment_pct = 0`) |
+| mass product P1 | **cost 430 k, 48 units/worker** | shipped | shipped |
+| inertia (D99) | 0.5 | 0.5 | 0.5 |
+
+### 7.2 The calibration tables
+
+| preset | plan | cumulative profit | revenue | cash at end |
+|---|---|---|---|---|
+| `preset-cost-v1` | **COST** — P1 only, 0.92× price, full capacity, 12 M marketing | **+1,968,432,753** | 7,578,040,000 | 3,968,432,753 |
+| | DIFF — all three products, 1.25×, quality 35 M, marketing 30 M | +1,763,551,268 | 7,076,250,000 | 3,763,551,268 |
+| `preset-diff-v1` | COST | −1,271,925,216 | 2,311,960,000 | 394,212,401 |
+| | **DIFF** | **+881,913,617** | 6,716,875,000 | 2,881,913,617 |
+| `preset-focus-v1` | **FOCUS** — P3 only, 1.40×, quality 45 M | **+1,719,917,288** | 6,734,000,000 | 3,719,917,288 |
+| | DIFF — all three products | +1,241,913,617 | 6,716,875,000 | 3,241,913,617 |
+
+Read it as a lesson, not a leaderboard: on the cost preset the discount wins because the product is
+genuinely cheaper and faster to make; on the differentiated preset the same discount loses 1.27 B,
+because those customers are not buying price; on the focused preset the narrow line beats a broader
+portfolio that has to spread itself over three classes.
+
+### 7.3 Why the cost preset needed a cost base
+
+The first version of the cost preset moved only elasticities and fixed cost, and the discount plan lost
+946 M to the premium plan's 2,022 M. Inside one template both plans pay the same price for materials
+and the same wages, so premium margin × premium volume beats discount margin × capacity-capped volume,
+whatever the elasticities say. Cost leadership is a **cost** advantage plus scale, so the preset now
+carries both — the amendment is recorded in D100.

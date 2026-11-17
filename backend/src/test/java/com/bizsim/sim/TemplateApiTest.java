@@ -87,15 +87,20 @@ class TemplateApiTest extends PostgresTestBase {
     }
 
     @Test
-    void the_shipped_template_is_listed_and_global() throws Exception {
+    void the_shipped_templates_are_listed_and_global() throws Exception {
+        // D100 ships three presets beside the standard economy: four global templates, no owner.
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeFacilitator))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].key").value("standard-v1"))
-                .andExpect(jsonPath("$[0].tenantId").doesNotExist())
-                .andExpect(jsonPath("$[0].status").value("PUBLISHED"))
-                .andExpect(jsonPath("$[0].products").value(count("product", "standard-v1")))
-                .andExpect(jsonPath("$[0].rounds").value(count("scenario_round", "standard-v1")));
+                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$[?(@.key=='standard-v1')].tenantId").doesNotExist())
+                .andExpect(jsonPath("$[?(@.key=='standard-v1')].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$[?(@.key=='preset-cost-v1')].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$[?(@.key=='preset-diff-v1')].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$[?(@.key=='preset-focus-v1')].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$[?(@.key=='standard-v1')].products")
+                        .value(count("product", "standard-v1")))
+                .andExpect(jsonPath("$[?(@.key=='standard-v1')].rounds")
+                        .value(count("scenario_round", "standard-v1")));
     }
 
     @Test
@@ -129,16 +134,16 @@ class TemplateApiTest extends PostgresTestBase {
                 "select definition::text = (select definition::text from scenario where key = 'standard-v1') "
                         + "from scenario where key = ?", Boolean.class, key)).isTrue();
 
-        // The global template is untouched and still the only row without a tenant.
+        // The shipped templates are untouched: standard-v1 plus the three D100 presets, all global.
         assertThat(jdbc.queryForObject(
-                "select count(*) from scenario where tenant_id is null", Integer.class)).isEqualTo(1);
+                "select count(*) from scenario where tenant_id is null", Integer.class)).isEqualTo(4);
         assertThat(count("product", "standard-v1")).isEqualTo(globalProducts);
 
         // Visible to its own tenant, not to another one — and not copyable across tenants.
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeFacilitator))
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(5));
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + otherFacilitator))
-                .andExpect(jsonPath("$.length()").value(1));
+                .andExpect(jsonPath("$.length()").value(4));
         // Another tenant's builder cannot see it either — 404, and their facilitator is refused first.
         mvc.perform(post("/api/templates/" + key + "/copy")
                         .header("Authorization", "Bearer " + otherBuilder))

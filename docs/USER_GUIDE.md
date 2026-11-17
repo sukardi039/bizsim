@@ -74,6 +74,21 @@ This is where a simulation is designed. There is one shipped template,
 Everything below is edited **on your copy**. Press **Save** at the bottom of each tab. A banner
 confirms *"Saved. New simulations from this template use these values."*
 
+### 3.1a The three presets (D100)
+
+Four templates ship with the product: the standard economy and three **presets**, each tuned to make
+one way of competing pay. Run the same class three times, on one preset each, and the position decides
+who wins:
+
+| Preset | It rewards | How it is built |
+|---|---|---|
+| **Cost leadership** | cheap, high volume, one product built fast | price moves demand hard, quality and brand hardly at all; the mass product is cheaper to make and faster to build; the market is three times the standard one, so volume can fill a factory |
+| **Differentiation** | premium price, quality and marketing | quality and brand carry the buying decision, price is almost ignored, and the position costs 80 M a round to hold |
+| **Focus** | one customer class, served properly | no product competes for the other classes' business; the niche is three times the standard size |
+
+All three carry half of last round's share (the `inertia` setting above, 0.5), so a position has to be
+defended month after month. Copy a preset and edit it exactly like the standard template.
+
 ### 3.2 The seven tabs
 
 **Settings** — the class-level numbers.
