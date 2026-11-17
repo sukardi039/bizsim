@@ -165,6 +165,7 @@ public class ScoringEngine {
         DecisionPayload d = team.decision() == null ? DecisionPayload.none() : team.decision();
         boolean insolvent = "INSOLVENT".equals(team.status());
         Effects effects = effects(scenario, team);
+        List<Scenario.ProductSpec> carries = carried(scenario, team);
 
         Map<String, Integer> staff = new LinkedHashMap<>(team.staff());
         Integer productionTarget = d.productionTarget().orElse(null);
@@ -182,7 +183,7 @@ public class ScoringEngine {
         Map<String, BigDecimal> qualityBought = new LinkedHashMap<>();
         BigDecimal qualitySpend = ZERO;
 
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carries) {
             ProductState state = team.products().get(spec.code());
             BigDecimal stock = state == null ? ZERO : nz(state.stock());
             BigDecimal currentPrice = state == null ? spec.basePrice() : nz(state.price());
@@ -218,7 +219,7 @@ public class ScoringEngine {
 
         // Capacity is worker-equivalents: planned units / (units per worker x R&D uplift).
         BigDecimal required = ZERO;
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carries) {
             BigDecimal upw = spec.unitsPerWorker().multiply(effects.upwMult().getOrDefault(spec.code(), ONE));
             required = required.add(div(produced.get(spec.code()), upw));
         }
@@ -250,7 +251,7 @@ public class ScoringEngine {
         BigDecimal capacityCost = insolvent ? ZERO : nz(d.capacityPurchaseOrZero());
 
         BigDecimal materials = ZERO;
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carries) {
             materials = materials.add(produced.get(spec.code()).multiply(effectiveCost.get(spec.code())));
         }
         materials = money(materials);
@@ -283,7 +284,7 @@ public class ScoringEngine {
         }
 
         BigDecimal capacityUsed = ZERO;
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carries) {
             BigDecimal upw = spec.unitsPerWorker().multiply(effects.upwMult().getOrDefault(spec.code(), ONE));
             capacityUsed = capacityUsed.add(div(produced.get(spec.code()), upw));
         }
@@ -322,11 +323,16 @@ public class ScoringEngine {
         }
         BigDecimal materials = ZERO;
         BigDecimal capacityUsed = ZERO;
-        for (Scenario.ProductSpec spec : scenario.products()) {
-            materials = materials.add(produced.get(spec.code()).multiply(p.effectiveCost().get(spec.code())));
+        for (Map.Entry<String, BigDecimal> line : produced.entrySet()) {
+            String code = line.getKey();
+            Scenario.ProductSpec spec = scenario.productsByCode().get(code);
+            if (spec == null) {
+                continue;
+            }
+            materials = materials.add(line.getValue().multiply(p.effectiveCost().get(code)));
             BigDecimal upw = spec.unitsPerWorker()
-                    .multiply(p.effects().upwMult().getOrDefault(spec.code(), ONE));
-            capacityUsed = capacityUsed.add(div(produced.get(spec.code()), upw));
+                    .multiply(p.effects().upwMult().getOrDefault(code, ONE));
+            capacityUsed = capacityUsed.add(div(line.getValue(), upw));
         }
         return new Plan(p.planned(), produced, p.prices(), p.effectiveCost(), p.effectiveQuality(),
                 p.qualityBought(), p.effects(), p.spendByChannel(), p.investByProject(), p.staff(),
@@ -350,8 +356,16 @@ public class ScoringEngine {
 
         for (Scenario.ProductSpec spec : scenario.products()) {
             double[] attractiveness = new double[teams.size()];
+            // D89: a company that does not carry the product does not compete for it. It used to be
+            // given a share of a market it could not serve, which inflated lost sales and took demand
+            // away from the companies that do hold the line.
+            boolean[] carries = new boolean[teams.size()];
             double sum = 0;
             for (int i = 0; i < teams.size(); i++) {
+                carries[i] = carries(teams.get(i), spec.code());
+                if (!carries[i]) {
+                    continue;
+                }
                 attractiveness[i] = attractiveness(scenario, spec.code(), teams.get(i), plans.get(i));
                 sum += attractiveness[i];
             }
@@ -391,8 +405,13 @@ public class ScoringEngine {
                 int byRemainder = raw[b].subtract(pieces[b]).compareTo(raw[a].subtract(pieces[a]));
                 return byRemainder != 0 ? byRemainder : Integer.compare(a, b);
             });
-            for (int k = 0; k < leftover; k++) {
-                pieces[order.get(k)] = pieces[order.get(k)].add(ONE);
+            for (int k = 0; k < n && leftover > 0; k++) {
+                int index = order.get(k);
+                if (!carries[index]) {
+                    continue;
+                }
+                pieces[index] = pieces[index].add(ONE);
+                leftover--;
             }
             for (int i = 0; i < n; i++) {
                 result.get(teams.get(i).teamId()).put(spec.code(), pieces[i].doubleValue());
@@ -510,7 +529,7 @@ public class ScoringEngine {
         BigDecimal stockValueChange = ZERO;
         boolean weighted = scenario.params().weightedCosting();
 
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carried(scenario, team)) {
             ProductState state = team.products().get(spec.code());
             BigDecimal opening = state == null ? ZERO : nz(state.stock());
             BigDecimal produced = plan.produced().get(spec.code());
@@ -720,6 +739,34 @@ public class ScoringEngine {
     }
 
     // ------------------------------------------------------------------ numeric helpers
+
+    /**
+     * The products this company carries (D89). {@code company_product} is the company's line: a
+     * company profile may seat a company with a subset of the catalogue. A decision that named a
+     * product the company does not hold used to be accepted, produced and sold — and the stock then
+     * vanished between rounds, because there was no row for it to live in.
+     *
+     * <p>A company with no rows at all (a run written before profiles, or data repaired by hand) is
+     * treated as carrying the whole catalogue, so this rule can never silently zero a company whose
+     * rows were never written.
+     */
+    private static List<Scenario.ProductSpec> carried(Scenario scenario, TeamInput team) {
+        if (team.products() == null || team.products().isEmpty()) {
+            return scenario.products();
+        }
+        List<Scenario.ProductSpec> out = new ArrayList<>();
+        for (Scenario.ProductSpec spec : scenario.products()) {
+            if (team.products().containsKey(spec.code())) {
+                out.add(spec);
+            }
+        }
+        return out;
+    }
+
+    /** Whether this company holds the product at all. */
+    private static boolean carries(TeamInput team, String code) {
+        return team.products() == null || team.products().isEmpty() || team.products().containsKey(code);
+    }
 
     private static BigDecimal nz(BigDecimal v) {
         return v == null ? ZERO : v;

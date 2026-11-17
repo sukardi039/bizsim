@@ -126,7 +126,8 @@ public final class AutoWorker {
 
         Map<String, BigDecimal> unitsByProduct = new LinkedHashMap<>();
         Map<String, BigDecimal> priceByProduct = new LinkedHashMap<>();
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        List<Scenario.ProductSpec> carries = carried(scenario, context);
+        for (Scenario.ProductSpec spec : carries) {
             ScoringEngine.ProductLine previous = last.get(spec.code());
             BigDecimal forecast = forecast(spec, previous, context, profile, seedKey);
             BigDecimal stock = stock(context, spec.code());
@@ -175,7 +176,7 @@ public final class AutoWorker {
         BigDecimal machines = BigDecimal.ZERO;
 
         BigDecimal expectedRevenue = BigDecimal.ZERO;
-        for (Scenario.ProductSpec spec : scenario.products()) {
+        for (Scenario.ProductSpec spec : carries) {
             expectedRevenue = expectedRevenue.add(
                     unitsByProduct.get(spec.code()).multiply(priceByProduct.get(spec.code())));
         }
@@ -218,8 +219,8 @@ public final class AutoWorker {
         List<DecisionPayload.QualityRow> quality = new ArrayList<>();
         BigDecimal qualitySpend = BigDecimal.ZERO;
         if (profile.buysQuality() && scenario.params().qualityUpgrade()
-                && comfortable(context, scenario, profile)) {
-            Scenario.ProductSpec first = scenario.products().get(0);
+                && comfortable(context, scenario, profile) && !carries.isEmpty()) {
+            Scenario.ProductSpec first = carries.get(0);
             qualitySpend = scenario.params().qualityCostPerPoint();
             quality.add(new DecisionPayload.QualityRow(first.code(), qualitySpend));
         }
@@ -324,6 +325,24 @@ public final class AutoWorker {
     private static BigDecimal stock(Context context, String product) {
         ScoringEngine.ProductState state = context.products().get(product);
         return state == null || state.stock() == null ? BigDecimal.ZERO : state.stock();
+    }
+
+    /**
+     * The products this company carries (D89). A bot decides for the company's own line, never for the
+     * whole catalogue: a company seated with a subset profile has no row for the rest, so naming one
+     * would be refused at submit and the company would never play.
+     */
+    private static List<Scenario.ProductSpec> carried(Scenario scenario, Context context) {
+        if (context.products() == null || context.products().isEmpty()) {
+            return scenario.products();
+        }
+        List<Scenario.ProductSpec> out = new ArrayList<>();
+        for (Scenario.ProductSpec spec : scenario.products()) {
+            if (context.products().containsKey(spec.code())) {
+                out.add(spec);
+            }
+        }
+        return out;
     }
 
     private static boolean comfortable(Context context, Scenario scenario, Profile profile) {

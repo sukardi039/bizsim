@@ -623,6 +623,7 @@ accounts are never rewritten by this; remove the variables once you have signed 
 | Re-publishing makes a new package | the old one stays as it taught |
 | One session per facilitator | a second parallel cohort needs a second account |
 | Sessions are disposable, accounts are permanent | deleting a run keeps the people |
+| A company trades only the products its profile gave it | its stock lives in one row per product; a product it does not carry has nowhere to live, so the decision form does not offer it and the server refuses it (D89) |
 | A builder cannot see sessions | preparing is not watching |
 
 ---

@@ -83,7 +83,8 @@ public class RoundService {
         Scenario scenario = scenarios.load(run.scenarioKey());
         ScoringEngine.TeamInput input = input(scenario, runId, round.id(), teamId, payload);
 
-        List<ApiProblem> problems = validator.validate(scenario, payload, input.rnd());
+        List<ApiProblem> problems = validator.validate(scenario, payload, input.rnd(),
+                input.products().keySet());
         if (!problems.isEmpty()) {
             throw new ValidationException(problems);
         }
@@ -538,6 +539,11 @@ public class RoundService {
         String productLang = runs.langOf(runId);
         for (Scenario.ProductSpec spec : scenario.products()) {
             ScoringEngine.ProductState state = line.get(spec.code());
+            // D89: the form offers the company's own line, not the catalogue. A company seated with a
+            // subset profile never sees a product it does not carry, so it cannot name one by accident.
+            if (!line.isEmpty() && state == null) {
+                continue;
+            }
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("code", spec.code());
             row.put("name", spec.nameIn(productLang));

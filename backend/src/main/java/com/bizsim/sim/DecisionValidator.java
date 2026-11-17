@@ -23,13 +23,19 @@ import java.util.Set;
 public class DecisionValidator {
 
     public List<ApiProblem> validate(Scenario scenario, DecisionPayload payload,
-                                     Map<String, ScoringEngine.RndState> rndState) {
+                                     Map<String, ScoringEngine.RndState> rndState,
+                                     java.util.Collection<String> carried) {
         List<ApiProblem> problems = new ArrayList<>();
         if (payload == null) {
             return List.of(ApiProblem.of("decision.required", "decision payload is required"));
         }
 
-        Set<String> productCodes = new HashSet<>(scenario.productsByCode().keySet());
+        Set<String> inScenario = new HashSet<>(scenario.productsByCode().keySet());
+        // D89: a decision may only name the products this company holds. The catalogue is what the
+        // template sells; company_product is what this company carries, and the two differ when a
+        // profile seats a company with a subset.
+        Set<String> productCodes = new HashSet<>(carried);
+        productCodes.retainAll(inScenario);
 
         if (payload.production() == null || payload.production().isEmpty()) {
             problems.add(ApiProblem.of("production.required", "production: every product needs a volume, even 0"));
@@ -37,8 +43,7 @@ public class DecisionValidator {
             Set<String> seen = new HashSet<>();
             for (DecisionPayload.ProductRow row : payload.production()) {
                 if (row.product() == null || !productCodes.contains(row.product())) {
-                    problems.add(ApiProblem.of("production.unknown_product",
-                            "production: unknown product " + row.product(), "product", nullToDash(row.product())));
+                    addProductProblem(problems, "production", row.product(), inScenario);
                 } else if (!seen.add(row.product())) {
                     problems.add(ApiProblem.of("production.duplicate_product",
                             "production: product " + row.product() + " appears more than once",
@@ -64,8 +69,7 @@ public class DecisionValidator {
             Set<String> seen = new HashSet<>();
             for (DecisionPayload.PriceRow row : payload.price()) {
                 if (row.product() == null || !productCodes.contains(row.product())) {
-                    problems.add(ApiProblem.of("price.unknown_product",
-                            "price: unknown product " + row.product(), "product", nullToDash(row.product())));
+                    addProductProblem(problems, "price", row.product(), inScenario);
                 } else if (!seen.add(row.product())) {
                     problems.add(ApiProblem.of("price.duplicate_product",
                             "price: product " + row.product() + " appears more than once",
@@ -160,9 +164,7 @@ public class DecisionValidator {
             Set<String> seen = new HashSet<>();
             for (DecisionPayload.QualityRow row : payload.quality()) {
                 if (row.product() == null || !productCodes.contains(row.product())) {
-                    problems.add(ApiProblem.of("quality.unknown_product",
-                            "quality: unknown product " + row.product(),
-                            "product", nullToDash(row.product())));
+                    addProductProblem(problems, "quality", row.product(), inScenario);
                     continue;
                 }
                 if (!seen.add(row.product())) {
@@ -189,6 +191,22 @@ public class DecisionValidator {
 
     private static String nullToDash(String value) {
         return value == null || value.isBlank() ? "—" : value;
+    }
+
+    /**
+     * Why a named product is not allowed (D89): either the template never had it, or the template has
+     * it and this company does not carry it. The two are different mistakes and the trainee is told
+     * which one they made.
+     */
+    private static void addProductProblem(List<ApiProblem> problems, String group, String code,
+                                          Set<String> inScenario) {
+        if (code != null && inScenario.contains(code)) {
+            problems.add(ApiProblem.of(group + ".not_carried",
+                    group + ": this company does not carry " + code, "product", code));
+        } else {
+            problems.add(ApiProblem.of(group + ".unknown_product",
+                    group + ": unknown product " + code, "product", nullToDash(code)));
+        }
     }
 
     /**

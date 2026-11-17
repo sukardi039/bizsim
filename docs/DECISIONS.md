@@ -373,3 +373,31 @@ Ruled with it:
 - **Every figure is read, not re-derived** from the template, so a report agrees with the round even
   after the template is edited, and historical rounds keep their own numbers.
 
+**D89 — A decision may only name the products the company carries (ruling 17 Nov 2026).**
+`company_product` is the company's line, and a company profile may seat a company with a subset of
+the template's catalogue. Until this ruling the decision form offered the whole catalogue and the
+validator checked names against the catalogue, so a company seated without a product could still send
+units for it: the engine produced and sold it, and the closing stock was **lost**, because there was
+no row to hold it. The statement then reported stock the next round never saw — the gap D88's reports
+had to show as an inventory-revaluation line.
+
+Ruled:
+
+- **The form lists the company's own line.** `GET /runs/{id}/teams/{id}/context` returns the carried
+  products only, so a trainee is never offered one they cannot decide.
+- **The validator requires exactly the carried products.** Any other name is refused with
+  `production.not_carried` (and `price.not_carried` / `quality.not_carried`); a name the template
+  does not have at all stays `unknown_product`. Both are translated, so a Chinese class reads them in
+  Chinese.
+- **The engine plans, produces, settles and reports only the carried products.** A company that does
+  not carry a product does not compete for its demand: it is left out of the attractiveness sum, so
+  the market is shared among the companies that can actually serve it. The pool itself is unchanged —
+  D-a..D-d on pool scaling stay open.
+- **Bots decide for the carried line**, never for the catalogue: a bot that named a missing product
+  would be refused at submit and the company would never play.
+- **A company with no product rows at all keeps the whole catalogue**, so the rule cannot silently
+  zero a company whose rows were never written (legacy data, or a hand-repaired database).
+- **Historical statements are not rewritten.** They keep the numbers they were computed with; the fix
+  applies to rounds computed from now on.
+
+

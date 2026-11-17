@@ -45,6 +45,12 @@ Everything here is written only by the round-closing transaction (decision A / 4
 
 One submission per company, not per role. **PROPOSED** payload:
 
+The `product` names are the codes of the company's **own** line (`company_product`), not the whole
+catalogue: a profile may seat a company with a subset. The form offers the line, the validator
+requires exactly it (`production.not_carried` otherwise, D89), and the engine plans, produces and
+settles only those products — a product the company does not carry has no stock row, so trading it
+would lose the stock between rounds.
+
 ```jsonc
 {
   "production": [ { "product": "P1", "units": 1200 },
