@@ -454,11 +454,13 @@ Two lines appear only when there is something to say:
 Nothing here is recomputed: each figure is read from the round's stored statement, so an old round
 still reads as it did on the day it was computed.
 
-The statements are laid out the way a printed statement is: one column of figures with the amounts
-aligned on the right, a rule under every subtotal and a double rule under the result; the cash flow
-is split into **operating**, **investing** and **financing** activities, each ending in its own net
-line; and the balance sheet sits in **two columns**, assets against liabilities and equity, so
-total assets and total liabilities and equity can be read across from each other.
+The statements are three separate panels, each with its own heading and the round it covers (a badge
+top-right, and a line under the title saying whether it is *for the round* or *as at the end of the
+round*). Inside each panel the figures run down one column, aligned on the right, with a **subheading
+for every block of lines** — Income and Operating expenses, Operating / Investing / Financing
+activities and Cash movement, Assets and Liabilities and Equity. A rule separates each subtotal, a
+double rule closes the result, and the balance sheet sits in **two columns**, assets against
+liabilities and equity, so the two totals can be read across from each other.
 
 ### 7.5 Presenting and exporting the debrief
 

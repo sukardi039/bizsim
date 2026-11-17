@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api, type FinancialRow, type Financials } from "./api";
 import { useI18n } from "./i18n";
 
@@ -10,10 +10,11 @@ import { useI18n } from "./i18n";
  * the round detail above is built from. This component only labels and lays them out, so the trainee's
  * console and the facilitator's debrief show identical figures by construction.
  *
- * Rows arrive as i18n keys with a level (0 a line, 1 a subtotal, 2 a total) and a section, so the
- * page can rule them the way a printed statement is ruled: subtotals underlined, the result
- * double-ruled, the balance sheet in two columns, and the cash flow split into operating, investing
- * and financing.
+ * Each report is its own panel with its own heading and the round it covers, followed by one column
+ * of figures: subtotals are ruled, the result is double-ruled, and each block of lines carries a
+ * subheading (Income, Operating expenses, Operating activities, Assets…). Rows arrive as i18n keys
+ * with a level (0 a line, 1 a subtotal, 2 a total) and a section, so the grouping is the server's
+ * accounting decision, not a guess made here.
  */
 export default function FinancialStatements({
   runId,
@@ -59,11 +60,6 @@ export default function FinancialStatements({
   const section = (rows: FinancialRow[], name: string) =>
     rows.filter((row) => row.section === name);
 
-  const cashGroups = ["operating", "investing", "financing", "movement"].map((name) => ({
-    name,
-    label: t(`cash.section.${name}`),
-    rows: section(entry.cashFlow, name),
-  }));
   const assets = section(entry.balance, "assets");
   const liabilitiesAndEquity = [
     ...section(entry.balance, "liabilities"),
@@ -73,59 +69,109 @@ export default function FinancialStatements({
   // rounding line never appears as noise.
   const difference = section(entry.balance, "check").filter((row) => Math.abs(row.amount) >= 1);
 
+  const badge = t("financials.round", { round });
+
   return (
-    <section className="detail-section financials">
-      <h4>{t("financials.title", { round })}</h4>
-      <p className="muted">{t("financials.hint")}</p>
+    <div className="financials">
+      <p className="muted financials-hint">{t("financials.hint")}</p>
 
-      <div className="statement">
-        <h5>{t("pnl.title")}</h5>
-        <Report rows={entry.pnl} />
+      <article className="report-card">
+        <header className="report-head">
+          <h3>{t("pnl.title")}</h3>
+          <span className="report-round">{badge}</span>
+        </header>
+        <p className="report-scope">{t("pnl.scope")}</p>
+        <Statement
+          rows={entry.pnl}
+          groups={[
+            { name: "revenue", label: t("pnl.groupIncome") },
+            { name: "expenses", label: t("pnl.groupExpenses") },
+            { name: "total" },
+          ]}
+        />
         <p className="muted note">{t("pnl.note")}</p>
-      </div>
+      </article>
 
-      <div className="statement">
-        <h5>{t("cash.title")}</h5>
-        {cashGroups.map((group) =>
-          group.rows.length > 0 ? (
-            <Report key={group.name} label={group.label} rows={group.rows} />
-          ) : null,
-        )}
+      <article className="report-card">
+        <header className="report-head">
+          <h3>{t("cash.title")}</h3>
+          <span className="report-round">{badge}</span>
+        </header>
+        <p className="report-scope">{t("cash.scope")}</p>
+        <Statement
+          rows={entry.cashFlow}
+          groups={[
+            { name: "operating", label: t("cash.section.operating") },
+            { name: "investing", label: t("cash.section.investing") },
+            { name: "financing", label: t("cash.section.financing") },
+            { name: "movement", label: t("cash.section.movement") },
+          ]}
+        />
         <p className="muted note">{t("cash.note")}</p>
-      </div>
+      </article>
 
-      <div className="statement">
-        <h5>{t("balance.title")}</h5>
+      <article className="report-card">
+        <header className="report-head">
+          <h3>{t("balance.title")}</h3>
+          <span className="report-round">{badge}</span>
+        </header>
+        <p className="report-scope">{t("balance.scope")}</p>
         <div className="balance-grid">
-          <Report label={t("balance.groupAssets")} rows={assets} />
-          <Report label={t("balance.groupLiabilitiesEquity")} rows={liabilitiesAndEquity} />
+          <Statement rows={assets} groups={[{ name: "assets", label: t("balance.groupAssets") }]} />
+          <Statement
+            rows={liabilitiesAndEquity}
+            groups={[
+              { name: "liabilities", label: t("balance.groupLiabilities") },
+              { name: "equity", label: t("balance.groupEquity") },
+            ]}
+          />
         </div>
-        {difference.length > 0 && <Report rows={difference} />}
+        {difference.length > 0 && <Statement rows={difference} groups={[{ name: "check" }]} />}
         <p className="muted note">{t("balance.note")}</p>
-      </div>
-    </section>
+      </article>
+    </div>
   );
 }
 
+interface Group {
+  name: string;
+  label?: string;
+}
+
 /**
- * One ruled table. A subtotal is separated from the lines above it by a rule; a total closes the
- * block with a double rule, which is how a printed statement says "this is the result".
+ * One ruled table. A block of lines opens with its subheading; a subtotal is separated from the lines
+ * above it by a rule, and a total closes the block with a double rule — how a printed statement says
+ * "this is the result".
  */
-function Report({ label, rows }: { label?: string; rows: FinancialRow[] }) {
+function Statement({ rows, groups }: { rows: FinancialRow[]; groups: Group[] }) {
   const { t, money } = useI18n();
-  if (rows.length === 0) return null;
+  const blocks = groups
+    .map((group) => ({ group, rows: rows.filter((row) => row.section === group.name) }))
+    .filter((block) => block.rows.length > 0);
+  if (blocks.length === 0) return null;
+
   return (
     <table className="report">
-      {label && <caption>{label}</caption>}
       <tbody>
-        {rows.map((row) => (
-          <tr
-            key={row.key}
-            className={row.level === 2 ? "total" : row.level === 1 ? "subtotal" : undefined}
-          >
-            <th scope="row">{t(row.key)}</th>
-            <td className={row.amount < 0 ? "num negative" : "num"}>{money(row.amount)}</td>
-          </tr>
+        {blocks.map((block) => (
+          <Fragment key={block.group.name}>
+            {block.group.label && (
+              <tr className="group">
+                <th scope="colgroup" colSpan={2}>
+                  {block.group.label}
+                </th>
+              </tr>
+            )}
+            {block.rows.map((row) => (
+              <tr
+                key={row.key}
+                className={row.level === 2 ? "total" : row.level === 1 ? "subtotal" : undefined}
+              >
+                <th scope="row">{t(row.key)}</th>
+                <td className={row.amount < 0 ? "num negative" : "num"}>{money(row.amount)}</td>
+              </tr>
+            ))}
+          </Fragment>
         ))}
       </tbody>
     </table>

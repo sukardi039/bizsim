@@ -247,29 +247,52 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   font-weight: 600;
 }
 
-/* D88: the three reports. The profit and loss and the cash flow read top to bottom as one column of
-   figures; the balance sheet sits in two columns, assets against liabilities and equity, the way a
-   printed statement is laid out. Subtotals are ruled, the result is double-ruled. */
-.financials .statement { margin-top: 1.1rem; max-width: 52rem; }
-.financials .statement h5 {
-  margin: 0 0 .3rem;
-  font-size: .8rem;
-  letter-spacing: .06em;
+/* D88: the three reports, each its own panel. The title says which statement it is, the badge says
+   which round, the line under it says what period, and the figures run down one column the way a
+   printed statement is ruled. */
+.financials { margin: .4rem 0 .2rem; }
+.financials-hint { margin: 0 0 .2rem; font-size: .86rem; max-width: 52rem; }
+
+.report-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .85rem 1.05rem 1rem;
+  margin-top: 1rem;
+  max-width: 58rem;
+}
+.report-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: .2rem;
+}
+.report-head h3 { margin: 0; font-size: 1.12rem; letter-spacing: .01em; }
+.report-round {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: .16rem .6rem;
+  white-space: nowrap;
 }
-.financials .note { font-size: .8rem; margin: .45rem 0 0; }
+.report-scope { margin: .45rem 0 .1rem; font-size: .78rem; color: var(--muted); }
+.financials .note { font-size: .8rem; margin: .5rem 0 0; }
 
 .report { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.report caption {
-  caption-side: top;
-  text-align: left;
-  padding: .5rem 0 .15rem;
-  color: var(--muted);
+.report tr.group th {
+  padding: .7rem 0 .2rem;
   font-size: .72rem;
   font-weight: 600;
   letter-spacing: .07em;
   text-transform: uppercase;
+  color: var(--muted);
+  border-bottom: none;
 }
 .report th[scope="row"] {
   text-align: left;

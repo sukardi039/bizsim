@@ -643,11 +643,14 @@ const en: Dict = {
 
   // D88: the three reports on the review page. A row's key arrives from the server; the words live
   // here, so a language is a full set and not a translation of an English string.
-  "financials.title": "Financial statements · round {round}",
+  "financials.round": "Round {round}",
   "financials.hint":
     "The round's profit and loss, the cash flow that moved the bank, and the balance sheet as at the end of the round.",
   "financials.unavailable": "The financial statements could not be read.",
   "pnl.title": "Profit and loss",
+  "pnl.scope": "For the round",
+  "pnl.groupIncome": "Income",
+  "pnl.groupExpenses": "Operating expenses",
   "pnl.revenue": "Revenue",
   "pnl.cogs": "Cost of goods sold",
   "pnl.grossProfit": "Gross profit",
@@ -659,11 +662,12 @@ const en: Dict = {
   "pnl.holding": "Stock holding",
   "pnl.hiring": "Hiring and firing",
   "pnl.report": "Market review",
-  "pnl.operatingTotal": "Operating expenses",
+  "pnl.operatingTotal": "Total operating expenses",
   "pnl.profit": "Operating profit",
   "pnl.note":
     "Machines bought this month are not an expense: they are on the balance sheet at cost.",
   "cash.title": "Cash flow statement",
+  "cash.scope": "For the round",
   "cash.profit": "Profit for the round",
   "cash.inventory": "Change in inventories",
   "cash.operatingTotal": "Net cash from operations",
@@ -682,6 +686,10 @@ const en: Dict = {
   "cash.section.movement": "Cash movement",
   "cash.financingTotal": "Net cash from financing",
   "balance.title": "Assets and liabilities",
+  "balance.scope": "As at the end of the round",
+  "balance.groupAssets": "Assets",
+  "balance.groupLiabilities": "Liabilities",
+  "balance.groupEquity": "Equity",
   "balance.cash": "Cash",
   "balance.inventory": "Inventories",
   "balance.machines": "Machines at cost",
@@ -697,8 +705,6 @@ const en: Dict = {
   "balance.difference": "Difference",
   "balance.note":
     "Assets are cash, what the stock cost and the machines at cost; nothing is borrowed and machines are not depreciated.",
-  "balance.groupAssets": "Assets",
-  "balance.groupLiabilitiesEquity": "Liabilities and equity",
 };
 
 const zh: Dict = {
@@ -1300,10 +1306,13 @@ const zh: Dict = {
   "companies.saved": "档案已保存。",
 
   // D88：复核页上的三张报表。行键由服务端给出，文字在这里，因此每种语言都是完整的一套。
-  "financials.title": "财务报表 · 第 {round} 轮",
+  "financials.round": "第 {round} 轮",
   "financials.hint": "本轮的利润表、现金变动，以及期末的资产与负债。",
   "financials.unavailable": "无法读取财务报表。",
   "pnl.title": "利润表",
+  "pnl.scope": "本期",
+  "pnl.groupIncome": "收入",
+  "pnl.groupExpenses": "营业费用",
   "pnl.revenue": "营业收入",
   "pnl.cogs": "销售成本",
   "pnl.grossProfit": "毛利",
@@ -1315,10 +1324,11 @@ const zh: Dict = {
   "pnl.holding": "库存持有成本",
   "pnl.hiring": "招聘与解雇",
   "pnl.report": "市场报告",
-  "pnl.operatingTotal": "营业费用",
+  "pnl.operatingTotal": "营业费用合计",
   "pnl.profit": "营业利润",
   "pnl.note": "本月购买的机器不是费用：按成本列入资产与负债表。",
   "cash.title": "现金流量表",
+  "cash.scope": "本期",
   "cash.profit": "本期利润",
   "cash.inventory": "存货变动",
   "cash.operatingTotal": "经营活动现金净额",
@@ -1337,6 +1347,10 @@ const zh: Dict = {
   "cash.section.movement": "现金变动",
   "cash.financingTotal": "筹资活动现金净额",
   "balance.title": "资产与负债",
+  "balance.scope": "期末",
+  "balance.groupAssets": "资产",
+  "balance.groupLiabilities": "负债",
+  "balance.groupEquity": "所有者权益",
   "balance.cash": "现金",
   "balance.inventory": "存货",
   "balance.machines": "机器设备（按成本）",
@@ -1351,8 +1365,6 @@ const zh: Dict = {
   "balance.totalLiabilitiesEquity": "负债和所有者权益合计",
   "balance.difference": "差额",
   "balance.note": "资产包括现金、存货成本与机器成本；没有借款，机器不计折旧。",
-  "balance.groupAssets": "资产",
-  "balance.groupLiabilitiesEquity": "负债和所有者权益",
 };
 
 const catalogs: Record<Locale, Dict> = { en, zh };
