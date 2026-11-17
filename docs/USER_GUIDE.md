@@ -88,6 +88,7 @@ confirms *"Saved. New simulations from this template use these values."*
 | information | market review price, forecast horizon, forecast band |
 | research | min R&D benefit ratio |
 | dynamics | cycle demand drift, cycle cost drift |
+| loyalty (D99) | **share carried over** — how much of last round's share a product keeps |
 | quality (D40) | **Offer quality upgrades to the class** (checkbox, off by default), quality cost per point |
 | **Per function** (table) | salary and **starting headcount** for Production, Sales, R&D, Admin |
 
@@ -95,6 +96,15 @@ The quality switch is a per-template mechanic: **off means the trainee form has 
 any money sent to it is refused**. On, each company may buy quality points for a product at the price
 you set, and the level persists across rounds up to 100. A template written before this feature has
 no switch and therefore behaves exactly as it did.
+
+**Share carried over** is the same kind of switch, and it is `0` unless you set it. At `0` every
+round is a fresh contest: today's price, quality and marketing decide everything, and a company's
+lead disappears the month it stops earning it. Set it to `0.5`, say, and each product keeps half of
+the share it **actually sold** last round, with the other half re-contested — so a price cut, a
+quality drive or a service failure takes a couple of months to work through the market, and a loyal
+line is worth defending. It is a weight (0 to 1), applied per product: a company can hold a loyal
+line and a failing one at the same time. Leave it off for a short course where every month should
+teach its own lesson; turn it on when you want the class to argue about *defending* a position.
 
 **Environment** — the round-by-round timeline. Each row belongs to a **language** (D86), and one
 row is one round of that language's cycle: *language*, *round*, *demand index*, *cost index*, *wage
