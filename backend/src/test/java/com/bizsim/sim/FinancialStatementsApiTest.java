@@ -114,8 +114,8 @@ class FinancialStatementsApiTest extends PostgresTestBase {
 
             assertThat(net).as("net movement is the movement in the bank")
                     .isEqualByComparingTo(closing.subtract(opening));
-            assertThat(operating.add(investing).add(financing).add(revaluation))
-                    .as("the sections add up to the movement")
+            assertThat(operating.add(investing).add(financing))
+                    .as("the three sections add up to the movement")
                     .isEqualByComparingTo(net);
             assertThat(revaluation).as("weighted-average statements need no revaluation line")
                     .isEqualByComparingTo(BigDecimal.ZERO);
@@ -187,6 +187,7 @@ class FinancialStatementsApiTest extends PostgresTestBase {
                 String key = row.get("key").asText();
                 assertThat(key).as("%s row %s carries a prefix", block, key).startsWith(block.equals("cashFlow") ? "cash." : block + ".");
                 assertThat(row.get("level").asInt()).as("a level the page knows").isBetween(0, 2);
+                assertThat(row.get("section").asText()).as("a section to group by").isNotBlank();
             }
         }
     }

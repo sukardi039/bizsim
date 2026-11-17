@@ -256,6 +256,8 @@ export interface FinancialRow {
   key: string;
   amount: number;
   level: number;
+  /** Which block the row belongs to: "operating", "investing", "assets", "equity" and so on. */
+  section: string;
 }
 
 export interface FinancialRound {

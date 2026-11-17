@@ -46,8 +46,11 @@ public class FinancialStatementsService {
         this.rounds = rounds;
     }
 
-    /** One line of a report. {@code level}: 0 line, 1 subtotal, 2 total. */
-    public record Row(String key, BigDecimal amount, int level) {
+    /**
+     * One line of a report. {@code level}: 0 line, 1 subtotal, 2 total. {@code section} groups the
+     * lines so the page can rule them together — "operating", "investing", "assets" and so on.
+     */
+    public record Row(String key, BigDecimal amount, int level, String section) {
     }
 
     /** The three reports for one round. The balance sheet is as at the end of that round. */
@@ -101,14 +104,17 @@ public class FinancialStatementsService {
             BigDecimal netChange = closingCash.subtract(openingCash);
             // Zero on every weighted-average statement. A pre-D79 replacement-cost statement valued
             // closing stock at a different cost from the units it expensed, and the gap is shown
-            // rather than buried.
+            // rather than buried. It is a working-capital adjustment, so it belongs to operating cash
+            // -- which is why operating is derived from the movement and the investing section, and
+            // the three totals add up to the movement exactly.
             BigDecimal revaluation = netChange.subtract(operating).subtract(investing);
             reserve = reserve.add(revaluation);
+            operating = operating.add(revaluation);
 
             List<Row> pnl = new ArrayList<>();
-            pnl.add(row("pnl.revenue", revenue, 0));
-            pnl.add(row("pnl.cogs", cogs.negate(), 0));
-            pnl.add(row("pnl.grossProfit", revenue.subtract(cogs), 1));
+            pnl.add(row("pnl.revenue", revenue, 0, "revenue"));
+            pnl.add(row("pnl.cogs", cogs.negate(), 0, "revenue"));
+            pnl.add(row("pnl.grossProfit", revenue.subtract(cogs), 1, "revenue"));
             BigDecimal payroll = money(row, "payroll");
             BigDecimal marketing = money(row, "marketing");
             BigDecimal rnd = money(row, "rnd_spend");
@@ -117,60 +123,62 @@ public class FinancialStatementsService {
             BigDecimal holding = money(row, "holding_cost");
             BigDecimal hiring = money(row, "hiring_cost");
             BigDecimal report = money(row, "report_cost");
-            pnl.add(row("pnl.payroll", payroll.negate(), 0));
-            pnl.add(row("pnl.marketing", marketing.negate(), 0));
-            pnl.add(row("pnl.rnd", rnd.negate(), 0));
-            pnl.add(row("pnl.quality", quality.negate(), 0));
-            pnl.add(row("pnl.fixed", fixed.negate(), 0));
-            pnl.add(row("pnl.holding", holding.negate(), 0));
-            pnl.add(row("pnl.hiring", hiring.negate(), 0));
-            pnl.add(row("pnl.report", report.negate(), 0));
+            pnl.add(row("pnl.payroll", payroll.negate(), 0, "expenses"));
+            pnl.add(row("pnl.marketing", marketing.negate(), 0, "expenses"));
+            pnl.add(row("pnl.rnd", rnd.negate(), 0, "expenses"));
+            pnl.add(row("pnl.quality", quality.negate(), 0, "expenses"));
+            pnl.add(row("pnl.fixed", fixed.negate(), 0, "expenses"));
+            pnl.add(row("pnl.holding", holding.negate(), 0, "expenses"));
+            pnl.add(row("pnl.hiring", hiring.negate(), 0, "expenses"));
+            pnl.add(row("pnl.report", report.negate(), 0, "expenses"));
             BigDecimal operatingExpenses = payroll.add(marketing).add(rnd).add(quality)
                     .add(fixed).add(holding).add(hiring).add(report);
-            pnl.add(row("pnl.operatingTotal", operatingExpenses.negate(), 1));
-            pnl.add(row("pnl.profit", profit, 2));
+            pnl.add(row("pnl.operatingTotal", operatingExpenses.negate(), 1, "expenses"));
+            pnl.add(row("pnl.profit", profit, 2, "total"));
 
             List<Row> cashFlow = new ArrayList<>();
-            cashFlow.add(row("cash.profit", profit, 0));
-            cashFlow.add(row("cash.inventory", stockChange.negate(), 0));
-            cashFlow.add(row("cash.operatingTotal", operating, 1));
-            cashFlow.add(row("cash.machines", capacity.negate(), 0));
-            if (refund.signum() != 0) {
-                cashFlow.add(row("cash.refund", refund, 0));
-            }
-            cashFlow.add(row("cash.investingTotal", investing, 1));
-            cashFlow.add(row("cash.financing", ZERO, 0));
+            cashFlow.add(row("cash.profit", profit, 0, "operating"));
+            cashFlow.add(row("cash.inventory", stockChange.negate(), 0, "operating"));
             if (revaluation.abs().compareTo(CENT) >= 0) {
-                cashFlow.add(row("cash.revaluation", revaluation, 0));
+                cashFlow.add(row("cash.revaluation", revaluation, 0, "operating"));
             }
-            cashFlow.add(row("cash.netChange", netChange, 1));
-            cashFlow.add(row("cash.opening", openingCash, 0));
-            cashFlow.add(row("cash.closing", closingCash, 2));
+            cashFlow.add(row("cash.operatingTotal", operating, 1, "operating"));
+            cashFlow.add(row("cash.machines", capacity.negate(), 0, "investing"));
+            if (refund.signum() != 0) {
+                cashFlow.add(row("cash.refund", refund, 0, "investing"));
+            }
+            cashFlow.add(row("cash.investingTotal", investing, 1, "investing"));
+            cashFlow.add(row("cash.financing", ZERO, 0, "financing"));
+            cashFlow.add(row("cash.financingTotal", ZERO, 1, "financing"));
+            cashFlow.add(row("cash.netChange", netChange, 1, "movement"));
+            cashFlow.add(row("cash.opening", openingCash, 0, "movement"));
+            cashFlow.add(row("cash.closing", closingCash, 2, "movement"));
 
             BigDecimal assets = closingCash.add(closingInventory).add(machinery);
             BigDecimal liabilities = ZERO;
             BigDecimal equity = capital.add(retained).add(refunds).add(reserve);
 
             List<Row> balance = new ArrayList<>();
-            balance.add(row("balance.cash", closingCash, 0));
-            balance.add(row("balance.inventory", closingInventory, 0));
-            balance.add(row("balance.machines", machinery, 0));
-            balance.add(row("balance.assetsTotal", assets, 1));
-            balance.add(row("balance.liabilities", liabilities, 0));
-            balance.add(row("balance.liabilitiesTotal", liabilities, 1));
-            balance.add(row("balance.capital", capital, 0));
-            balance.add(row("balance.retained", retained, 0));
+            balance.add(row("balance.cash", closingCash, 0, "assets"));
+            balance.add(row("balance.inventory", closingInventory, 0, "assets"));
+            balance.add(row("balance.machines", machinery, 0, "assets"));
+            balance.add(row("balance.assetsTotal", assets, 1, "assets"));
+            balance.add(row("balance.liabilities", liabilities, 0, "liabilities"));
+            balance.add(row("balance.liabilitiesTotal", liabilities, 1, "liabilities"));
+            balance.add(row("balance.capital", capital, 0, "equity"));
+            balance.add(row("balance.retained", retained, 0, "equity"));
             if (refunds.signum() != 0) {
-                balance.add(row("balance.refunds", refunds, 0));
+                balance.add(row("balance.refunds", refunds, 0, "equity"));
             }
             if (reserve.abs().compareTo(CENT) >= 0) {
-                balance.add(row("balance.revaluation", reserve, 0));
+                balance.add(row("balance.revaluation", reserve, 0, "equity"));
             }
-            balance.add(row("balance.equityTotal", equity, 1));
-            balance.add(row("balance.totalLiabilitiesEquity", liabilities.add(equity), 2));
+            balance.add(row("balance.equityTotal", equity, 1, "equity"));
+            balance.add(row("balance.totalLiabilitiesEquity", liabilities.add(equity), 2, "equity"));
             // Normally exactly zero. Shown when it is not, so a statement that does not balance says
             // so on the page instead of looking tidy.
-            balance.add(row("balance.difference", assets.subtract(liabilities).subtract(equity), 0));
+            balance.add(row("balance.difference",
+                    assets.subtract(liabilities).subtract(equity), 0, "check"));
 
             out.add(new Round(number, pnl, cashFlow, balance));
         }
@@ -209,8 +217,8 @@ public class FinancialStatementsService {
         return total.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private static Row row(String key, BigDecimal amount, int level) {
-        return new Row(key, amount.setScale(2, RoundingMode.HALF_UP), level);
+    private static Row row(String key, BigDecimal amount, int level, String section) {
+        return new Row(key, amount.setScale(2, RoundingMode.HALF_UP), level, section);
     }
 
     private static BigDecimal money(Map<String, Object> row, String key) {

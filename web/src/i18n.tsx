@@ -676,6 +676,11 @@ const en: Dict = {
   "cash.opening": "Cash at the start of the round",
   "cash.closing": "Cash at the end of the round",
   "cash.note": "No borrowing is modelled, so there is no financing cash flow.",
+  "cash.section.operating": "Operating activities",
+  "cash.section.investing": "Investing activities",
+  "cash.section.financing": "Financing activities",
+  "cash.section.movement": "Cash movement",
+  "cash.financingTotal": "Net cash from financing",
   "balance.title": "Assets and liabilities",
   "balance.cash": "Cash",
   "balance.inventory": "Inventories",
@@ -692,6 +697,8 @@ const en: Dict = {
   "balance.difference": "Difference",
   "balance.note":
     "Assets are cash, what the stock cost and the machines at cost; nothing is borrowed and machines are not depreciated.",
+  "balance.groupAssets": "Assets",
+  "balance.groupLiabilitiesEquity": "Liabilities and equity",
 };
 
 const zh: Dict = {
@@ -1324,6 +1331,11 @@ const zh: Dict = {
   "cash.opening": "期初现金",
   "cash.closing": "期末现金",
   "cash.note": "本模型没有借款，因此没有筹资活动的现金流。",
+  "cash.section.operating": "经营活动",
+  "cash.section.investing": "投资活动",
+  "cash.section.financing": "筹资活动",
+  "cash.section.movement": "现金变动",
+  "cash.financingTotal": "筹资活动现金净额",
   "balance.title": "资产与负债",
   "balance.cash": "现金",
   "balance.inventory": "存货",
@@ -1339,6 +1351,8 @@ const zh: Dict = {
   "balance.totalLiabilitiesEquity": "负债和所有者权益合计",
   "balance.difference": "差额",
   "balance.note": "资产包括现金、存货成本与机器成本；没有借款，机器不计折旧。",
+  "balance.groupAssets": "资产",
+  "balance.groupLiabilitiesEquity": "负债和所有者权益",
 };
 
 const catalogs: Record<Locale, Dict> = { en, zh };

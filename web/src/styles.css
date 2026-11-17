@@ -247,9 +247,10 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   font-weight: 600;
 }
 
-/* D88: the three reports. Stacked rather than side by side — an accountant reads a column of
-   figures top to bottom, and the amounts are wider than a third of the card. */
-.financials .statement { margin-top: 1rem; max-width: 46rem; }
+/* D88: the three reports. The profit and loss and the cash flow read top to bottom as one column of
+   figures; the balance sheet sits in two columns, assets against liabilities and equity, the way a
+   printed statement is laid out. Subtotals are ruled, the result is double-ruled. */
+.financials .statement { margin-top: 1.1rem; max-width: 52rem; }
 .financials .statement h5 {
   margin: 0 0 .3rem;
   font-size: .8rem;
@@ -257,8 +258,55 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   text-transform: uppercase;
   color: var(--muted);
 }
-.financials .lines .total.grand { font-weight: 700; }
-.financials .note { font-size: .8rem; margin: .4rem 0 0; }
+.financials .note { font-size: .8rem; margin: .45rem 0 0; }
+
+.report { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.report caption {
+  caption-side: top;
+  text-align: left;
+  padding: .5rem 0 .15rem;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.report th[scope="row"] {
+  text-align: left;
+  font-weight: 400;
+  font-size: .88rem;
+  color: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: .16rem 0;
+  border-bottom: none;
+}
+.report td {
+  text-align: right;
+  padding: .16rem 0 .16rem 1rem;
+  white-space: nowrap;
+  border-bottom: none;
+}
+.report tr.subtotal th,
+.report tr.subtotal td {
+  border-top: 1px solid var(--line);
+  padding-top: .3rem;
+  font-weight: 600;
+}
+.report tr.total th,
+.report tr.total td {
+  border-top: 1px solid var(--line);
+  border-bottom: 3px double var(--line);
+  padding-top: .3rem;
+  padding-bottom: .3rem;
+  font-weight: 700;
+}
+.balance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: .2rem 1.6rem;
+  align-items: start;
+}
 
 /* ---------------------------------------------------------------- facilitator tools (D12) */
 .check { display: flex; align-items: center; gap: .5rem; margin: .75rem 0 .25rem; }
