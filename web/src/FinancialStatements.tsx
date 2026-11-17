@@ -97,7 +97,6 @@ export function StatementDialog({
         <header className="report-modal-head">
           <h2>{title}</h2>
           <div className="report-modal-tools">
-            <span className="report-round">{t("financials.round", { round })}</span>
             <button className="report-modal-close" onClick={onClose} autoFocus>
               {t("report.close")}
             </button>

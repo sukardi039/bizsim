@@ -585,9 +585,9 @@ language your class runs in.
 9. **The three reports, on screen (D91, D92)** — beside *My results* are three buttons: **Profit and
    loss**, **Cash flow statement**, **Assets and liabilities**. Each opens that report in a pop-up for
    the round selected in the table above, showing **that round and the two before it side by side**
-   (one column when you are in round 1, two in round 2). The pop-up carries the report name, the round
-   badge and the same sections and rulings as the facilitator sees, and closes with **Esc**, the
-   **Close** button or a click outside it.
+   (one column when you are in round 1, two in round 2). The pop-up carries the report name and the
+   same sections and rulings as the facilitator sees — the round is named over its column, not in the
+   header — and closes with **Esc**, the **Close** button or a click outside it.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."* A price is the one number the system has
