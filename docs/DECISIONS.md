@@ -539,7 +539,8 @@ winning one line and losing another could not see it. Ruled:
 
 
 
-**D99 — Shared inertia and the three Porter presets (ruled 17 Nov 2026; implementation next).** The
+**D99 — Shared inertia and the three Porter presets (ruled 17 Nov 2026; inertia implemented in
+v0.18.0, presets next).** The
 gap left by D98 is that an advantage is only worth *one month*: the allocator re-contests the whole
 market every round, so a rival's price cut bites immediately and loyalty costs nothing to break. Ruled,
 with the defaults fixed so the work is unambiguous:
@@ -558,3 +559,22 @@ with the defaults fixed so the work is unambiguous:
   calibration table** (two plans, 6 rounds, seeded, winner by cumulative profit) in
   `docs/SCENARIO_CALIBRATION.md`. A preset that does not invert the winner is a bug, not a preset.
 - **No historical statement changes**: both apply to rounds computed after their release.
+
+Implemented (v0.18.0), with the two points the ruling left open settled this way:
+
+- **The carried share is converted, not compared raw.** A statement stores the product's share of the
+  whole pool (D97, a percentage); the blend works on the market the class serves, so the held share is
+  divided by `(1 − baselineShare)`. Without that, turning inertia on in a template with a 15% baseline
+  competitor would have handed every company 15% less than its history.
+- **The blend is renormalised.** `held` is what a company *sold*, and a stockout makes it less than
+  what it was allocated, so the weights can sum to slightly under 1. Normalising keeps the pieces
+  adding up to the served market instead of leaving the shortfall unallocated. When λ = 0 — and when
+  there is no previous round — the arithmetic is the pre-D99 code path untouched, so `standard-v1`
+  remains bit-for-bit identical (proved by test, not by inspection).
+- **Reachable where the builder works**: `inertia` is an editable template setting (0..1) in the
+  editor, validated by both the settings API and the loader, so a template that carries a bad weight
+  fails when it is saved rather than at round close in a classroom.
+- **Audit evidence**: `scripts/audit_play.py --inertia` builds a copy of `standard-v1` at λ = 0.5 and
+  plays six rounds on it; `audit_financials.py` re-derives every allocation with the same blend.
+  Local run: **PASS — 6,014 checks over 104 company-rounds**, three classes (λ = 0 weighted, λ = 0
+  replacement, λ = 0.5), every store tied.

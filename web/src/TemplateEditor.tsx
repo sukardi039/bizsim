@@ -156,6 +156,8 @@ const SETTINGS: { field: string; kind: "int" | "money" | "decimal" }[] = [
   { field: "minRndBenefitRatio", kind: "decimal" },
   { field: "cycleDemandDrift", kind: "decimal" },
   { field: "cycleCostDrift", kind: "decimal" },
+  // D99: how much of last round's market share a product carries into the next, 0..1.
+  { field: "inertia", kind: "decimal" },
   // D15: the price of one quality point, when the switch below is on.
   { field: "qualityCostPerPoint", kind: "money" },
 ];

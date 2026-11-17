@@ -145,6 +145,17 @@ public class ScoringEngine {
 
     public RoundResult compute(Scenario scenario, EnvironmentService.RoundEnvironment environment,
                                List<TeamInput> teams) {
+        return compute(scenario, environment, teams, Map.of());
+    }
+
+    /**
+     * D99. {@code previousShare} carries, per company and product, the share of the market this class
+     * serves that the company held after the last round — a fraction, not a percentage. An empty map
+     * (or a template with inertia 0) re-contests the whole market, which is how every round worked
+     * before D99 and stays bit-for-bit the same.
+     */
+    public RoundResult compute(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                               List<TeamInput> teams, Map<Long, Map<String, Double>> previousShare) {
         List<Plan> plans = new ArrayList<>();
         for (TeamInput team : teams) {
             plans.add(fitToCash(scenario, team, plan(scenario, environment, team)));
@@ -152,7 +163,7 @@ public class ScoringEngine {
 
         Map<String, BigDecimal> pools = pools(scenario, environment, teams.size());
         Map<Long, Map<String, Double>> demandByTeam =
-                allocateDemand(scenario, environment, teams, plans, pools);
+                allocateDemand(scenario, environment, teams, plans, pools, previousShare);
 
         List<TeamOutcome> outcomes = new ArrayList<>();
         for (int i = 0; i < teams.size(); i++) {
@@ -351,7 +362,8 @@ public class ScoringEngine {
     private Map<Long, Map<String, Double>> allocateDemand(Scenario scenario,
                                                           EnvironmentService.RoundEnvironment environment,
                                                           List<TeamInput> teams, List<Plan> plans,
-                                                          Map<String, BigDecimal> pools) {
+                                                          Map<String, BigDecimal> pools,
+                                                          Map<Long, Map<String, Double>> previousShare) {
         Map<Long, Map<String, Double>> result = new LinkedHashMap<>();
         for (TeamInput team : teams) {
             result.put(team.teamId(), new LinkedHashMap<>());
@@ -391,8 +403,29 @@ public class ScoringEngine {
             BigDecimal[] raw = new BigDecimal[n];
             BigDecimal[] pieces = new BigDecimal[n];
             BigDecimal assigned = ZERO;
+            // D99: loyalty. The contest above is what this round's price, quality and reach deserve;
+            // the share a company already held is what its customers did last month. With inertia the
+            // served market is split λ : 1−λ between the two, so a rival's price cut (or a company's
+            // own mistake) takes more than one month to move the whole market. λ = 0 — the default,
+            // and every template written before D99 — leaves the contest numbers untouched.
+            double lambda = scenario.params().inertia().doubleValue();
+            boolean blended = lambda > 0 && previousShare != null && !previousShare.isEmpty();
+            double[] weight = new double[n];
+            double weightSum = 0;
             for (int i = 0; i < n; i++) {
-                double share = attractiveness[i] / sum;
+                double contest = attractiveness[i] / sum;
+                weight[i] = contest;
+                if (blended && carries[i]) {
+                    Map<String, Double> held = previousShare.getOrDefault(teams.get(i).teamId(), Map.of());
+                    weight[i] = lambda * held.getOrDefault(spec.code(), 0d) + (1 - lambda) * contest;
+                }
+                weightSum += weight[i];
+            }
+            for (int i = 0; i < n; i++) {
+                // Normalising keeps the pieces adding up to the target when last month's shares did
+                // not: they are what customers actually bought, so a company that stocked out held
+                // less than it was allocated and the blend would otherwise under-serve the market.
+                double share = blended && weightSum > 0 ? weight[i] / weightSum : weight[i];
                 raw[i] = target.multiply(bd(share));
                 pieces[i] = raw[i].setScale(0, RoundingMode.DOWN);
                 assigned = assigned.add(pieces[i]);

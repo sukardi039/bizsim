@@ -98,7 +98,8 @@ public class ScenarioRepository {
                 // D48: absent means off, so an existing package seats the same companies it always did.
                 d.path("autoWorkers").asBoolean(false),
                 d.path("guidedRounds").asInt(0),
-                "WEIGHTED".equalsIgnoreCase(d.path("costBasis").asText("REPLACEMENT")));
+                "WEIGHTED".equalsIgnoreCase(d.path("costBasis").asText("REPLACEMENT")),
+                inertia(d, key));
 
 
         Map<String, Map<String, Scenario.Text>> productTexts = productTextsOf(key);
@@ -501,7 +502,9 @@ public class ScenarioRepository {
             // D61: how many opening rounds a trainee sees a suggested plan in.
             "guidedRounds",
             // D79: REPLACEMENT or WEIGHTED inventory costing — a builder choice, not calibration.
-            "costBasis");
+            "costBasis",
+            // D99: how much of last round's share is carried, 0..1 — a builder choice.
+            "inertia");
 
     /** The editable part of the definition document, as stored. */
     public Map<String, Object> settings(String key) {
@@ -809,5 +812,19 @@ public class ScenarioRepository {
             return node.decimalValue();
         }
         return new BigDecimal(node.asText());
+    }
+
+    /**
+     * D99: the share carried from the previous round is a weight, so it can only be 0..1. A template
+     * that names something else is a data fault and fails at load rather than quietly re-contesting
+     * the market with half an inertia.
+     */
+    private static BigDecimal inertia(JsonNode definition, String key) {
+        BigDecimal value = dec(definition.path("inertia"));
+        if (value.signum() < 0 || value.compareTo(BigDecimal.ONE) > 0) {
+            throw new IllegalStateException("scenario " + key + " inertia must be between 0 and 1, got "
+                    + value.stripTrailingZeros().toPlainString());
+        }
+        return value;
     }
 }

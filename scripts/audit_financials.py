@@ -470,10 +470,16 @@ def attractiveness(run: Run, code: str, team: Team, body: dict) -> float:
     return value
 
 
-def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict]) -> dict:
+def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict],
+             previous: dict | None = None) -> dict:
     result = {team.id: {} for team in teams}
     baseline = float(run.baseline_share)
     n = len(teams)
+    # D99: loyalty. lambda = 0 (the default) leaves the contest untouched; with a value, the served
+    # market is split lambda : 1 - lambda between last round's held share and this round's contest,
+    # then normalised so the pieces still add up to the market.
+    inertia = float(run.params.get("inertia") or 0)
+    blended = inertia > 0 and bool(previous)
     for code in run.products:
         scores = [attractiveness(run, code, team, body) for team, body in zip(teams, bodies)]
         total = sum(scores)
@@ -483,7 +489,17 @@ def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict]) -> dict
             for team in teams:
                 result[team.id][code] = 0
             continue
-        raw = [target * D(str(score / total)) for score in scores]
+        weights = []
+        for i, team in enumerate(teams):
+            contest = scores[i] / total
+            if blended:
+                held = (previous or {}).get(team.id, {}).get(code, 0.0)
+                weights.append(inertia * held + (1 - inertia) * contest)
+            else:
+                weights.append(contest)
+        weight_total = sum(weights)
+        raw = [target * D(str(weights[i] / weight_total if blended and weight_total > 0
+                             else weights[i])) for i in range(n)]
         pieces = [value.quantize(D(1), ROUND_DOWN) for value in raw]
         assigned = sum(pieces, ZERO)
         leftover = int(min(target - assigned, D(n)))
@@ -493,6 +509,35 @@ def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict]) -> dict
         for i, team in enumerate(teams):
             result[team.id][code] = int(pieces[i])
     return result
+
+
+def previous_shares(statements: dict, round_number: int, run: Run) -> dict:
+    """D99: what each company held after the last computed round, as a fraction of the served market.
+
+    The statement stores a percentage of the whole pool (D97); the engine converts it the same way
+    before blending, so this deliberately repeats that arithmetic — 12 places, half up.
+    """
+    earlier = [number for (number, _team) in statements if number < round_number]
+    if not earlier:
+        return {}
+    served = 1 - float(run.baseline_share)
+    if served <= 0:
+        return {}
+    last = max(earlier)
+    denominator = D("100") * D(str(served))
+    out = {}
+    for (number, team_id), row in statements.items():
+        if number != last:
+            continue
+        detail = row["detail"] if isinstance(row["detail"], dict) else json.loads(row["detail"] or "{}")
+        held = {}
+        for line in (detail or {}).get("products", []):
+            if line.get("share") is None:
+                continue
+            held[line["product"]] = float((D(str(line["share"])) / denominator)
+                                          .quantize(D("1e-12"), ROUND_HALF_UP))
+        out[team_id] = held
+    return out
 
 
 # ---------------------------------------------------------------- settlement
@@ -730,7 +775,8 @@ def audit_run(cur, run_row, audit: Audit) -> None:
         env = run.environment(round_number)
         bodies = [plan(run, team, decisions.get((round_number, team.id), {}), env)
                   for team in teams]
-        demand = allocate(run, env, teams, bodies)
+        demand = allocate(run, env, teams, bodies,
+                          previous_shares(statements, round_number, run))
         pool = sum((whole_pool(run, code, env, len(teams)) for code in run.products), ZERO)
         # D34: the cohort's demand must add up to the whole pieces the market offers it.
         target_total = sum(((whole_pool(run, code, env, len(teams))

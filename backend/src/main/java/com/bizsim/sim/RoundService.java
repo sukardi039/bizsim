@@ -144,8 +144,12 @@ public class RoundService {
         EnvironmentService.RoundEnvironment environment =
                 this.environment.forRound(scenario, runId, round.number());
         Map<Long, ScoringEngine.TeamInput> inputs = inputs(runId, round.id());
+        // D99: loyalty only exists when the template asks for it and a round has been played.
+        Map<Long, Map<String, Double>> previous = scenario.params().inertia().signum() > 0
+                ? rounds.previousShares(runId, round.number(), scenario.params().baselineShare())
+                : Map.of();
         List<ScoringEngine.TeamOutcome> outcomes = engine.compute(
-                scenario, environment, new ArrayList<>(inputs.values())).teams();
+                scenario, environment, new ArrayList<>(inputs.values()), previous).teams();
 
         Map<Long, RoundRepository.TeamState> state = new LinkedHashMap<>();
         for (RoundRepository.TeamState team : rounds.teams(runId)) {

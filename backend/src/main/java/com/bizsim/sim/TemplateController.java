@@ -230,6 +230,25 @@ public class TemplateController {
         requireMinimum(settings, "startingCash", BigDecimal.ZERO);
         requireMinimum(settings, "startingBrand", BigDecimal.ZERO);
         requireMinimum(settings, "fixedCostPerMonth", BigDecimal.ZERO);
+        requireWeight(settings, "inertia");
+    }
+
+    /** D99: the carried share is a weight between 0 and 1; anything else cannot be honoured. */
+    private static void requireWeight(Map<String, Object> settings, String field) {
+        Object raw = settings.get(field);
+        if (raw == null) {
+            return;
+        }
+        try {
+            BigDecimal value = new BigDecimal(String.valueOf(raw));
+            if (value.signum() < 0 || value.compareTo(BigDecimal.ONE) > 0) {
+                throw ProblemException.badRequest("template.settings_invalid",
+                        field + " must be between 0 and 1", "field", field, "min", "0", "max", "1");
+            }
+        } catch (NumberFormatException e) {
+            throw ProblemException.badRequest("template.settings_invalid",
+                    field + " must be a number", "field", field);
+        }
     }
 
     private static void requireRange(Map<String, Object> settings, String field, int min, int max) {

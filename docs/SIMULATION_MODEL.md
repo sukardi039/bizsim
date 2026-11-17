@@ -151,6 +151,29 @@ brand = brand × (1 − decay) + Σ_c α_c × sqrt(spend_c)      capped 0..100
 - `decay` ≈ 0.10/month, `α_c` per channel, both scenario data.
 - Marketing must be paid **every month** to hold brand — that is the intended lesson.
 
+### 5.3a Loyalty — the share carried from the previous round (D99)
+
+Without loyalty an advantage is worth exactly one month: every round re-contests the whole market,
+so a rival's price cut bites immediately and a lead costs nothing to keep. A template may instead
+carry part of last round's share:
+
+```
+share_ij(t) = λ × held_ij(t−1) + (1 − λ) × contest_ij(t)
+```
+
+- `contest_ij` is §5.2's attractiveness share; `held_ij(t−1)` is what the company actually sold of
+  its market last round, taken from `round_statement.detail.products[].share` (D97) — **per product**,
+  so one line can be loyal while another is failing. A share is divided by `(1 − baselineShare)` on
+  the way in: the statement stores a percentage of the whole pool, and the blend works on the market
+  the class serves.
+- `λ` is a **template setting** (`inertia`, 0..1), default **0**: a template that never names it
+  re-contests the whole market exactly as it did before D99.
+- The blended weights are renormalised before whole pieces are cut, because what a company *sold*
+  can be less than it was allocated (a stockout). Without that the market would quietly shrink by
+  the units nobody could supply. Round 1 has no history, so it is a pure contest.
+- Whole pieces by largest remainder, as in §5.2/§5.3 — the allocation still adds up to the market.
+- Historical statements are untouched: the blend applies to rounds computed after D99.
+
 ### 5.4 Environment — economic events move customer classes (D18, D81–D85)
 
 The market is made of **classes of potential customer**, not of products. Each class has a size

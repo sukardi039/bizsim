@@ -98,7 +98,10 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
                          int guidedRounds,
                          /** D79: stock is charged at what it cost (weighted average) rather than at
                           *  this month's replacement cost. Off = the pre-D79 behaviour. */
-                         boolean weightedCosting) {
+                         boolean weightedCosting,
+                         /** D99: the weight last round's share carries into this one — 0 (the
+                          *  default) re-contests the whole market every round, exactly as before. */
+                         BigDecimal inertia) {
     }
 
     /**

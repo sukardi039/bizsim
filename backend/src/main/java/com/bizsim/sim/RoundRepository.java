@@ -661,6 +661,45 @@ public class RoundRepository {
         }, runId, teamId);
     }
 
+    /**
+     * D99: what each company held after the last computed round, per product, as a fraction of the
+     * market the cohort serves. The statement stores a percentage of the whole pool (D97), so it is
+     * converted here — the engine blends shares that add up to the served market, not to the pool.
+     * Empty when there is no earlier computed round: round 1 has no loyalty to carry.
+     */
+    public Map<Long, Map<String, Double>> previousShares(long runId, int beforeRound,
+                                                         BigDecimal baselineShare) {
+        Map<Long, Map<String, Double>> result = new LinkedHashMap<>();
+        BigDecimal served = BigDecimal.ONE.subtract(baselineShare);
+        if (served.signum() <= 0) {
+            return result;
+        }
+        BigDecimal denominator = new BigDecimal("100").multiply(served);
+        jdbc.query("""
+                select s.team_id, s.detail::text as detail
+                from round_statement s
+                join round r on r.id = s.round_id
+                where r.run_id = ? and r.status = 'COMPUTED' and r.number < ?
+                  and r.number = (select max(number) from round
+                                  where run_id = ? and status = 'COMPUTED' and number < ?)
+                """, rs -> {
+            Map<String, Double> held = new LinkedHashMap<>();
+            JsonNode detail = readTree(rs.getString("detail"));
+            for (JsonNode line : detail.path("products")) {
+                JsonNode share = line.path("share");
+                // A statement written before D97 carries no share; it contributes no loyalty.
+                if (share.isMissingNode() || share.isNull()) {
+                    continue;
+                }
+                held.put(line.path("product").asText(),
+                        share.decimalValue().divide(denominator, 12, java.math.RoundingMode.HALF_UP)
+                                .doubleValue());
+            }
+            result.put(rs.getLong("team_id"), held);
+        }, runId, beforeRound, runId, beforeRound);
+        return result;
+    }
+
     private Object readJson(String text) {
         if (text == null) {
             return null;

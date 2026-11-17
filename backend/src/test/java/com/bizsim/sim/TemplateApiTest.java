@@ -246,6 +246,27 @@ class TemplateApiTest extends PostgresTestBase {
     }
 
     @Test
+    void inertia_is_a_setting_and_only_a_weight_between_zero_and_one_is_accepted() throws Exception {
+        String key = copyStandard();
+
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("inertia", 0.5))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.settings.inertia").value(0.5));
+
+        // D99: a weight above one would have last month outweigh this month's contest altogether.
+        mvc.perform(put("/api/templates/" + key + "/settings")
+                        .header("Authorization", "Bearer " + acmeFacilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("inertia", 1.5))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("template.settings_invalid"))
+                .andExpect(jsonPath("$.params.field").value("inertia"));
+    }
+
+    @Test
     void templates_are_staff_material_and_only_a_builder_may_change_them() throws Exception {
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmePlayer))
                 .andExpect(status().isForbidden());

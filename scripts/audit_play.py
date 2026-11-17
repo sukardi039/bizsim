@@ -161,7 +161,9 @@ def second_run(rounds: int) -> None:
             cur.execute("select id from app_user where role = 'FACILITATOR' and email like "
                         "'%%@%s.test' order by id limit 1" % TENANT)
             facilitator_id = cur.fetchone()[0]
-            cur.execute("select id, email from app_user where email like 'player%%@%s.test' "
+            # `player@` is the seed's stand-alone player; the class seats are `player1@`, `player2@`…
+            # A plain LIKE would put that extra account first and seat the wrong person on team 1.
+            cur.execute("select id, email from app_user where email ~ '^player[0-9]+@%s\\.test$' "
                         "order by id" % TENANT)
             players = cur.fetchall()
         conn.commit()
@@ -205,6 +207,65 @@ def second_run(rounds: int) -> None:
 
 
 
+def inertia_run(rounds: int) -> None:
+    """A third class on a copy of `standard-v1` with inertia on (D99).
+
+    The audit only proves the blend if a class plays with it: after round 1 every allocation is a mix
+    of the previous statement's share and this round's contest. Four companies, six rounds — different
+    prices, so the shares are not symmetrical and loyalty has something to hold on to.
+
+    The copy is made through the template API (a complete copy, every catalogue row), which needs a
+    builder; the audit database's admin is promoted for the two calls and put back afterwards.
+    """
+    import psycopg
+
+    dsn = dict(host="127.0.0.1", port=55432, user="postgres",
+               dbname=os.environ.get("BIZSIM_AUDIT_DB", "bizsim_audit"))
+    with psycopg.connect(**dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("delete from run where simulation_id in "
+                        "(select id from simulation where name = 'audit · inertia 0.5')")
+            cur.execute("update app_user set role = 'BUILDER' where email = %s",
+                        ("admin@" + TENANT + ".test",))
+            cur.execute("select id from app_user where role = 'FACILITATOR' and email like "
+                        "'%%@%s.test' order by id limit 1" % TENANT)
+            facilitator_id = cur.fetchone()[0]
+        conn.commit()
+
+    builder = login("admin@" + TENANT + ".test")
+    copy = call("/api/templates/standard-v1/copy", "POST",
+                {"name": "audit inertia 0.5"}, builder)
+    key = copy["key"]
+    call(f"/api/templates/{key}/settings", "PUT", {"inertia": 0.5}, builder)
+
+    with psycopg.connect(**dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("update app_user set role = 'ADMIN' where email = %s",
+                        ("admin@" + TENANT + ".test",))
+            # `player@` is the seed's stand-alone player; the class seats are `player1@`, `player2@`…
+            # A plain LIKE would put that extra account first and seat the wrong person on team 1.
+            cur.execute("select id, email from app_user where email ~ '^player[0-9]+@%s\\.test$' "
+                        "order by id" % TENANT)
+            players = cur.fetchall()
+        conn.commit()
+
+    admin = login("admin@" + TENANT + ".test")
+    run = call(f"/api/runs?facilitatorId={facilitator_id}", "POST", {
+        "name": "audit · inertia 0.5",
+        "scenarioKey": key,
+        "teams": [{"name": f"I{i}", "companyName": f"Inertia {i}"} for i in range(1, 5)]},
+        admin)
+    run_id = run["id"]
+    for index, team in enumerate(run["teams"], start=1):
+        call(f"/api/runs/{run_id}/players", "POST",
+             {"teamId": team["id"], "userId": players[index - 1][0], "roleKey": "OWNER"}, admin)
+    names = ["quality", "machinist", "hoarder", "overfunder"]
+    seats = [{"id": team["id"], "email": players[index][1], "name": names[index]}
+             for index, team in enumerate(run["teams"])]
+    print(f"run {run_id}: created on {key} (inertia 0.5)")
+    play(run_id, seats, strategies, rounds)
+
+
 def play(run_id: int, seats: list[dict], strategy_table, rounds: int) -> None:
     """Drive one class: `seats` is [{id, email, name}], `name` being the strategy key."""
     facilitator = login("trainer@" + TENANT + ".test")
@@ -238,6 +299,10 @@ def main() -> None:
     emails = [f"player{index}@{TENANT}.test" for index in range(1, len(names) + 1)]
     if "--second" in sys.argv:
         second_run(6)
+        print("done — now run scripts/audit_financials.py")
+        return
+    if "--inertia" in sys.argv:
+        inertia_run(6)
         print("done — now run scripts/audit_financials.py")
         return
 
