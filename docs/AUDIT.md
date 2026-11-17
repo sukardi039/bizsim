@@ -178,11 +178,37 @@ python scripts/audit_financials.py            # add --verbose to see deltas insi
 Exit code 0 means every check passed; 1 prints the disagreements. It needs `psycopg` and nothing else.
 Run it after any change to the engine, and keep the output with the release.
 
+## The reports, audited against their own contract (D93)
+
+`audit_financials.py` proves the **stored figures** are right. It says nothing about whether the three
+reports the console shows are internally sound — a subtotal could be printed from the wrong rows and
+every stored column would still match. `scripts/audit_reports.py` closes that gap over the live API:
+
+```bash
+export BIZSIM_API=http://127.0.0.1:8099 BIZSIM_TENANT=demo BIZSIM_AUDIT_PW=...
+python scripts/audit_reports.py [--run 1] [--i18n web/src/i18n.tsx]
+```
+
+For every company and every computed round it checks:
+
+| Report | Invariants |
+|---|---|
+| Profit and loss | revenue − COGS = gross profit; the expense lines sum to *Total operating expenses*; gross − expenses = operating profit = the stored `profit` |
+| Cash flow | profit ± stock (± revaluation) = operations; machines ± refunds = investing; financing ends in its own total; the three sections add up to the net movement; opening + movement = closing = the stored `cash_after` (and opening = the stored `opening_cash`) |
+| Assets and liabilities | cash + inventory + machines = total assets; liabilities = their total; capital + retained + refunds + revaluation = total equity; assets = liabilities + equity = the total line; the cash line is the bank; no Difference line on a balanced sheet |
+| All three | every row key exists in **both** language catalogues; sections come from the known set and stay in the ruled order; levels are 0, 1 or 2; no duplicate keys; one row per line |
+
+The same contract runs inside the build as `FinancialReportContractTest`, and the print layout is
+measured by `DebriefExportApiTest.the_printed_statements_stay_inside_the_page` (every text run inside
+its page, one column heading per round). Last local run: **688 checks over 16 company-rounds**, PASS.
+
 ## What this does not prove
 
 * That the **model** is right — only that the implementation does what the model says. Whether
   elasticity 1.5 on price is the right pedagogy is a product decision, not an audit finding.
-* That the **reports** render correctly: the PDF and Excel exports read the same statement rows, so
-  their arithmetic follows, but the layout is checked separately (`docs/USER_GUIDE.md`, D76).
+* That the **files are authentic**: a PDF or workbook already downloaded can be edited, and nothing
+  signs it. The audit proves the file generated *now* matches the stored data.
+* That the **page looks good**. Geometry is asserted (nothing off the page, columns present), but
+  typography and readability remain a human judgement (`docs/USER_GUIDE.md`).
 * Anything about **performance** or concurrency. Two facilitators computing different classes at the
   same moment do not touch each other's rows, but that is a design argument, not a measurement.

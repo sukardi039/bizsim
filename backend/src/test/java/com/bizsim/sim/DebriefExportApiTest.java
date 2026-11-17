@@ -348,6 +348,76 @@ class DebriefExportApiTest extends PostgresTestBase {
         return text.split(java.util.regex.Pattern.quote(phrase), -1).length - 1;
     }
 
+    /**
+     * D93: the print layout, measured. Every text run must sit inside its page — a figure printed off
+     * the edge is the failure mode a reader notices and a text assertion never catches — and the
+     * statements page must carry one column heading per round.
+     */
+    @Test
+    void the_printed_statements_stay_inside_the_page() throws Exception {
+        byte[] body = resultPdf(playerToken);
+        try (org.apache.pdfbox.pdmodel.PDDocument document = org.apache.pdfbox.Loader.loadPDF(body)) {
+            assertThat(document.getNumberOfPages()).isGreaterThanOrEqualTo(2);
+
+            Positions positions = new Positions();
+            positions.setSortByPosition(true);
+            positions.getText(document);
+
+            for (int page = 1; page <= document.getNumberOfPages(); page++) {
+                org.apache.pdfbox.pdmodel.PDPage sheet = document.getPage(page - 1);
+                var box = sheet.getCropBox();
+                float width = box.getWidth();
+                float height = box.getHeight();
+                if (sheet.getRotation() == 90 || sheet.getRotation() == 270) {
+                    float swap = width;
+                    width = height;
+                    height = swap;
+                }
+                for (float[] run : positions.byPage.getOrDefault(page, List.of())) {
+                    assertThat(run[0]).as("page " + page + " text starts on the page").isGreaterThanOrEqualTo(-1f);
+                    assertThat(run[1]).as("page " + page + " text ends on the page").isLessThanOrEqualTo(width + 1f);
+                    assertThat(run[2]).as("page " + page + " text is above the bottom edge").isGreaterThanOrEqualTo(-1f);
+                    assertThat(run[3]).as("page " + page + " text is below the top edge").isLessThanOrEqualTo(height + 1f);
+                }
+            }
+
+            // The statements section carries the round columns it claims: one per computed round.
+            String text = allText(body);
+            int computed = Integer.parseInt(text.replaceAll("(?s).*rounds 1\u2013(\\d+).*", "$1").trim());
+            int columns = occurrences(text, "Round 1") + occurrences(text, "Round 2");
+            assertThat(columns).as("each round is a column in the statements").isGreaterThanOrEqualTo(computed);
+        }
+    }
+
+    /** Collects every text run's box, page by page, in the page's displayed orientation. */
+    private static final class Positions extends org.apache.pdfbox.text.PDFTextStripper {
+
+        private final java.util.Map<Integer, List<float[]>> byPage = new java.util.LinkedHashMap<>();
+        private int page;
+
+        private Positions() throws java.io.IOException {
+            super();
+        }
+
+        @Override
+        protected void startPage(org.apache.pdfbox.pdmodel.PDPage sheet) throws java.io.IOException {
+            page++;
+            byPage.put(page, new java.util.ArrayList<>());
+            super.startPage(sheet);
+        }
+
+        @Override
+        protected void writeString(String string, List<org.apache.pdfbox.text.TextPosition> runs)
+                throws java.io.IOException {
+            for (org.apache.pdfbox.text.TextPosition run : runs) {
+                float x = run.getXDirAdj();
+                float y = run.getYDirAdj();
+                byPage.get(page).add(new float[]{x, x + run.getWidthDirAdj(), y, y + run.getHeightDir()});
+            }
+            super.writeString(string, runs);
+        }
+    }
+
     private byte[] resultPdf(String token) throws Exception {
         return mvc.perform(get("/api/runs/" + runId + "/debrief/export")
                         .param("format", "pdf")

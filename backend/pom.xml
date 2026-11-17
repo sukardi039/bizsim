@@ -111,6 +111,14 @@
       <version>3.17.0</version>
       <scope>test</scope>
     </dependency>
+    <!-- Reads text positions out of a generated PDF so the layout test can prove no figure is
+         printed off the page and that each statement page carries one column per round (D93). -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>3.0.2</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

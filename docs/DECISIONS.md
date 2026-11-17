@@ -451,6 +451,24 @@ than last month? Ruled:
   statements.
 - **The workbook already satisfies the rule**: one row per line per round, filterable by round.
 
+**D93 — The reports have a contract, and it is checked in the build (ruling 17 Nov 2026).** The
+question "are these numbers verified?" had two halves; only one was answered. Ruled:
+
+- **The stored figures are audited independently** (D80): `scripts/audit_financials.py` re-derives
+  them; last full run 2,650 checks over 48 company-rounds, PASS.
+- **The reports are audited against their own contract**: a subtotal is the sum of the lines above
+  it, the cash-flow sections add up to the movement, a balance sheet balances, the total line repeats
+  the two sides, and the report agrees with the stored statement — `scripts/audit_reports.py` over the
+  live API, last local run **688 checks over 16 company-rounds**, PASS.
+- **The format is a checked contract too**: every row key exists in both language catalogues, sections
+  come from a known set and stay in the ruled order, levels are 0/1/2, keys are unique, and keys carry
+  their `pnl.` / `cash.` / `balance.` prefix.
+- **The print layout is measured, not eyeballed**: `DebriefExportApiTest` asserts every text run of
+  the generated PDF sits inside its page and that the statements page carries one column heading per
+  round. Whether a page *looks* good stays a human call.
+- **What is still not proven**: a file already downloaded is not tamper-evident — nothing signs it.
+  The audit proves the file generated now matches the stored data.
+
 
 
 

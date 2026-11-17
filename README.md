@@ -149,6 +149,21 @@ python scripts/audit_financials.py          # exit 0 = everything reconciles
 python scripts/audit_play.py --rounds 8     # build a deliberately awkward class to audit
 ```
 
+## Audit the reports
+
+The three statements have their own contract — a subtotal is the sum of the lines above it, the
+cash-flow sections add up to the movement, a balance sheet balances, every row is a key the console
+can label in both languages, and the rows stay in the order a reader expects.
+`scripts/audit_reports.py` checks that over the live API, for every company and round of a session:
+
+```bash
+export BIZSIM_API=http://127.0.0.1:8099 BIZSIM_TENANT=demo BIZSIM_AUDIT_PW=...
+python scripts/audit_reports.py [--run 1]
+```
+
+Exit code 0 means every check passed; 1 prints the disagreements. The same contract runs in the
+build as `FinancialReportContractTest`, so a broken subtotal fails CI rather than a classroom.
+
 `docs/AUDIT.md` lists every computed quantity, the invariants they must satisfy, the coverage and the
 two documented tolerances. Run it after any change to the engine, and keep the output with the release.
 
