@@ -206,6 +206,10 @@ class DebriefExportApiTest extends PostgresTestBase {
         assertThat(text).doesNotContain("Share");
         // D88: the three statements travel with the company report, in print.
         assertThat(text).contains("The three statements");
+        // D92: once for the whole term, a column per round — not repeated on every round page.
+        assertThat(text).contains("The three statements, every round");
+        assertThat(occurrences(text, "Operating profit")).isEqualTo(1);
+        assertThat(occurrences(text, "Gross profit")).isEqualTo(1);
         assertThat(text).contains("Profit and loss").contains("Cash flow statement")
                 .contains("Assets and liabilities");
         assertThat(text).contains("Gross profit").contains("Operating profit");
@@ -337,6 +341,11 @@ class DebriefExportApiTest extends PostgresTestBase {
             text.append(new PdfTextExtractor(reader).getTextFromPage(page)).append('\n');
         }
         return text.toString();
+    }
+
+    /** How many times a phrase appears: a table printed once, not once per round. */
+    private static int occurrences(String text, String phrase) {
+        return text.split(java.util.regex.Pattern.quote(phrase), -1).length - 1;
     }
 
     private byte[] resultPdf(String token) throws Exception {

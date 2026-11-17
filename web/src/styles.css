@@ -285,6 +285,16 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
 .financials .note { font-size: .8rem; margin: .5rem 0 0; }
 
 .report { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+/* D92: a column per round, the round named above its figures. */
+.report thead th {
+  padding: .1rem 0 .3rem;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  border-bottom: 1px solid var(--line);
+}
+.report thead th.num { text-align: right; }
+.report.multi td { padding-left: .55rem; }
 .report tr.group th {
   padding: .7rem 0 .2rem;
   font-size: .72rem;

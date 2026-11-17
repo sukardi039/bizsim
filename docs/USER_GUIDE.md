@@ -466,6 +466,12 @@ The facilitator reads them inline under the company detail. A **trainee** opens 
 a pop-up from the buttons beside *My results* (§8, D91), so their results card stays a short page
 rather than three long statements stacked on it.
 
+Every report shows **the round in front of you and the two before it** (D92), one column per round,
+named above its figures: a comparison is what a debrief is for, and it is the question trainees ask —
+*"is this better or worse than last month?"*. Early in a term there is less to compare: round 1 has
+one column, round 2 has two, and from round 3 on there are three. A line that a round did not carry
+prints as zero in that column, so the columns stay aligned.
+
 ### 7.5 Presenting and exporting the debrief
 
 Three buttons sit next to the round selector:
@@ -482,13 +488,14 @@ console to 中文 and the download comes out in Chinese, labels and sheet names 
 product and trainee names stay exactly as they were entered. Present view is also what prints cleanly: Ctrl/Cmd+P in **Present** mode
 hides the console and keeps the cards.
 
-**Where the three statements travel (D88).** The workbook carries them in full on the **Statements**
-sheet, for every company and round. A **trainee's** PDF prints them on each round page, after the cost
-lines, under their own names — profit and loss, cash flow statement, assets and liabilities. The
-**class** PDF does not: it is the projection document for the room, and the statements belong to one
-company at a time — open a company's **Detail** on screen for those, or read them from the workbook.
-The **Submissions** sheet and the PDF's *What you sent* table list the products each company actually
-carries, not the whole catalogue (D89).
+**Where the three statements travel (D88, D92).** The workbook carries them in full on the
+**Statements** sheet, for every company and round. A **trainee's** PDF prints them **once, at the end,
+for every round of the term**, a column per round — the progression in one table rather than the same
+statement repeated on each month's page. The **class** PDF does not carry them: it is the projection
+document for the room, and the statements belong to one company at a time — open a company's
+**Detail** on screen for those, or read them from the workbook. The **Submissions** sheet and the
+PDF's *What you sent* table list the products each company actually carries, not the whole catalogue
+(D89).
 
 ### 7.6 Live
 
@@ -575,11 +582,12 @@ language your class runs in.
    company only, no market share, no competitor line. The Excel file carries the statements too, one
    row per line on its **Statements** sheet, so the term can be filtered or pivoted. A trainee who has
    not been seated in the session gets a refusal, not an empty file.
-9. **The three reports, on screen (D91)** — beside *My results* are three buttons: **Profit and
+9. **The three reports, on screen (D91, D92)** — beside *My results* are three buttons: **Profit and
    loss**, **Cash flow statement**, **Assets and liabilities**. Each opens that report in a pop-up for
-   the round selected in the table above; the pop-up carries the report name, the round badge and the
-   same sections and rulings as the facilitator sees, and closes with **Esc**, the **Close** button or
-   a click outside it.
+   the round selected in the table above, showing **that round and the two before it side by side**
+   (one column when you are in round 1, two in round 2). The pop-up carries the report name, the round
+   badge and the same sections and rulings as the facilitator sees, and closes with **Esc**, the
+   **Close** button or a click outside it.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."* A price is the one number the system has

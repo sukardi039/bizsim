@@ -125,17 +125,18 @@ public class DebriefExportService {
      */
     static final class StatementText {
 
-        final String pnl, cash, balance, block, sheet, statementColumn, sectionColumn, lineColumn,
-                levelColumn, amountColumn;
+        final String pnl, cash, balance, allRounds, block, sheet, statementColumn, sectionColumn,
+                lineColumn, levelColumn, amountColumn;
         final Map<String, String> lines, sections;
 
-        private StatementText(String pnl, String cash, String balance, String block, String sheet,
-                              String statementColumn, String sectionColumn, String lineColumn,
-                              String levelColumn, String amountColumn,
+        private StatementText(String pnl, String cash, String balance, String allRounds, String block,
+                              String sheet, String statementColumn, String sectionColumn,
+                              String lineColumn, String levelColumn, String amountColumn,
                               Map<String, String> lines, Map<String, String> sections) {
             this.pnl = pnl;
             this.cash = cash;
             this.balance = balance;
+            this.allRounds = allRounds;
             this.block = block;
             this.sheet = sheet;
             this.statementColumn = statementColumn;
@@ -161,7 +162,7 @@ public class DebriefExportService {
 
         static final StatementText EN = new StatementText(
                 "Profit and loss", "Cash flow statement", "Assets and liabilities",
-                "The three statements", "Statements",
+                "The three statements, every round", "The three statements", "Statements",
                 "Statement", "Section", "Line", "Level", "Amount",
                 words("pnl.revenue", "Revenue", "pnl.cogs", "Cost of goods sold",
                         "pnl.grossProfit", "Gross profit", "pnl.payroll", "Payroll",
@@ -195,7 +196,7 @@ public class DebriefExportService {
 
         static final StatementText ZH = new StatementText(
                 "利润表", "现金流量表", "资产与负债",
-                "三张报表", "报表",
+                "三张报表 · 全部轮次", "三张报表", "报表",
                 "报表", "分组", "项目", "层级", "金额",
                 words("pnl.revenue", "营业收入", "pnl.cogs", "销售成本",
                         "pnl.grossProfit", "毛利", "pnl.payroll", "工资",
@@ -502,6 +503,8 @@ public class DebriefExportService {
                 for (RoundReport round : report.rounds()) {
                     traineePage(document, report, round, labels, fonts, first);
                 }
+                // D92: the three statements for the whole term, a column per round, once at the end.
+                allStatements(document, report, labels, fonts);
             }
 
             document.close();
@@ -556,62 +559,83 @@ public class DebriefExportService {
         document.add(submissionTable(report, round, labels, fonts.head, fonts.body));
         document.add(new Paragraph(labels.costBlock(), fonts.blockHead()));
         document.add(costTable(round, labels, fonts.head, fonts.body));
-        statementsBlock(document, round.rows().get(0), labels, fonts);
     }
 
     /**
-     * D88 in print: the three statements for one company and one round, read down one column, ruled
-     * the way the console rules them. Company reports only — the class debrief is a projection
-     * document, and its statements are on the screen.
+     * D92 in print: the three statements for **every round of the term**, a column per round, on a
+     * page of their own. A trainee reading their file wants the progression, not the same statement
+     * printed once per month.
+     *
+     * <p>Company reports only — the class debrief is a projection document, and one company's
+     * statements for eight rounds are the workbook's job.
      */
-    private void statementsBlock(Document document, Row row, Labels labels, Fonts fonts) {
-        FinancialStatementsService.Round statements = row.statements();
-        if (statements == null) {
+    private void allStatements(Document document, Report report, Labels labels, Fonts fonts) {
+        if (report.rounds().isEmpty()) {
             return;
         }
         StatementText text = StatementText.of(labels.lang());
-        document.add(new Paragraph(text.block, fonts.blockHead()));
-        // D88: each statement carries its own name inside its table, so the title can never be
-        // orphaned from the figures it introduces when the block breaks across a page.
-        document.add(statementPdf(statements.pnl(), text, fonts, text.pnl));
-        document.add(statementPdf(statements.cashFlow(), text, fonts, text.cash));
-        balanceTables(document, statements.balance(), text, fonts, text.balance);
+        document.newPage();
+        document.add(new Paragraph(text.allRounds, fonts.blockHead()));
+        document.add(statementEveryRound(text.pnl, report, "pnl", text, labels, fonts));
+        document.add(statementEveryRound(text.cash, report, "cashFlow", text, labels, fonts));
+        document.add(statementEveryRound(text.balance, report, "balance", text, labels, fonts));
     }
 
-    /** One statement as a two-column table: its title, its sections, then the figures. */
-    private PdfPTable statementPdf(List<FinancialStatementsService.Row> rows, StatementText text,
-                                   Fonts fonts, String title) {
-        PdfPTable table = new PdfPTable(2);
+    /** One statement across every round: the first column names the line, then one column per round. */
+    private PdfPTable statementEveryRound(String title, Report report, String source,
+                                          StatementText text, Labels labels, Fonts fonts) {
+        List<RoundReport> rounds = report.rounds();
+        PdfPTable table = new PdfPTable(rounds.size() + 1);
         table.setWidthPercentage(100);
-        table.setWidths(new float[]{4.6f, 1.5f});
-        table.setSpacingBefore(2);
-        table.setSpacingAfter(5);
-        table.setHeaderRows(0);
-        // A statement is read as one block; a page break inside it would split a subtotal from the
-        // lines it summarises.
-        table.setKeepTogether(true);
+        float[] widths = new float[rounds.size() + 1];
+        widths[0] = 3f;
+        for (int i = 1; i < widths.length; i++) {
+            widths[i] = 1f;
+        }
+        table.setWidths(widths);
+        table.setSpacingBefore(4);
+        table.setSpacingAfter(8);
+        // The statement's name and the round headings repeat if the table runs onto a second page.
+        table.setHeaderRows(2);
 
-        if (title != null) {
-            PdfPCell head = new PdfPCell(new Phrase(title, fonts.statementHead()));
-            head.setColspan(2);
-            head.setBorder(Rectangle.NO_BORDER);
-            head.setPaddingLeft(0);
-            head.setPaddingBottom(2);
-            table.addCell(head);
+        PdfPCell head = new PdfPCell(new Phrase(title, fonts.statementHead()));
+        head.setColspan(rounds.size() + 1);
+        head.setBorder(Rectangle.NO_BORDER);
+        head.setPaddingLeft(0);
+        head.setPaddingBottom(2);
+        table.addCell(head);
+
+        PdfPCell blank = new PdfPCell(new Phrase(" ", fonts.head()));
+        blank.setBorder(Rectangle.BOTTOM);
+        blank.setPaddingLeft(0);
+        table.addCell(blank);
+        for (RoundReport round : rounds) {
+            PdfPCell cell = new PdfPCell(new Phrase(
+                    String.format(labels.roundWord(), round.round()), fonts.head()));
+            cell.setBorder(Rectangle.BOTTOM);
+            cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            table.addCell(cell);
         }
 
+        List<FinancialStatementsService.Row> lines = statementRows(rounds.get(rounds.size() - 1), source);
         String section = null;
-        for (FinancialStatementsService.Row line : rows) {
+        for (FinancialStatementsService.Row line : lines) {
+            // The "difference" line exists only to expose a statement that does not balance; printing
+            // it as a row of zeros on every clean term would suggest something is wrong.
+            if ("check".equals(line.section()) && rounds.stream().noneMatch(
+                    round -> amountOf(round, source, line.key()).abs().compareTo(BigDecimal.ONE) >= 0)) {
+                continue;
+            }
             if (!line.section().equals(section)) {
                 section = line.section();
                 String name = text.sections.get(section);
                 if (name != null) {
-                    PdfPCell head = new PdfPCell(new Phrase(name, fonts.head()));
-                    head.setColspan(2);
-                    head.setBorder(Rectangle.NO_BORDER);
-                    head.setPaddingTop(6);
-                    head.setPaddingLeft(0);
-                    table.addCell(head);
+                    PdfPCell block = new PdfPCell(new Phrase(name, fonts.head()));
+                    block.setColspan(rounds.size() + 1);
+                    block.setBorder(Rectangle.NO_BORDER);
+                    block.setPaddingTop(6);
+                    block.setPaddingLeft(0);
+                    table.addCell(block);
                 }
             }
             Font font = line.level() >= 1 ? fonts.boldBody() : fonts.body();
@@ -620,65 +644,49 @@ public class DebriefExportService {
             PdfPCell label = new PdfPCell(new Phrase(
                     text.lines.getOrDefault(line.key(), line.key()), font));
             label.setBorder(border);
-            label.setPaddingTop(3);
-            label.setPaddingBottom(3);
+            label.setPaddingTop(2);
+            label.setPaddingBottom(2);
             label.setPaddingLeft(0);
             label.setPaddingRight(6);
-            PdfPCell amount = new PdfPCell(new Phrase(grouped(line.amount()), font));
-            amount.setBorder(border);
-            amount.setHorizontalAlignment(Element.ALIGN_RIGHT);
-            amount.setPaddingTop(3);
-            amount.setPaddingBottom(3);
             table.addCell(label);
-            table.addCell(amount);
+            for (RoundReport round : rounds) {
+                PdfPCell amount = new PdfPCell(new Phrase(
+                        grouped(amountOf(round, source, line.key())), font));
+                amount.setBorder(border);
+                amount.setHorizontalAlignment(Element.ALIGN_RIGHT);
+                amount.setPaddingTop(2);
+                amount.setPaddingBottom(2);
+                table.addCell(amount);
+            }
         }
         return table;
     }
 
-    /** Assets against liabilities and equity, the two totals level with each other. */
-    private void balanceTables(Document document, List<FinancialStatementsService.Row> rows,
-                               StatementText text, Fonts fonts, String title) {
-        List<FinancialStatementsService.Row> assets = new ArrayList<>();
-        List<FinancialStatementsService.Row> other = new ArrayList<>();
-        List<FinancialStatementsService.Row> difference = new ArrayList<>();
-        for (FinancialStatementsService.Row line : rows) {
-            if ("assets".equals(line.section())) {
-                assets.add(line);
-            } else if ("check".equals(line.section())) {
-                if (line.amount().abs().compareTo(new BigDecimal("1")) >= 0) {
-                    difference.add(line);
-                }
-            } else {
-                other.add(line);
+    /** The stored statement lines of one round for one of the three reports. */
+    private static List<FinancialStatementsService.Row> statementRows(RoundReport round, String source) {
+        FinancialStatementsService.Round statements = round.rows().isEmpty()
+                ? null : round.rows().get(0).statements();
+        if (statements == null) {
+            return List.of();
+        }
+        return switch (source) {
+            case "pnl" -> statements.pnl();
+            case "cashFlow" -> statements.cashFlow();
+            default -> statements.balance();
+        };
+    }
+
+    /** One line's amount in one round; zero when that statement does not carry the line. */
+    private static BigDecimal amountOf(RoundReport round, String source, String key) {
+        for (FinancialStatementsService.Row line : statementRows(round, source)) {
+            if (line.key().equals(key)) {
+                return line.amount();
             }
         }
-
-        PdfPTable outer = new PdfPTable(2);
-        outer.setWidthPercentage(100);
-        outer.setWidths(new float[]{1f, 1f});
-        outer.setSpacingBefore(2);
-        outer.setSpacingAfter(5);
-        outer.setKeepTogether(true);
-        if (title != null) {
-            PdfPCell head = new PdfPCell(new Phrase(title, fonts.statementHead()));
-            head.setColspan(2);
-            head.setBorder(Rectangle.NO_BORDER);
-            head.setPaddingLeft(0);
-            head.setPaddingBottom(2);
-            outer.addCell(head);
-        }
-        for (List<FinancialStatementsService.Row> side : List.of(assets, other)) {
-            PdfPCell cell = new PdfPCell(statementPdf(side, text, fonts, null));
-            cell.setBorder(Rectangle.NO_BORDER);
-            cell.setPadding(0);
-            cell.setPaddingRight(10);
-            outer.addCell(cell);
-        }
-        document.add(outer);
-        if (!difference.isEmpty()) {
-            document.add(statementPdf(difference, text, fonts, null));
-        }
+        return BigDecimal.ZERO;
     }
+
+
 
     private void pageHead(Document document, String heading, String subheading, Fonts fonts,
                           boolean[] first) {

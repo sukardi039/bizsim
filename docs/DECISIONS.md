@@ -433,6 +433,25 @@ past everything else. Ruled:
 - **One card, two homes.** The pop-up and the inline block are the same component over the same
   endpoint, so they cannot drift; only the placement differs.
 
+**D92 — A report is read as three rounds, and the trainee's PDF carries the whole term (ruling
+17 Nov 2026).** A statement for one round alone invites the question it cannot answer: better or worse
+than last month? Ruled:
+
+- **Every report shows the current round and the two before it**, one column per round, the current
+  round leftmost, named above its figures. Round 1 shows one column, round 2 shows two; the columns
+  appear as the rounds exist, and never as empty placeholders.
+- **Applies wherever the reports are read**: the trainee's pop-up, the facilitator's inline panels
+  under a company's Detail, and the PDF. Same component, same columns.
+- **A line a round did not carry prints as 0** in that column, so lines stay aligned across rounds;
+  the "difference" line is still only printed when a balance sheet does not balance.
+- **The trainee's PDF prints the three statements once, at the end, for every round of the term** —
+  a column per round — instead of repeating the same statement on each month's page. The month pages
+  keep what is genuinely per-month: summary, submission, cost lines.
+- **The class PDF is unchanged**, as in D90: the projection document does not carry per-company
+  statements.
+- **The workbook already satisfies the rule**: one row per line per round, filterable by round.
+
+
 
 
 
