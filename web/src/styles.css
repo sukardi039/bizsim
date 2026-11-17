@@ -334,11 +334,14 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   padding-bottom: .3rem;
   font-weight: 700;
 }
+/* D95: the two sides of the balance sheet stack. With a column per round, side by side left each
+   side about 280px — too narrow for a label and three sets of figures, so Assets sits above
+   Liabilities and equity, each at full width. */
 .balance-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: .2rem 1.6rem;
-  align-items: start;
+  display: block;
+}
+.balance-grid > table + table {
+  margin-top: .45rem;
 }
 
 /* D91: a report in a pop-up. The panel scrolls on a laptop, and the backdrop closes it. */

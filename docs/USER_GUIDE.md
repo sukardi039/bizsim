@@ -459,8 +459,9 @@ top-right, and a line under the title saying whether it is *for the round* or *a
 round*). Inside each panel the figures run down one column, aligned on the right, with a **subheading
 for every block of lines** — Income and Operating expenses, Operating / Investing / Financing
 activities and Cash movement, Assets and Liabilities and Equity. A rule separates each subtotal, a
-double rule closes the result, and the balance sheet sits in **two columns**, assets against
-liabilities and equity, so the two totals can be read across from each other.
+double rule closes the result, and the balance sheet is printed in **two stacked blocks** — **Assets**
+first, then **Liabilities and equity** — each at full width, so a label and several rounds of figures
+have the room they need (D95).
 
 The facilitator reads them inline under the company detail. A **trainee** opens them one at a time in
 a pop-up from the buttons beside *My results* (§8, D91), so their results card stays a short page

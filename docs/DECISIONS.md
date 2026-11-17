@@ -479,6 +479,16 @@ forward. D92 had put the current round leftmost; corrected:
 - The card's own heading names the current round; the figures the table is built from are the
   current round's, whichever column it lands in.
 
+**D95 — The balance sheet's two sides stack (ruling 17 Nov 2026).** Side by side, each side of the
+balance sheet had roughly half the card for a label plus one column per round — with three rounds that
+is four columns in ~280px, and the figures crowded the labels. Ruled:
+
+- **Assets on top, Liabilities and equity below**, each at full width, each keeping its own headings
+  and its own total. The two totals can still be compared directly — they are one above the other.
+- Applies in the pop-up, the facilitator's inline panels and the PDF alike (the PDF's all-rounds
+  balance table was already a single stacked column of sections).
+- The profit and loss and the cash flow are unaffected: one column per round, unchanged.
+
 
 
 
