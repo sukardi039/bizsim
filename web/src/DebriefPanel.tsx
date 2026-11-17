@@ -11,6 +11,7 @@ import {
 } from "./api";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
+import FinancialStatements from "./FinancialStatements";
 import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
@@ -319,13 +320,14 @@ export default function DebriefPanel({
                           return <p className="muted">{t("debrief.noStatement")}</p>;
                         }
                         return (
-                          <StatementDetail
-                            row={statement}
-                            share={row.market_share}
-                            decision={decisions[row.team_id]}
-                            runId={runId}
-                            teamId={row.team_id}
-                          />
+                          <>
+                            <StatementDetail
+                              row={statement}
+                              share={row.market_share}
+                              decision={decisions[row.team_id]}
+                            />
+                            <FinancialStatements runId={runId} teamId={row.team_id} round={round} />
+                          </>
                         );
                       })()}
                     </td>

@@ -331,6 +331,42 @@ label.inline { display: flex; align-items: center; gap: .5rem; font-size: .9rem;
   align-items: start;
 }
 
+/* D91: a report in a pop-up. The panel scrolls on a laptop, and the backdrop closes it. */
+.report-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(6, 10, 18, .6);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  overflow: auto;
+}
+.report-modal {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  width: min(58rem, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 1rem 1.15rem 1.15rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .45);
+}
+.report-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: .6rem;
+  border-bottom: 1px solid var(--line);
+}
+.report-modal-head h2 { margin: 0; font-size: 1.3rem; }
+.report-modal-tools { display: flex; align-items: center; gap: .6rem; }
+.report-modal-close { padding: .3rem .8rem; }
+.report-modal-body { padding-top: .6rem; }
+.report-card.in-modal { border: none; padding: 0; margin: 0; max-width: none; }
+
 /* ---------------------------------------------------------------- facilitator tools (D12) */
 .check { display: flex; align-items: center; gap: .5rem; margin: .75rem 0 .25rem; }
 .cash-row { display: flex; gap: .35rem; align-items: center; }

@@ -647,6 +647,8 @@ const en: Dict = {
   "financials.hint":
     "The round's profit and loss, the cash flow that moved the bank, and the balance sheet as at the end of the round.",
   "financials.unavailable": "The financial statements could not be read.",
+  "financials.loading": "Reading the statements…",
+  "report.close": "Close",
   "pnl.title": "Profit and loss",
   "pnl.scope": "For the round",
   "pnl.groupIncome": "Income",
@@ -1309,6 +1311,8 @@ const zh: Dict = {
   "financials.round": "第 {round} 轮",
   "financials.hint": "本轮的利润表、现金变动，以及期末的资产与负债。",
   "financials.unavailable": "无法读取财务报表。",
+  "financials.loading": "正在读取报表…",
+  "report.close": "关闭",
   "pnl.title": "利润表",
   "pnl.scope": "本期",
   "pnl.groupIncome": "收入",

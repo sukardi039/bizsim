@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useI18n } from "./i18n";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
+import { StatementDialog, type StatementKind } from "./FinancialStatements";
 import NumberInput from "./NumberInput";
 import ClockBadge from "./ClockBadge";
 import {
@@ -151,6 +152,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   /** D76: their own development report, separate from the round-by-round debrief. */
   const [downloadingReport, setDownloadingReport] = useState(false);
   const [resultRound, setResultRound] = useState<number | null>(null);
+  /** D91: which of the three reports is open in its pop-up, if any. */
+  const [openReport, setOpenReport] = useState<StatementKind | null>(null);
   const roundRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
@@ -360,6 +363,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
 
   // Results are readable on the waiting screen as well: a class whose session has finished should
   // still see its own statements, and nothing here submits anything.
+  const shownRound =
+    resultRound ?? (statements.length > 0 ? statements[statements.length - 1].round : 0);
   const resultsSection =
     statements.length > 0 ? (
       <section className="card">
@@ -404,6 +409,10 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           <button onClick={() => void developmentReport()} disabled={downloadingReport}>
             {downloadingReport ? t("debrief.exporting") : t("player.developmentReport")}
           </button>
+          {/* D91: the three reports open in their own pop-up, for the round selected below. */}
+          <button onClick={() => setOpenReport("pnl")}>{t("pnl.title")}</button>
+          <button onClick={() => setOpenReport("cash")}>{t("cash.title")}</button>
+          <button onClick={() => setOpenReport("balance")}>{t("balance.title")}</button>
         </div>
         <p className="muted">{t("player.downloadHint")}</p>
 
@@ -452,15 +461,25 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
 
         {(() => {
           const row =
-            statements.find((entry) => entry.round === (resultRound ?? statements[statements.length - 1].round)) ??
+            statements.find((entry) => entry.round === shownRound) ??
             statements[statements.length - 1];
           return (
             <>
               <h3 className="pick-head">{t("player.resultsRound", { round: row.round })}</h3>
-              <StatementDetail row={row} runId={run.id} teamId={team.id} />
+              <StatementDetail row={row} />
             </>
           );
         })()}
+
+        {openReport && run && team && (
+          <StatementDialog
+            runId={run.id}
+            teamId={team.id}
+            round={shownRound}
+            statement={openReport}
+            onClose={() => setOpenReport(null)}
+          />
+        )}
       </section>
     ) : null;
 

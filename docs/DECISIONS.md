@@ -418,5 +418,21 @@ revenue, cost and profit, so the paper and the screen disagreed. Ruled:
   `FinancialStatementsService`, the labels from a full English and Chinese set inside the export, so a
   class reading Chinese prints Chinese.
 
+**D91 — A trainee reads the three reports in a pop-up, from buttons beside "My results" (ruling
+17 Nov 2026).** Stacking three long statements under a trainee's round made their results page scroll
+past everything else. Ruled:
+
+- **Three buttons** — Profit and loss, Cash flow statement, Assets and liabilities — sit beside
+  *My results (PDF/Excel)* and the development report.
+- Each **opens that report in a pop-up** for the round selected in the results table, with the report
+  name, the round badge and the same sections and rulings the facilitator sees inline.
+- The pop-up closes with **Esc**, the **Close** button, or a click on the backdrop, and traps nothing:
+  a trainee is reading, not filling a form.
+- **The facilitator keeps the inline panels** under a company's Detail — in a debrief the class is
+  looking at one round on one screen, and three extra clicks per company would cost the session.
+- **One card, two homes.** The pop-up and the inline block are the same component over the same
+  endpoint, so they cannot drift; only the placement differs.
+
+
 
 

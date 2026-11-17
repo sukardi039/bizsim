@@ -462,6 +462,10 @@ activities and Cash movement, Assets and Liabilities and Equity. A rule separate
 double rule closes the result, and the balance sheet sits in **two columns**, assets against
 liabilities and equity, so the two totals can be read across from each other.
 
+The facilitator reads them inline under the company detail. A **trainee** opens them one at a time in
+a pop-up from the buttons beside *My results* (§8, D91), so their results card stays a short page
+rather than three long statements stacked on it.
+
 ### 7.5 Presenting and exporting the debrief
 
 Three buttons sit next to the round selector:
@@ -571,6 +575,11 @@ language your class runs in.
    company only, no market share, no competitor line. The Excel file carries the statements too, one
    row per line on its **Statements** sheet, so the term can be filtered or pivoted. A trainee who has
    not been seated in the session gets a refusal, not an empty file.
+9. **The three reports, on screen (D91)** — beside *My results* are three buttons: **Profit and
+   loss**, **Cash flow statement**, **Assets and liabilities**. Each opens that report in a pop-up for
+   the round selected in the table above; the pop-up carries the report name, the round badge and the
+   same sections and rulings as the facilitator sees, and closes with **Esc**, the **Close** button or
+   a click outside it.
 
 Errors come back in your own language and name the field, e.g. *"P1: the price must be greater than
 zero"* or *"Not enough cash: the plan needs X, you have Y."* A price is the one number the system has
