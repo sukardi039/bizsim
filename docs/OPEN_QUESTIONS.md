@@ -263,3 +263,39 @@ Product owner: ______________________   Date: __________
 
 When this file is answered I write the V3 migration, the `ScoringStrategy` contract and the S2a
 tests — no further questions.
+
+## Open (measured, not ruled) — 17 Nov 2026: the cost-leadership preset cannot win as specified (D100)
+
+D100 asked for three presets, each rewarding the position it is named for, calibrated by two plans
+over six rounds. The harness exists (`PresetCalibrationTest`), and it measured the opposite:
+
+| preset | plan | cumulative profit (8 rounds) | revenue |
+|---|---|---|---|
+| `preset-cost-v1` (price el. 2.1, fixed 40 M) | COST — one cheap product, full capacity, 0.88× price | **−946 M** | 2,421 M |
+| | DIFF — all three products, 1.25× price, quality and marketing | **+2,022 M** | 8,300 M |
+
+**Why:** inside one template both plans buy materials at the same unit cost and run the same wage
+bill, and volume is capped by the workforce. A premium price therefore earns a bigger margin on every
+unit it sells, while a discount only wins extra units — and the extra units are bounded by capacity.
+Total gross profit is `margin × units`, and the margin ratio (≈0.44 at 0.88× vs 1.25×) is bigger than
+any volume ratio the workforce allows. `standard-v1` already says the same thing from the other side
+(D14: "discounting does not win by itself"). No combination of the three D100 knobs (elasticities,
+fixed cost, cross-class reach) reverses it, because none of them changes the cost of a unit.
+
+Three structural levers would, and they are product decisions, not calibration:
+
+1. **Give the cost preset a genuine cost advantage** — a lower `base_unit_cost` in the preset's
+   catalogue (that is what cost leadership *is*: scale economics). This changes absolute profitability
+   for both plans in that preset, so the acceptance test must compare against the *other* preset's
+   baseline, not inside one template.
+2. **Make the discount plan scale past the workforce** — a cheaper product with a much higher
+   units-per-worker, so cost leadership means throughput per worker rather than price alone
+   (P1 at 40 units/worker against P3 at 6 already hints at this; the plan testing it must be
+   single-product and the market must be big enough to absorb the output).
+3. **Retire the "cost leader wins" claim** and keep two presets that the engine can actually teach —
+   differentiated and focused — with the cost preset described as "the volume trap: cheap prices do
+   not beat capacity" rather than "the cost leader wins".
+
+Until one is ruled, `preset-cost-v1` is **not shipped**: D100's own rule is that a preset which does
+not invert the winner is a bug, not a preset. `preset-diff-v1` and `preset-focus-v1` still need their
+tables run before they can ship either.

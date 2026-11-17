@@ -578,3 +578,40 @@ Implemented (v0.18.0), with the two points the ruling left open settled this way
   plays six rounds on it; `audit_financials.py` re-derives every allocation with the same blend.
   Local run: **PASS — 6,014 checks over 104 company-rounds**, three classes (λ = 0 weighted, λ = 0
   replacement, λ = 0.5), every store tied.
+
+**D100 — The three Porter presets are tuned economies, not new mechanics (ruled 17 Nov 2026).**
+D99 fixed the loyalty mechanism; this fixes what each preset's *economy* must reward, so the class
+can be taught one competitive position at a time. A preset is template **data** — the shipped
+catalogue, classes, channels and timeline, with three numbers changed — cloned from `standard-v1`:
+
+| Preset | price el. | quality el. | brand el. | marketing el. | fixed cost | reach | must reward |
+|---|---|---|---|---|---|---|---|
+| `preset-cost-v1` | 2.10 | 0.50 | 0.45 | 0.50 | 40 M | all classes | **COST** — cheap, full capacity, thin marketing |
+| `preset-diff-v1` | 1.10 | 1.40 | 0.90 | 0.90 | 80 M | all classes | **DIFF** — premium price, quality spend, heavy marketing |
+| `preset-focus-v1` | 1.30 | 1.00 | 0.50 | 0.60 | 35 M | own class only (`cross_segment_pct = 0`) | **FOCUS** — the premium line alone |
+
+- **λ = 0.5 in all three**: a position has to be defended for more than one month, which is the whole
+  point of D99. `standard-v1` keeps λ = 0 and is untouched.
+- **Shipping is data only**: one migration seeding three scenarios and their catalogue rows by copying
+  `standard-v1` (no Java path changes, no new engine branch), so a preset is a row a builder can copy
+  or edit like any other template.
+- **Acceptance is a measurement, in the build**: `PresetCalibrationTest` plays two plain plans for six
+  rounds each, no events, and asserts the named plan wins on cumulative profit. The plans differ only
+  in price posture, quality spend, marketing and (for FOCUS) which products the company carries —
+  never in cleverness of policy — so what separates them is the preset's economy.
+- **A preset that does not invert the winner is not shipped.** If the numbers have to move to make the
+  named plan win, the numbers move, and the table above is updated to match what was measured.
+- **The tables ship with the presets** in `docs/SCENARIO_CALIBRATION.md`: two plans, six rounds, the
+  profit of each, for each preset.
+
+**Status, 17 Nov 2026 — nothing shipped, and the cost preset is blocked by measurement.** The
+calibration harness (`PresetCalibrationTest`) was written to the rule above and run before any data
+was written. `preset-cost-v1` failed it decisively: with the same unit costs and the same wage bill in
+one template, the discount plan lost **946 M** over eight rounds while the premium plan earned
+**2,022 M**. That is not a tuning miss — no value of the three knobs above changes what a unit costs,
+so the margin ratio (0.44) beats any volume ratio the workforce allows. The finding, the arithmetic
+and the three structural levers that would fix it (a lower `base_unit_cost` in that preset; a
+throughput product; or retiring the claim) are recorded in `OPEN_QUESTIONS.md` under 17 Nov 2026.
+Consequently **no preset migration has been written**: shipping a preset that does not invert its
+winner is the bug this record forbids. `preset-diff-v1` and `preset-focus-v1` are also uncalibrated
+until the cost question is settled, because their numbers were set relative to it.
