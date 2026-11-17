@@ -798,8 +798,8 @@ def audit_run(cur, run_row, audit: Audit) -> None:
                 # D97: the product's share of its own pool, on the same denominator as the company
                 # share. Rounds computed before the field existed carry none, and are not failed.
                 if stored_line.get("share") is not None:
-                    pool = whole_pool(run, line["product"], env, len(teams))
-                    expected = div(line["sold"] * D(100), pool) if pool else ZERO
+                    product_pool = whole_pool(run, line["product"], env, len(teams))
+                    expected = div(line["sold"] * D(100), product_pool) if product_pool else ZERO
                     audit.check(f"{line['product']} market share", stored_line["share"], expected,
                                 tolerance=TOL, where=where)
             # The identity the whole product rests on: everything profit charges that cash did not
