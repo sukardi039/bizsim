@@ -467,10 +467,11 @@ a pop-up from the buttons beside *My results* (§8, D91), so their results card 
 rather than three long statements stacked on it.
 
 Every report shows **the round in front of you and the two before it** (D92), one column per round,
-named above its figures: a comparison is what a debrief is for, and it is the question trainees ask —
-*"is this better or worse than last month?"*. Early in a term there is less to compare: round 1 has
-one column, round 2 has two, and from round 3 on there are three. A line that a round did not carry
-prints as zero in that column, so the columns stay aligned.
+named above its figures, **oldest on the left and the current round in the right-most column** — the
+way a comparative statement is printed (D94). A comparison is what a debrief is for, and it is the
+question trainees ask — *"is this better or worse than last month?"*. Early in a term there is less to
+compare: round 1 has one column, round 2 has two, and from round 3 on there are three. A line that a
+round did not carry prints as zero in that column, so the columns stay aligned.
 
 ### 7.5 Presenting and exporting the debrief
 

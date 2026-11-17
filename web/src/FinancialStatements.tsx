@@ -127,6 +127,9 @@ function ReportCard({
   showTitle: boolean;
 }) {
   const { t } = useI18n();
+  // D94: a statement is read oldest to newest, the current round in the right-most column — so the
+  // newest round is the last entry, and it is the one whose lines the table is built from.
+  const current = entries[entries.length - 1];
 
   if (statement === "balance") {
     const assets = pick(entries, "balance", "assets");
@@ -141,7 +144,7 @@ function ReportCard({
     );
     return (
       <article className={showTitle ? "report-card" : "report-card in-modal"}>
-        {showTitle && <CardHead title={t("balance.title")} round={entries[0].round} />}
+        {showTitle && <CardHead title={t("balance.title")} round={current.round} />}
         <p className="report-scope">{t("balance.scope")}</p>
         <div className="balance-grid">
           <Report
@@ -171,11 +174,11 @@ function ReportCard({
   if (statement === "cash") {
     return (
       <article className={showTitle ? "report-card" : "report-card in-modal"}>
-        {showTitle && <CardHead title={t("cash.title")} round={entries[0].round} />}
+        {showTitle && <CardHead title={t("cash.title")} round={current.round} />}
         <p className="report-scope">{t("cash.scope")}</p>
         <Report
           entries={entries}
-          rows={entries[0].cashFlow}
+          rows={current.cashFlow}
           groups={[
             { name: "operating", label: t("cash.section.operating") },
             { name: "investing", label: t("cash.section.investing") },
@@ -191,11 +194,11 @@ function ReportCard({
 
   return (
     <article className={showTitle ? "report-card" : "report-card in-modal"}>
-      {showTitle && <CardHead title={t("pnl.title")} round={entries[0].round} />}
+      {showTitle && <CardHead title={t("pnl.title")} round={current.round} />}
       <p className="report-scope">{t("pnl.scope")}</p>
       <Report
         entries={entries}
-        rows={entries[0].pnl}
+        rows={current.pnl}
         groups={[
           { name: "revenue", label: t("pnl.groupIncome") },
           { name: "expenses", label: t("pnl.groupExpenses") },
@@ -227,7 +230,7 @@ type Source = "pnl" | "cashFlow" | "balance";
 
 /** The rows of one block, taken from the newest round in the comparison. */
 function pick(entries: Entry[], source: Source, section: string): FinancialRow[] {
-  return entries[0][source].filter((row) => row.section === section);
+  return entries[entries.length - 1][source].filter((row) => row.section === section);
 }
 
 /** One line's amount in one round; zero when that round's statement does not carry the line. */
@@ -357,13 +360,13 @@ function useBooks(runId: number, teamId: number) {
 }
 
 /**
- * D92: the round asked for and the two before it, where they exist — current on the left, the older
- * rounds to its right, the way a comparison is read. A class in round 2 gets two columns, not three
- * with an empty one.
+ * D92/D94: the round asked for and the two before it, where they exist — **oldest on the left, the
+ * current round in the right-most column**, the way a printed comparative statement runs. A class in
+ * round 2 gets two columns, not three with an empty one.
  */
 function comparison(rounds: Entry[], current: number): Entry[] {
   const out: Entry[] = [];
-  for (const number of [current, current - 1, current - 2]) {
+  for (const number of [current - 2, current - 1, current]) {
     const entry = rounds.find((row) => row.round === number);
     if (entry) out.push(entry);
   }

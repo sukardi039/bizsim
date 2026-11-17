@@ -438,8 +438,8 @@ past everything else. Ruled:
 than last month? Ruled:
 
 - **Every report shows the current round and the two before it**, one column per round, the current
-  round leftmost, named above its figures. Round 1 shows one column, round 2 shows two; the columns
-  appear as the rounds exist, and never as empty placeholders.
+  round in the **right-most** column (D94), named above its figures. Round 1 shows one column, round 2
+  shows two; the columns appear as the rounds exist, and never as empty placeholders.
 - **Applies wherever the reports are read**: the trainee's pop-up, the facilitator's inline panels
   under a company's Detail, and the PDF. Same component, same columns.
 - **A line a round did not carry prints as 0** in that column, so lines stay aligned across rounds;
@@ -468,6 +468,16 @@ question "are these numbers verified?" had two halves; only one was answered. Ru
   round. Whether a page *looks* good stays a human call.
 - **What is still not proven**: a file already downloaded is not tamper-evident — nothing signs it.
   The audit proves the file generated now matches the stored data.
+
+**D94 — The current round sits in the right-most column (ruling 17 Nov 2026).** Accounting convention
+for a comparative statement: the newest period is the last column, read left to right as time moving
+forward. D92 had put the current round leftmost; corrected:
+
+- The columns run **oldest → newest**, so the round the class is debriefing is the **right-most**.
+- Same order in the trainee's pop-up, the facilitator's inline panels and the printed PDF — the PDF's
+  all-rounds tables already ran Round 1 → last, so this brings the screen into line with the paper.
+- The card's own heading names the current round; the figures the table is built from are the
+  current round's, whichever column it lands in.
 
 
 
