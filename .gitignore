@@ -13,3 +13,4 @@ dist/
 web/node_modules/
 web/dist/
 .env
+backend/src/main/resources/map-template.json

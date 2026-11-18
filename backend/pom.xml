@@ -122,26 +122,10 @@
   </dependencies>
 
   <build>
-    <resources>
-      <!-- D103: the shared position map is drawn by the console's own component at build time; the
-           resulting SVG template has to travel inside the jar, beside the migrations. -->
-      <resource>
-        <directory>src/main/resources</directory>
-      </resource>
-      <!-- D103: the shared map's SVG template. It is produced by the console's own component
-           (`web/public/`, written by `npm run build`), and this copies it onto the classpath when the
-           console sits beside the backend — a local build or CI. An API-only image has no `web/` at all;
-           that is not an error, the Dockerfile copies the file in explicitly, and if it is ever missing the
-           app answers 503 with a message naming the command. A `<resource>` has no "optional" flag in a
-           Maven POM (adding one makes the POM malformed), and a missing directory only warns, so this
-           declaration is safe in both worlds. -->
-      <resource>
-        <directory>${project.basedir}/../web/public</directory>
-        <includes>
-          <include>map-template.json</include>
-        </includes>
-      </resource>
-    </resources>
+    <!-- No <resources> override: the default (src/main/resources) is what the jar needs, and a build with
+         no console-beside-it must not silently bake a different jar than a machine that has one. The shared
+         map's template reaches src/main/resources in the image's own Node stage (D103), and the app answers
+         503 naming the command if it was never supplied. -->
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
