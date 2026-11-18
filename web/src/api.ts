@@ -735,6 +735,17 @@ export const api = {
   /** D88: profit and loss, cash flow and the balance sheet, one entry per computed round. */
   financials: (runId: number, teamId: number) =>
     request<Financials>(`/runs/${runId}/teams/${teamId}/financials`),
+  /** D103: freezes the session's picture into a link the class can open without an account. */
+  shareMap: (runId: number, round?: number, title?: string) =>
+    request<{ id: number; token: string; url: string; title: string; round?: number; expiresAt: string }>(
+      `/runs/${runId}/map-share`,
+      { method: "POST", body: JSON.stringify({ round, title }) },
+    ),
+
+  /** Withdraw a shared link: a share is for a class, not for ever. */
+  revokeMap: (runId: number, id: number) =>
+    request<{ revoked: boolean }>(`/runs/${runId}/map-share/${id}/revoke`, { method: "POST" }),
+
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
   context: (runId: number, teamId: number) =>

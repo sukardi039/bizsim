@@ -122,6 +122,19 @@
   </dependencies>
 
   <build>
+    <resources>
+      <!-- D103: the shared position map is drawn by the console's own component at build time; the
+           resulting SVG template has to travel inside the jar, beside the migrations. -->
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <resource>
+        <directory>${project.basedir}/../web/public</directory>
+        <includes>
+          <include>map-template.json</include>
+        </includes>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

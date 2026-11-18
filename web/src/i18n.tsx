@@ -27,7 +27,7 @@ const STORAGE = "bizsim.locale";
 
 type Dict = Record<string, string>;
 
-const en: Dict = {
+export const en: Dict = {
   "nav.bots": "Auto workers",
   "bots.title": "Auto workers",
   "bots.hint": "A reusable opponent: level is how well it plays, personality is what it wants. Seat one in a package like a person — it then plays every round by itself, under the same rules as a trainee.",
@@ -613,6 +613,12 @@ const en: Dict = {
   "debrief.present": "Present",
   "debrief.pdf": "Download PDF",
   "debrief.excel": "Download Excel",
+  "debrief.shareMap": "Share this map",
+  "debrief.shareMapBusy": "Preparing the link…",
+  "debrief.shareMapDone": "Link copied. Anyone with it can open the map — no sign-in needed.",
+  "debrief.shareMapHint": "The link shows every computed round, newest first, with the numbers beside each picture.",
+  "debrief.shareMapFailed": "The link could not be created.",
+  "debrief.shareMapOpen": "Open the shared map",
   "debrief.exporting": "Preparing…",
   "debrief.cumulative": "Cumulative profit",
   "debrief.roce": "ROCE",
@@ -630,6 +636,8 @@ const en: Dict = {
   "debrief.quadrantPremiumStrong": "Premium, with a brand",
   "debrief.quadrantStuck": "Stuck in the middle",
   "debrief.quadrantOverpriced": "Priced above what they offer",
+  "debrief.positionMapQuadrants":
+    "Quadrants: cheap suppliers (bottom left) · premium and differentiated (bottom right) · stuck in the middle (top left) · priced above what they offer (top right).",
   "debrief.brand": "Brand",
   "debrief.stock": "Stock",
   "debrief.status": "Status",
@@ -725,7 +733,7 @@ const en: Dict = {
     "Assets are cash, what the stock cost and the machines at cost; nothing is borrowed and machines are not depreciated.",
 };
 
-const zh: Dict = {
+export const zh: Dict = {
   "nav.bots": "自动玩家",
   "bots.title": "自动玩家",
   "bots.hint": "可重复使用的对手：等级决定下得多好，性格决定它想要什么。像学员一样安排进模拟包，它就会按与学员相同的规则自动完成每一轮。",
@@ -1296,6 +1304,12 @@ const zh: Dict = {
   "debrief.present": "投屏讲解",
   "debrief.pdf": "下载 PDF",
   "debrief.excel": "下载 Excel",
+  "debrief.shareMap": "分享定位图",
+  "debrief.shareMapBusy": "正在生成链接…",
+  "debrief.shareMapDone": "链接已复制。任何人无需登录即可打开。",
+  "debrief.shareMapHint": "链接包含已计算的每一期，最新一期在最前，每张图旁附有数字。",
+  "debrief.shareMapFailed": "无法生成链接。",
+  "debrief.shareMapOpen": "打开分享的定位图",
   "debrief.exporting": "正在生成…",
   "debrief.cumulative": "累计利润",
   "debrief.roce": "资本回报率",
@@ -1312,6 +1326,8 @@ const zh: Dict = {
   "debrief.quadrantPremiumStrong": "高价且有品牌",
   "debrief.quadrantStuck": "卡在中间",
   "debrief.quadrantOverpriced": "价高于质",
+  "debrief.positionMapQuadrants":
+    "四个象限：廉价供应商（左下）· 高端差异化（右下）· 卡在中间（左上）· 价高于质（右上）。",
   "debrief.brand": "品牌",
   "debrief.stock": "库存",
   "debrief.status": "状态",
@@ -1432,7 +1448,7 @@ interface I18n {
   applySession: (locale: string | null | undefined) => void;
 }
 
-const Context = createContext<I18n | null>(null);
+export const Context = createContext<I18n | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   /** The person's own preference: what gets stored and sent to their account. */

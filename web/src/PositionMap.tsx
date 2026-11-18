@@ -161,9 +161,12 @@ function brandIndices(points: Position[]): number[] {
 export default function PositionMap({
   points,
   axis = "quality",
+  standalone = false,
 }: {
   points: Position[];
   axis?: VerticalAxis;
+  /** D102: rendered on its own page — no in-page heading, and a larger box, because it is the subject. */
+  standalone?: boolean;
 }) {
   const { t } = useI18n();
   if (points.length < 2) {
@@ -220,9 +223,9 @@ export default function PositionMap({
   );
 
   return (
-    <figure className="position-map">
+    <figure className={standalone ? "position-map standalone" : "position-map"}>
       <figcaption>
-        <h3>{t("debrief.positionMap")}</h3>
+        {!standalone && <h3>{t("debrief.positionMap")}</h3>}
         <p className="muted">{t("debrief.positionMapHint")}</p>
         {axis === "brand" && <p className="muted">{t("debrief.positionFlatQuality")}</p>}
       </figcaption>
@@ -232,13 +235,20 @@ export default function PositionMap({
             axis is quality, brand when it is brand — so the words follow the axis, not a fixed guess. */}
         {/* Anchored in the middle of each quadrant, not at the frame edge: a label near the top edge
             sits above the average line even when its quadrant is the bottom one, and then the words
-            contradict the bubbles (D101a). */}
-        {quadrant(scale(0.8), SIZE - scale(1.2),
-          axis === "brand" ? "debrief.quadrantCheapUnknown" : "debrief.quadrantCheap")}
-        {quadrant(scale(1.2), SIZE - scale(1.2),
-          axis === "brand" ? "debrief.quadrantPremiumStrong" : "debrief.quadrantPremium")}
-        {quadrant(scale(0.8), SIZE - scale(0.8), "debrief.quadrantStuck")}
-        {quadrant(scale(1.2), SIZE - scale(0.8), "debrief.quadrantOverpriced")}
+            contradict the bubbles (D101a).
+            On the shared page (`standalone`) they are omitted: at 620 px in a crowded class the words
+            run into the bubbles and the labels, and the caption underneath already names the four
+            quadrants — a chart that cannot be read is worse than one without decorative text. */}
+        {!standalone && (
+          <>
+            {quadrant(scale(0.8), SIZE - scale(1.2),
+              axis === "brand" ? "debrief.quadrantCheapUnknown" : "debrief.quadrantCheap")}
+            {quadrant(scale(1.2), SIZE - scale(1.2),
+              axis === "brand" ? "debrief.quadrantPremiumStrong" : "debrief.quadrantPremium")}
+            {quadrant(scale(0.8), SIZE - scale(0.8), "debrief.quadrantStuck")}
+            {quadrant(scale(1.2), SIZE - scale(0.8), "debrief.quadrantOverpriced")}
+          </>
+        )}
 
         <line x1={scale(1)} y1={PAD} x2={scale(1)} y2={SIZE - PAD} className="position-axis" />
         <line x1={PAD} y1={scale(1)} x2={SIZE - PAD} y2={scale(1)} className="position-axis" />

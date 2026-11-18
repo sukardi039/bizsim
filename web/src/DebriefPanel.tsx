@@ -45,6 +45,9 @@ export default function DebriefPanel({
   const [open, setOpen] = useState<number | null>(null);
   const [slides, setSlides] = useState(false);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
+  /** D103: the share link, once made — shown so it can be copied, or opened straight away. */
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   /** D76: which company's development report is being fetched. */
   const [reportFor, setReportFor] = useState<number | null>(null);
 
@@ -328,9 +331,44 @@ export default function DebriefPanel({
           >
             {downloading === "xlsx" ? t("debrief.exporting") : t("debrief.excel")}
           </button>
+          {/* D103: the map is what the class asks for on their phones — one link, every round, no login. */}
+          <button
+            className="share"
+            title={t("debrief.shareMapHint")}
+            onClick={async () => {
+              setProblem(null);
+              setSharing(true);
+              try {
+                const shared = await api.shareMap(runId, undefined, t("debrief.positionMap"));
+                setShareLink(shared.url);
+                try {
+                  await navigator.clipboard?.writeText(shared.url);
+                } catch {
+                  // Copying is a courtesy; the link is on screen either way.
+                }
+              } catch (error) {
+                setProblem(describeError(error, t));
+              } finally {
+                setSharing(false);
+              }
+            }}
+            disabled={sharing}
+          >
+            {sharing ? t("debrief.shareMapBusy") : t("debrief.shareMap")}
+          </button>
         </div>
       </div>
       <p className="muted">{t("debrief.hint")}</p>
+      {shareLink && (
+        <p className="muted share-link">
+          {t("debrief.shareMapDone")}{" "}
+          <a href={shareLink} target="_blank" rel="noreferrer">
+            {t("debrief.shareMapOpen")}
+          </a>
+          <br />
+          <input readOnly value={shareLink} onFocus={(event) => event.currentTarget.select()} />
+        </p>
+      )}
       {problem && <p className="error">{problem}</p>}
 
       {/* D98/D101: the round's competitive picture — price against quality (or brand), bubble by share.
@@ -346,7 +384,7 @@ export default function DebriefPanel({
             <th className="num">{t("debrief.cost")}</th>
             <th className="num">{t("debrief.profit")}</th>
             <th className="num">{t("debrief.cash")}</th>
-            <th className="num">{t("debrief.share")}</th>
+            <th className="num">{t("debrief.shareMap")}</th>
             <th className="num">{t("debrief.lostSales")}</th>
             <th className="num">{t("debrief.capacity")}</th>
             <th />
