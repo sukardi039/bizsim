@@ -230,12 +230,15 @@ export default function PositionMap({
         <rect x={PAD} y={PAD} width={SIZE - PAD * 2} height={SIZE - PAD * 2} className="position-frame" />
         {/* The four sectors, named. The top half is "more of the vertical thing" — quality when the
             axis is quality, brand when it is brand — so the words follow the axis, not a fixed guess. */}
-        {quadrant(PAD + (SIZE - PAD * 2) * 0.25, PAD + 16,
+        {/* Anchored in the middle of each quadrant, not at the frame edge: a label near the top edge
+            sits above the average line even when its quadrant is the bottom one, and then the words
+            contradict the bubbles (D101a). */}
+        {quadrant(scale(0.8), SIZE - scale(1.2),
           axis === "brand" ? "debrief.quadrantCheapUnknown" : "debrief.quadrantCheap")}
-        {quadrant(PAD + (SIZE - PAD * 2) * 0.75, PAD + 16,
+        {quadrant(scale(1.2), SIZE - scale(1.2),
           axis === "brand" ? "debrief.quadrantPremiumStrong" : "debrief.quadrantPremium")}
-        {quadrant(PAD + (SIZE - PAD * 2) * 0.25, SIZE - PAD - 8, "debrief.quadrantStuck")}
-        {quadrant(PAD + (SIZE - PAD * 2) * 0.75, SIZE - PAD - 8, "debrief.quadrantOverpriced")}
+        {quadrant(scale(0.8), SIZE - scale(0.8), "debrief.quadrantStuck")}
+        {quadrant(scale(1.2), SIZE - scale(0.8), "debrief.quadrantOverpriced")}
 
         <line x1={scale(1)} y1={PAD} x2={scale(1)} y2={SIZE - PAD} className="position-axis" />
         <line x1={PAD} y1={scale(1)} x2={SIZE - PAD} y2={scale(1)} className="position-axis" />

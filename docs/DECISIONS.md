@@ -656,3 +656,12 @@ Ruled, all six points shipped as v0.19.1 (frontend only — no engine, no migrat
   the defect was exactly this case: nobody had bought quality.
 
 Record with the measurements: `docs/POSITION_MAP.md`.
+
+**D101a — A quadrant has to be a quadrant (18 Nov 2026, same day).** D101's first cut anchored the four
+corner labels at 16 px inside the frame's top and bottom edges, so the lower pair ("stuck in the
+middle", "priced above what they offer") sat **above the horizontal average line** whenever the bubbles
+drew near the bottom of the scale — the words were pointing at the wrong half of the map. The labels are
+now anchored around their own quadrant's centre (a quarter and three-quarters along each axis, the top
+quadrants pulled inward so they clear the frame), so any bubble drawn below the average line is
+unambiguously in a lower quadrant. Seen on the live v0.19.1 map, where all four companies sat low and
+the label read as a contradiction.
