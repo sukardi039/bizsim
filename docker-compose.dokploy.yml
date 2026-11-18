@@ -23,8 +23,11 @@ services:
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      # Context is the repo root: the api image builds the console's shared-map template in its own
+      # Node stage (D103), and that needs web/ as well as backend/. `dockerfile` still points at the
+      # backend's own file, so the build is otherwise unchanged.
+      context: .
+      dockerfile: backend/Dockerfile
     env_file:
       - .env
     environment:

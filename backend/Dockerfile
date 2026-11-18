@@ -1,6 +1,19 @@
 # Backend container: build the jar, run it on a JRE. The console is a separate container, so this
 # image is API-only (BIZSIM_WEB_DIR is not set) and can be scaled or replaced on its own.
 
+# ---------------------------------------------------------------- 0. the console's shared-map template
+# D103: the shared position map is the console's own PositionMap component rendered to SVG at build
+# time. Building it needs Node and the console's sources, so it happens in a Node stage here rather
+# than by importing the web image: Docker builds each service's image separately (Dokploy builds the
+# api context on its own), and a `--from=<other service>` reference would fail for exactly the reason
+# this stage exists — the api build must be self-sufficient.
+FROM node:22-alpine AS map-template
+WORKDIR /src
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN node scripts/build-map-template.mjs
+
 # ---------------------------------------------------------------- 1. build
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /src
@@ -10,7 +23,12 @@ COPY pom.xml ./
 RUN mvn -B -q dependency:go-offline
 
 COPY src ./src
-RUN mvn -B -q -DskipTests package
+COPY --from=map-template /src/public/map-template.json ./src/main/resources/map-template.json
+# The jar must contain it: without the template the API still serves everything else, but no session can
+# share a map, and that failure belongs at build time rather than at a facilitator's click.
+RUN mvn -B -q -DskipTests package \
+    && unzip -l target/bizsim-backend-*.jar | grep -q "BOOT-INF/classes/map-template.json" \
+    || (echo "map-template.json did not reach the jar" >&2; exit 1)
 
 # ---------------------------------------------------------------- 2. run
 FROM eclipse-temurin:21-jre
@@ -22,6 +40,9 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY --from=build /src/target/bizsim-backend-*.jar /app/app.jar
+# Also beside the jar: the app looks for the template on the classpath first and on disk second, so a
+# restored/derived image that replaces the jar still has one.
+COPY --from=build /src/target/classes/map-template.json /app/map-template.json
 
 ENV BIZSIM_PORT=8080 \
     JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75"
