@@ -12,7 +12,7 @@ import {
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import FinancialStatements from "./FinancialStatements";
-import PositionMap, { positionsFrom } from "./PositionMap";
+import PositionMap, { positionsFrom, verticalAxisFor, withTrails } from "./PositionMap";
 import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
@@ -83,6 +83,24 @@ export default function DebriefPanel({
    */
   const computedKey = computedRounds.join(",");
 
+  /** One company's product lines as the statement stores them for a round (D101 needs them all). */
+  const linesOf = useCallback(
+    (teamId: number, at: number) =>
+      ((statements[teamId] ?? []).find((entry) => entry.round === at)?.detail?.products ?? []).map(
+        (line) => ({
+          product: line.product,
+          price: Number(line.price ?? 0),
+          quality: Number(line.quality ?? 0),
+          sold: Number(line.sold ?? 0),
+          revenue: Number(line.revenue ?? 0),
+        }),
+      ),
+    [statements],
+  );
+
+  /** Every earlier computed round's scoreboard, for the trails on the position map (D101). */
+  const [history, setHistory] = useState<Record<number, ScoreRow[]>>({});
+
   const load = useCallback(async () => {
     setProblem(null);
     try {
@@ -112,6 +130,29 @@ export default function DebriefPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    // The trails only need the rounds before the one on screen; a failure here must never stop the
+    // debrief, so it degrades to no trail rather than an error.
+    const earlier = computedRounds.filter((number) => number < round);
+    if (earlier.length === 0) {
+      setHistory({});
+      return;
+    }
+    let live = true;
+    void Promise.all(
+      earlier.map(async (number) => [number, await api.scoreboard(runId, number)] as const),
+    )
+      .then((pairs) => {
+        if (live) setHistory(Object.fromEntries(pairs));
+      })
+      .catch(() => {
+        if (live) setHistory({});
+      });
+    return () => {
+      live = false;
+    };
+  }, [runId, round, computedKey, computedRounds]);
 
   // D69: the selector cannot offer a round that has not been computed — asking the backend for one is
   // what produced the error message. The selection follows the **newest** computed round when a new
@@ -157,6 +198,52 @@ export default function DebriefPanel({
     const row = (statements[teamId] ?? []).find((entry) => entry.round === round);
     return row ? Number(row[key]) : null;
   };
+
+  /** This round's positions — the map's bubbles. */
+  const current = useMemo(
+    () =>
+      positionsFrom(
+        board.map((row) => ({
+          teamId: row.team_id,
+          company: row.company_name,
+          share: Number(row.market_share ?? 0),
+          brand: Number(row.brand ?? 0),
+          own: false,
+        })),
+        new Map(board.map((row) => [row.team_id, linesOf(row.team_id, round)])),
+      ),
+    [board, linesOf, round],
+  );
+
+  /** Position per earlier round, keyed by the company's index in `board`, oldest first. */
+  const trails = useMemo(() => {
+    const rounds = Object.keys(history)
+      .map(Number)
+      .sort((a, b) => a - b);
+    const byRound = rounds.map((earlier) =>
+      positionsFrom(
+        (history[earlier] ?? []).map((row) => ({
+          teamId: row.team_id,
+          company: row.company_name,
+          share: Number(row.market_share ?? 0),
+          brand: Number(row.brand ?? 0),
+          own: false,
+        })),
+        new Map((history[earlier] ?? []).map((row) => [row.team_id, linesOf(row.team_id, earlier)])),
+      ),
+    );
+    // The trail is the path *into* this round, so the round on screen is its last point: without it
+    // a company that only appears in one computed round had no line to draw at all.
+    return new Map(
+      current.map((point, index) => {
+        const past = byRound
+          .map((positions) => positions.find((position) => position.company === point.company))
+          .filter((position): position is NonNullable<typeof position> => Boolean(position))
+          .map((position) => ({ priceIndex: position.priceIndex, qualityIndex: position.qualityIndex }));
+        return [index, [...past, { priceIndex: point.priceIndex, qualityIndex: point.qualityIndex }]];
+      }),
+    );
+  }, [current, history, linesOf]);
 
   const totals = useMemo(() => {
     const sumOf = (key: keyof StatementRow) =>
@@ -246,30 +333,10 @@ export default function DebriefPanel({
       <p className="muted">{t("debrief.hint")}</p>
       {problem && <p className="error">{problem}</p>}
 
-      {/* D98: the round's competitive picture — price against quality, bubble by share. */}
-      <PositionMap
-        points={positionsFrom(
-          board.map((row) => ({
-            teamId: row.team_id,
-            company: row.company_name,
-            share: Number(row.market_share ?? 0),
-            own: false,
-          })),
-          new Map(
-            board.map((row) => {
-              const entry = statements[row.team_id]?.find((statement) => statement.round === round);
-              return [
-                row.team_id,
-                (entry?.detail?.products ?? []).map((line) => ({
-                  price: Number(line.price ?? 0),
-                  quality: Number(line.quality ?? 0),
-                  sold: Number(line.sold ?? 0),
-                })),
-              ];
-            }),
-          ),
-        )}
-      />
+      {/* D98/D101: the round's competitive picture — price against quality (or brand), bubble by share.
+          Each earlier round is placed the same way, so the map draws the path a company took instead
+          of only where it stopped. */}
+      <PositionMap axis={verticalAxisFor(current)} points={withTrails(current, trails)} />
 
       <table>
         <thead>

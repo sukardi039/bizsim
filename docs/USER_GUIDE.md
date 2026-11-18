@@ -74,7 +74,25 @@ This is where a simulation is designed. There is one shipped template,
 Everything below is edited **on your copy**. Press **Save** at the bottom of each tab. A banner
 confirms *"Saved. New simulations from this template use these values."*
 
-### 3.1a The three presets (D100)
+### 3.1a Reading the debrief's position map (D101)
+
+The debrief draws each company as a bubble: **price index** across, **quality index** up, both against
+the class average of 1.00 (the dashed cross), and **bubble size = market share**. Four quadrants are
+named — cheap, premium, stuck in the middle, priced above what they offer — so you can point at the
+position rather than describe it.
+
+- Each product is indexed **against its own class average**, then weighted by revenue actually booked.
+  A company at 1.25 is a quarter dearer than the field **for the same product**, however wide its line.
+- **Dashed trails** are earlier rounds: where each company has been, not only where it stopped.
+- If **nobody has bought quality** this round, every quality index is 1.00 and the vertical axis switches
+  to **brand** (indexed the same way), with a line under the title saying so. The map tells you when it
+  cannot show quality rather than showing a flat line and letting you believe it.
+
+Use it in the debrief to ask two questions: *is anyone actually differentiated, or is everyone competing
+on price alone?* and *is the class converging on one position — which is Porter's "stuck in the middle"
+in slow motion?*
+
+### 3.1b The three presets (D100)
 
 Four templates ship with the product: the standard economy and three **presets**, each tuned to make
 one way of competing pay. Run the same class three times, on one preset each, and the position decides

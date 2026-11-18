@@ -632,3 +632,27 @@ the whole term, no events:
 Each preset hands the win to the position it is named for, and the tables ship in
 `docs/SCENARIO_CALIBRATION.md`. The presets are data: a builder can copy one and edit it like any other
 template.
+
+**D101 — The position map indexes like with like, and says when it has nothing to say (ruled and
+built 18 Nov 2026).** D98 put price against quality on the debrief screen. Seen on a live class it was
+wrong: four companies on one horizontal line, all left of average, because a company was placed by the
+unweighted mean of its products' prices — so a mixed line looked cheap and a single cheap product
+looked cheapest. That draws product-line breadth and calls it price posture, and it contradicts the
+table directly beneath it.
+
+Ruled, all six points shipped as v0.19.1 (frontend only — no engine, no migration):
+
+- **Index per product, weight by revenue.** Each product is indexed against its own class average, then
+  weighted by revenue booked (units sold when there is none, the plain mean when a company sold
+  nothing). 1.25 now means "a quarter dearer than the field for the same product".
+- **Name the four quadrants** — cheap / premium / stuck in the middle / priced above what they offer.
+- **Number the axes** (0.70…1.30) and mark the average with its own dashed cross.
+- **Bubbles at their true position, labels moved**: displacing a dot would lie about where a company
+  sits, so only the label is nudged when two would collide.
+- **Trails.** Every earlier computed round is placed the same way and drawn as a dashed path into the
+  selected round; the current round is the trail's last point.
+- **Admit a flat axis.** If every quality index is within 0.02, the vertical axis becomes brand (indexed
+  the same way), the quadrant words follow it, and the caption says why. The live class that triggered
+  the defect was exactly this case: nobody had bought quality.
+
+Record with the measurements: `docs/POSITION_MAP.md`.
