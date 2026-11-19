@@ -691,3 +691,20 @@ Evidence: `WholeUnitsTest` drives the engine directly — a workforce-cut month,
 that fits — and fails on the old code (it reported **580.65** units produced). The independent auditor
 (`audit_financials.py`) re-derives the same figures and passes: **2,794 checks over 48 company-rounds**, with
 **0 of 144 statement lines** carrying a fractional produced or closing stock.
+
+**D105 — Historical fractional stock is left as it was played (ruled 19 Nov 2026).** A class played before
+D104 holds stock of 48.67 and 73.85, written by the old rounding. The engine no longer produces such rows,
+and the trainee's screen prints unit counts with zero decimals, so on that one class the screen now shows
+**49** where **48.67** is stored.
+
+Ruled: **the rows stay as they were played.** A finished class's statements are a record of what the class
+experienced; rewriting them to match a later ruling would make the debrief disagree with what the trainees
+were actually shown at the time. The alternative — a migration flooring `company_product.stock` and the
+statement lines — was offered and rejected for that reason.
+
+What this means, stated so nobody is surprised later:
+
+- for a class played before D104, the displayed count and the stored count differ by up to a unit;
+- the **stored** value is the truth; the screen rounds for reading;
+- the independent auditor reads stored values, so it stays exact;
+- no migration is added, and nothing may silently "repair" those rows.
