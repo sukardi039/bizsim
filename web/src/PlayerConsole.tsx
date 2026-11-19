@@ -593,7 +593,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             </span>
             <span>
               <small className="muted">{t("player.machines")}</small>
-              <strong>{plain(context.machineWorkers ?? 0)}</strong>
+              <strong>{plain(context.machineWorkers ?? 0, 0)}</strong>
             </span>
           </div>
         </div>
@@ -702,7 +702,10 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                 <td>
                   {product.name} <small className="muted">{product.code}</small>
                 </td>
-                <td className="num">{plain(product.stock)}</td>
+                {/* D104/D105: stock is a count of items. `plain` defaults to two decimals, so a
+                    whole stock of 48 printed as "48.00" — and a leftover fractional row from before the
+                    fix printed "48.67", which is what a trainee reported. Zero decimals, always. */}
+                <td className="num">{plain(product.stock, 0)}</td>
                 <td className="num">{money(product.unitCost)}</td>
                 <td className="num">
                   <NumberInput
@@ -713,7 +716,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                     onChange={(units) => setIn("production", product.code, units)}
                   />
                 </td>
-                <td className="num">{plain(workers.perProduct[product.code] ?? 0)}</td>
+                {/* D105: workforce need is measured in people, and half a person is not a plan. */}
+                <td className="num">{plain(workers.perProduct[product.code] ?? 0, 0)}</td>
                 <td className="num">
                   <NumberInput
                     className="num"
@@ -728,7 +732,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           </tbody>
         </table>
         <p className={overCapacity ? "error" : "muted"} style={{ marginBottom: 0 }}>
-          {t("player.workforce", { used: plain(workers.needed), available: plain(workers.available) })}
+          {t("player.workforce", { used: plain(workers.needed, 0), available: plain(workers.available, 0) })}
           {overCapacity ? " — hire production staff or buy machines, the round will be refused otherwise." : "."}
         </p>
       </section>
