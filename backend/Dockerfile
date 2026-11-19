@@ -26,15 +26,19 @@ COPY backend/src ./src
 COPY --from=map-template /src/public/map-template.json ./src/main/resources/map-template.json
 # The jar must contain it: without the template the API still serves everything else, but no session can
 # share a map, and that failure belongs at build time rather than at a facilitator's click.
-RUN mvn -B -q -DskipTests package \
-    && unzip -l target/bizsim-backend-*.jar | grep -q "BOOT-INF/classes/map-template.json" \
-    || (echo "map-template.json did not reach the jar" >&2; exit 1)
+# `jar tf` rather than `unzip -l`: the JDK is guaranteed present in this image, unzip is not — and a
+# build check that can itself be missing is worse than no check at all.
+RUN mvn -B -DskipTests package \
+    && JAR=$(ls target/bizsim-backend-*.jar) \
+    && echo "built $JAR" \
+    && (jar tf "$JAR" | grep -q "BOOT-INF/classes/map-template.json" \
+        || (echo "map-template.json did not reach the jar" >&2; exit 1))
 
 # ---------------------------------------------------------------- 2. run
 FROM eclipse-temurin:21-jre
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl unzip \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --home /app bizsim
 

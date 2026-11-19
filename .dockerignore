@@ -1,14 +1,16 @@
 # The api image builds from the repository root (it needs web/ as well as backend/), so this file keeps
-# the build context small and keeps machine-local state out of the image. Without it Docker uploads
-# node_modules, build output and the git history on every deploy.
+# the build context small and keeps machine-local state out of the image.
+#
+# Deliberately NOT excluded: web/public/map-template.json. It is small, it is committed, and the api
+# stage's Node build regenerates it anyway — excluding it would make the api build depend on an
+# assumption ("nothing reads the committed copy") for no measurable gain. A build that fails over a
+# 25 kB file is not worth the tokens saved.
 .git
 .gitignore
 **/node_modules
 **/dist
 **/target
 **/.build
-**/public/map-template.json
-docs/bizsim-user-guide.pdf
 *.log
 .dev
 .env
