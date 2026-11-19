@@ -1,0 +1,15 @@
+# The api image builds from the repository root (it needs web/ as well as backend/), so this file keeps
+# the build context small and keeps machine-local state out of the image. Without it Docker uploads
+# node_modules, build output and the git history on every deploy.
+.git
+.gitignore
+**/node_modules
+**/dist
+**/target
+**/.build
+**/public/map-template.json
+docs/bizsim-user-guide.pdf
+*.log
+.dev
+.env
+.env.*
