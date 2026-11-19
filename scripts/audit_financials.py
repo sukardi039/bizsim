@@ -61,6 +61,11 @@ def units(value) -> D:
     return D(value).quantize(UNIT, ROUND_HALF_UP)
 
 
+def whole(value) -> D:
+    """Physical units of a product: whole pieces, floored (D104)."""
+    return D(value).quantize(D("1"), ROUND_DOWN)
+
+
 def div(a, b, scale=6) -> D:
     """Java's div(): six decimals, half-up, and 0 instead of an exception on a zero divisor."""
     a, b = D(a), D(b)
@@ -347,7 +352,8 @@ def plan(run: Run, team: Team, decision: dict, env: dict) -> dict:
     if required > 0:
         capacity_factor = ZERO if workers <= 0 else min(ONE, div(workers, required))
     if capacity_factor < ONE:
-        produced = {code: units(value * capacity_factor) for code, value in produced.items()}
+        # D104: a cut in output yields fewer whole units -- never a fraction of one.
+        produced = {code: whole(value * capacity_factor) for code, value in produced.items()}
 
     spend = {code: (ZERO if insolvent else D(spend_of(decision, code))) for code in run.channels}
     marketing = sum(spend.values(), ZERO)
@@ -403,7 +409,8 @@ def fit_to_cash(run: Run, team: Team, body: dict, env: dict) -> dict:
     if body["materials"] <= available:
         return body
     factor = ZERO if body["materials"] == 0 else div(available, body["materials"])
-    produced = {code: units(value * factor) for code, value in body["produced"].items()}
+    # D104: whole pieces when the bank curtails the order, exactly as the engine does.
+    produced = {code: whole(value * factor) for code, value in body["produced"].items()}
     materials = money(sum((produced[code] * body["cost"][code] for code in run.products), ZERO))
     capacity_used = ZERO
     for code, spec in run.products.items():

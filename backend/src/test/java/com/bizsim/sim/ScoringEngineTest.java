@@ -50,9 +50,14 @@ class ScoringEngineTest {
         ScoringEngine.TeamOutcome outcome = run(team(decision(bd("200"), ZERO), bd("100"),
                 "ACTIVE", active("PRJ"), ZERO));
 
-        // 100 cash / 40 per unit = 2.5 units, then those 2.5 sell for 100 each.
-        assertThat(line(outcome).produced()).isEqualByComparingTo("2.50");
-        assertThat(outcome.cash()).isEqualByComparingTo("250.00");
+        // 100 cash / 40 per unit = 2.5 units of money's worth — which is **2 whole units** (D104): a
+        // company that can only afford two and a half units makes two, and the half it cannot afford is
+        // not stock. Before D104 this asserted 2.50 units and 250.00 of cash, which is precisely the
+        // fractional inventory a live class saw in its production screen.
+        assertThat(line(outcome).produced()).isEqualByComparingTo("2");
+        // 2 whole units at 40 = 80 of materials, not the 100 that 2.5 units would have cost: the half a
+        // company cannot afford is money it keeps, and stock it does not hold.
+        assertThat(line(outcome).cogs()).isEqualByComparingTo("80.00");
     }
 
     @Test

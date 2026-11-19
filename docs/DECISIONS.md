@@ -665,3 +665,29 @@ now anchored around their own quadrant's centre (a quarter and three-quarters al
 quadrants pulled inward so they clear the frame), so any bubble drawn below the average line is
 unambiguously in a lower quadrant. Seen on the live v0.19.1 map, where all four companies sat low and
 the label read as a contradiction.
+
+**D104 — Units are whole pieces (ruled 19 Nov 2026, from a live class screenshot).** A trainee's production
+screen showed stock of **48.67** and **73.85**. Nothing in the model asks for a fraction of a product: the
+engine scales planned output whenever the workforce or the cash cannot carry the plan, and that scaling
+rounded the result to two decimals. The fractional piece was an artefact of a rounding decision.
+
+Ruled: **stock, production, demand, sold and lost are whole pieces, always.** Where output is curtailed the
+engine **floors**, so a cut can only ever cost output — it never invents a unit for a company that is short
+of capacity or money. Applied in both places a fraction could appear: the workforce cap and the cash cap.
+
+Floored, not halved-up, is the deliberate part. Rounding 2.5 units to 3 would hand a company a unit it could
+not pay for, and the accounting would no longer balance: materials were costed for 2.5. Floored to 2, the
+materials are costed for 2 and the money kept is consistent with the stock held.
+
+Two consequences worth recording:
+
+- **Capacity figures stay fractional.** `capacityUsed` is worker-equivalents, not a physical count — a
+  company can use half a worker. Only counts of things are whole.
+- **An old assertion changed with the ruling.** `ScoringEngineTest` asserted that 100 cash buys "2.5 units,
+  which sell for 250". Under D104 it buys 2 units, sells for 200 and keeps the 20 it did not spend. The test
+  now says so and names D104, rather than being quietly adjusted.
+
+Evidence: `WholeUnitsTest` drives the engine directly — a workforce-cut month, a cash-cut month and a month
+that fits — and fails on the old code (it reported **580.65** units produced). The independent auditor
+(`audit_financials.py`) re-derives the same figures and passes: **2,794 checks over 48 company-rounds**, with
+**0 of 144 statement lines** carrying a fractional produced or closing stock.

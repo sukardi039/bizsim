@@ -242,8 +242,13 @@ public class ScoringEngine {
             capacityFactor = workers.signum() <= 0 ? ZERO : min(ONE, div(workers, required));
         }
         if (capacityFactor.compareTo(ONE) < 0) {
+            // D104: units are whole things. Scaling by a fraction and rounding to two decimals left a
+            // company holding 48.67 of a product -- stock nobody can sell, buy or count, and a number the
+            // decision form can only show as a fraction. Production is therefore floored to whole pieces
+            // whenever it is cut: a company short of workers makes fewer whole units, never a partial one,
+            // and a cut can only ever cost output rather than invent it.
             for (String code : produced.keySet()) {
-                produced.put(code, units(produced.get(code).multiply(capacityFactor)));
+                produced.put(code, whole(produced.get(code).multiply(capacityFactor)));
             }
         }
 
@@ -333,7 +338,8 @@ public class ScoringEngine {
         BigDecimal factor = p.materials().signum() == 0 ? ZERO : div(available, p.materials());
         Map<String, BigDecimal> produced = new LinkedHashMap<>();
         for (String code : p.produced().keySet()) {
-            produced.put(code, units(p.produced().get(code).multiply(factor)));
+            // D104: whole units here too — a cash cap reduces output, it does not create thirds of a unit.
+            produced.put(code, whole(p.produced().get(code).multiply(factor)));
         }
         BigDecimal materials = ZERO;
         BigDecimal capacityUsed = ZERO;
@@ -871,6 +877,15 @@ public class ScoringEngine {
 
     private static BigDecimal money(BigDecimal v) {
         return v.setScale(MONEY_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Units of a product are whole pieces, always (D104). Kept separate from {@link #units} because a
+     * capacity figure may legitimately be fractional (worker-equivalents) while stock and production may
+     * not: flooring is right for a physical count and wrong for a ratio.
+     */
+    private static BigDecimal whole(BigDecimal v) {
+        return v.max(ZERO).setScale(0, RoundingMode.DOWN);
     }
 
     private static BigDecimal units(BigDecimal v) {

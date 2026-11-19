@@ -75,6 +75,10 @@ would lose the stock between rounds.
 
 Rules on the payload:
 - Server validates the whole payload in one pass and returns **all** errors at once, not the first.
+- **Units are whole pieces (D104).** Production, stock, demand, sold and lost are integers. When the
+  workforce or the cash cannot carry the plan, output is curtailed and **floored** to whole units — a cut
+  can cost output, never invent a unit. Worker-equivalents (`capacityUsed`) may still be fractional,
+  because half a worker is a real thing and half a product is not.
 - Unknown product/channel/project codes are rejected.
 - Only **one** row per product / channel / project.
 - `price` is pending Q-A. If price is not a decision, that block is dropped and the price is
