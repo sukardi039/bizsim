@@ -741,3 +741,23 @@ Evidence, on a full eight-round six-company session played by the audit strategi
 | Fractional `produced` / `closingStock` / `demand` | 0 of 144 statement lines |
 | Fractional company stock | 0 of 18 rows |
 | Suite | 225 tests, 0 failures (`IntegerMarketTest` covers the type, the two refusals and the sum) |
+
+**D107 — Channel labels say what the model does, and segment-specific channels are a design question
+(20 Nov 2026).**
+
+*Part 1, ruled and built:* the trainee's marketing card now states, in both languages, that **channels are
+not market specific** — spend in any channel lifts share in every product and every class alike, and what
+differs is reach (Trade reaches furthest), brand (Digital builds most, one round later) and diminishing
+returns (~20 M in one channel is the neutral point). The guide gains §3.1c with the same table. This
+matters because a trainer reading "Field sales" as the trade audience would be teaching something the
+engine does not do.
+
+*Part 2, proposed and NOT built:* segment-weighted channel investment. The owner asked for it; the design
+is written out in **`docs/SEGMENT_CHANNELS.md`** with five numbered decisions (D-A where segment demand
+lives, D-B the weight matrix's shape, D-C what happens to market share and the scoreboard, D-D whether
+brand becomes per-segment, D-E re-calibrating the D100 presets) and a size estimate.
+
+The structural point, which is why this is a design question rather than an edit: making reach vary by
+segment moves the unit of competition from *(product)* to *(product, segment)*, so "your market share"
+stops being one number — and the three presets' winners were measured on the current carving. The release
+cannot ship until all three invert again under the new allocation, by the same acceptance test.

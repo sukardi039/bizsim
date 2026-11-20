@@ -240,6 +240,8 @@ export const en: Dict = {
   "player.price": "Price",
   "player.workforce": "Workforce: {used} of {available} workers used",
   "player.marketing": "Marketing",
+  "player.marketingScope":
+    "Channels are not market specific: spend in any channel raises your share in every product and every customer class alike. What differs is reach (Trade reaches furthest for the same money) and brand (Digital builds the most, one round later).",
   "player.capacity": "Workforce and capacity",
   "player.quality": "Quality upgrade",
   "player.qualityHint":
@@ -945,6 +947,8 @@ export const zh: Dict = {
   "player.price": "售价",
   "player.workforce": "用工：已使用 {used} / 可用 {available}",
   "player.marketing": "市场营销",
+  "player.marketingScope":
+    "渠道不针对特定市场：任何渠道的投入都会同等地提升你在每个产品和每个客户群中的份额。差别在于触达（同样金额下批发渠道触达最广）与品牌（线上渠道积累品牌最多，但延迟一期生效）。",
   "player.capacity": "人员与产能",
   "player.quality": "质量升级",
   "player.qualityHint": "每提升 1 点质量需 {cost}。提升后的质量会保留到之后各轮，最高 100。",

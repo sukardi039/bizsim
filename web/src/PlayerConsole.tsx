@@ -781,6 +781,10 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
 
       <section className="card">
         <h2>{t("player.marketing")}</h2>
+        {/* The engine's marketing is one company-wide reach number: it lifts your share in every
+            product and every customer class alike. Saying so here stops a trainee (and a trainer)
+            reading the three channels as three audiences. */}
+        <p className="muted">{t("player.marketingScope")}</p>
         <div className="row">
           {context.channels.map((channel) => (
             <label key={channel.code}>

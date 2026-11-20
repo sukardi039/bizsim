@@ -107,6 +107,22 @@ who wins:
 All three carry half of last round's share (the `inertia` setting above, 0.5), so a position has to be
 defended month after month. Copy a preset and edit it exactly like the standard template.
 
+### 3.1c Marketing channels are not market-specific
+
+The three channels differ in **reach** and in **brand**, not in audience:
+
+| Channel | Reach weight | Brand coefficient |
+|---|---|---|
+| Trade | 1.2 — reaches furthest for the same money | 1.2 |
+| Digital | 1.0 — the reference | **1.6 — builds the most brand, one round later** |
+| Field sales | 0.8 — reaches least | 0.8 |
+
+Marketing is **one company-wide number**: whatever you spend, wherever, lifts your share in every product
+and every customer class **alike**. There is no "advertise Digital only to the premium class" — so the
+choice you are teaching is *how much* and *which channel mix*, never *which audience*. About **20 M in
+one channel** is the neutral point: below it you are less attractive than the reference company, and each
+further dollar buys less (reach is square-rooted, and enters attraction at a power of 0.7).
+
 **Markets are whole numbers of items.** The editor refuses a fractional market — a customer class is a
 count of buyers, not a quantity — and says which field to fix, so `4000.5` becomes a question rather than
 a silent change. Stock and production are whole for the same reason: an item is an item.
