@@ -487,10 +487,10 @@ export const en: Dict = {
   "field.reachWeight": "Reach weight",
   "field.reachBySegmentHint":
     "Reach weight for this customer class. Blank uses the channel's own weight; 0 means the channel cannot reach that class at all.",
-  "editor.reachUsesChannelWeight": "clear all three to make the channel market-generic",
+  "editor.reachUsesChannelWeight": "blank = the channel is not specific to this market",
   "editor.usesChannelWeight": "uses {weight}",
   "editor.channelSegmentNote":
-    "A channel is market-specific: each column holds the weight it reaches that customer class with, and starts at the channel's own weight. Set a field to 0 if the channel cannot reach that class at all. To make a channel market-generic instead, clear all three fields and save — it then reaches every class equally.",
+    "These columns are market reach, not channel effectiveness: they say how well this channel reaches each customer class. Leave a column blank when the channel is not specific to that market — it then reaches that class at the channel's own weight (触达权重) and the market is contested as one pool, as before. Fill a weight to make that class contested separately. 0 means the channel cannot reach that class at all.",
   "field.brandAlpha": "Brand effect",
   "field.targetProduct": "Target",
   "field.advantageType": "Advantage",
@@ -1190,10 +1190,10 @@ export const zh: Dict = {
   "field.trendAffinity": "趋势偏好",
   "field.reachWeight": "触达权重",
   "field.reachBySegmentHint": "该客户群中的触达权重。留空表示使用渠道自身权重；0 表示该渠道完全无法触达该客户群。",
-  "editor.reachUsesChannelWeight": "清空三列即可改为不区分市场",
+  "editor.reachUsesChannelWeight": "留空 = 该渠道不区分此市场",
   "editor.usesChannelWeight": "使用 {weight}",
   "editor.channelSegmentNote":
-    "渠道按市场区分：每一列是该渠道对该客户群的触达权重，初始值等于渠道自身权重。若该渠道完全无法触达某客户群，可填 0。若要改为不区分市场，请清空三列并保存——此后该渠道对各客户群触达相同。",
+    "这三列是市场触达，不是渠道效力：它们表示该渠道对各客户群的触达程度。若渠道不区分某市场，该列留空——它对客户群的触达等于渠道自身权重（触达权重），该市场仍按整体竞争，与以往相同。填写权重后，该客户群将单独竞争。填 0 表示渠道完全无法触达该客户群。",
   "field.brandAlpha": "品牌效应",
   "field.targetProduct": "目标产品",
   "field.advantageType": "优势类型",

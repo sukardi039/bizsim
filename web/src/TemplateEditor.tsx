@@ -185,12 +185,16 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
     segment.texts?.find((text) => text.lang === locale)?.name || segment.name || segment.code;
 
   /**
-   * A channel is market-specific: every class field shows a real number, seeded with the channel's own
-   * weight when no class-specific value is stored. The table therefore never shows an empty cell that
-   * could be mistaken for a value — the trainer clears all three to make the channel market-generic.
+   * D110: show the weight that is **stored for that class**, and nothing else.
+   *
+   * The previous version seeded each class field with the channel's own `reachWeight`, on the reasoning
+   * that a channel is market-specific. The owner's correction: that prints `1.2 / 1.2 / 1.2` and invites
+   * a trainer to read three deliberate choices where none was ever made — it is channel effectiveness
+   * restated three times, not market specificity. A blank cell is the honest rendering of "no decision
+   * has been taken for this class", and the header says so.
    */
-  const reachOf = (row: TemplateChannel, segmentCode: string) =>
-    row.reachBySegment?.[segmentCode] ?? row.reachWeight;
+  const reachOf = (row: TemplateChannel, segmentCode: string): number | undefined =>
+    row.reachBySegment?.[segmentCode];
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
   const [tab, setTab] = useState<
     "settings" | "environment" | "segments" | "events" | "products" | "channels" | "projects"
@@ -971,7 +975,9 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                         <input
                           className="num"
                           disabled={locked}
-                          value={String(reachOf(row, segment.code))}
+                          placeholder="—"
+                          value={reachOf(row, segment.code) === undefined
+                            ? "" : String(reachOf(row, segment.code))}
                           onChange={(e) => setChannels((c) => c.map((r, i) => {
                             if (i !== index) return r;
                             const next = { ...(r.reachBySegment ?? {}) };
