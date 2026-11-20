@@ -183,6 +183,14 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
    */
   const segmentLabel = (segment: TemplateSegment) =>
     segment.texts?.find((text) => text.lang === locale)?.name || segment.name || segment.code;
+
+  /**
+   * A channel is market-specific: every class field shows a real number, seeded with the channel's own
+   * weight when no class-specific value is stored. The table therefore never shows an empty cell that
+   * could be mistaken for a value — the trainer clears all three to make the channel market-generic.
+   */
+  const reachOf = (row: TemplateChannel, segmentCode: string) =>
+    row.reachBySegment?.[segmentCode] ?? row.reachWeight;
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
   const [tab, setTab] = useState<
     "settings" | "environment" | "segments" | "events" | "products" | "channels" | "projects"
@@ -937,7 +945,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                       {segmentLabel(segment)}
                       {/* The blank cell is the common case and it is invisible: say what it means, in the
                           header, rather than in a tooltip nobody hovers. */}
-                      <small className="muted" style={{ display: "block", fontWeight: 400 }}>
+                      <small className="muted" style={{ display: "block", fontWeight: 400, fontSize: ".66rem" }}>
                         {t("editor.reachUsesChannelWeight")}
                       </small>
                     </th>
@@ -952,25 +960,18 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={row.code} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, code: e.target.value } : r))} /></td>
                     <td><input value={row.name} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
                     <td><input value={String(row.reachWeight)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, reachWeight: Number(e.target.value) } : r))} /></td>
-                    {/* Blank = "use the channel's weight". 0 is meaningful: the channel cannot reach
-                        that class at all, which is a strategy lever a trainer may want.
-                        An unset cell must *look* unset. The placeholder used to print the inherited
-                        weight in the same colour and weight as a typed value, so a trainer reading the
-                        table saw 1.2 / 1.2 / 1.2 and concluded the channel was class-specific with equal
-                        weights — when in fact nothing was stored at all (reported 20 Nov 2026). The
-                        inherited number is now spelled out as "uses 1.2" and greyed, and the input carries
-                        an `inherited` class so the distinction does not rest on colour alone. */}
+                    {/* A channel is market-specific. These three fields hold a real weight for each
+                        class, seeded with the channel's own weight, so nothing is ever blank and there is
+                        no placeholder to misread as a value (reported twice, 20 Nov 2026).
+                        Entering 0 is meaningful: the channel cannot reach that class at all.
+                        To make a channel market-generic, clear all three — the note above the table says
+                        so, and the save writes nulls, which the engine reads as "not class-specific". */}
                     {segments.map((segment) => (
                       <td key={segment.code}>
                         <input
-                          className={row.reachBySegment?.[segment.code] === undefined
-                            ? "num inherited" : "num"}
-                          placeholder={t("editor.usesChannelWeight", { weight: String(row.reachWeight) })}
-                          title={row.reachBySegment?.[segment.code] === undefined
-                            ? t("editor.usesChannelWeight", { weight: String(row.reachWeight) })
-                            : undefined}
+                          className="num"
                           disabled={locked}
-                          value={row.reachBySegment?.[segment.code] === undefined ? "" : String(row.reachBySegment[segment.code])}
+                          value={String(reachOf(row, segment.code))}
                           onChange={(e) => setChannels((c) => c.map((r, i) => {
                             if (i !== index) return r;
                             const next = { ...(r.reachBySegment ?? {}) };
