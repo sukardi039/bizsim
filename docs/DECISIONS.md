@@ -797,3 +797,35 @@ Evidence, two classes played six/eight rounds through the real API and re-derive
 | Independent auditor, **weighted** class | PASS — within 4,900 checks over 84 company-rounds |
 | Frozen copy | carries all 6 weights (verified in the database) |
 | Refusals | negative weight → 400; unknown class → 400 naming it |
+
+**D109 — A channel record carries its own market-specific parameters (ruled and built 21 Nov 2026).**
+D108 stored the per-class reach weights in a side table (`channel_reach`), which made a channel a row in
+two places: the record said what the channel was, and a second table said what it reached. The owner's
+ruling: **the market-specific parameter belongs to the channel record**.
+
+- **Three columns on `channel`** — `reach_mass`, `reach_mid`, `reach_premium` (migration `V40`) — instead
+  of rows in a side table. A column per class rather than a JSON blob because the classes are a small
+  authored set, the editor shows one column each, and a typo in a class code stays a key the code must
+  handle rather than a silently ignored blob entry.
+- **Null means "not class-specific here"**, falling back to `reach_weight` — the same meaning the side
+  table's "no row" had, so existing templates behave identically.
+- **Columns are mapped by class position**, not by hard-coded code: the loader and the migration both key
+  them to the template's own catalogue order (`sort_order, code`). A tenant template that renamed its
+  classes keeps its weights; the migration joins on position for exactly that reason.
+- **A frozen package copy carries the weights by construction.** The D108 bug — `cloneInto` copying the
+  side table before the classes existed, rejected by the foreign key — cannot recur, because there is no
+  second table and no ordering to get wrong. `SegmentChannelTest.a_frozen_copy_carries_the_per_class_weights`
+  now passes against the new shape without modification.
+
+Evidence:
+
+| Check | Result |
+|---|---|
+| Suite | **227 tests, 0 failures** (including the frozen-copy test) |
+| Migration on a planted template | side-table weights 1.8 / 1.0 / 0.3 → `reach_mass` / `reach_mid` / `reach_premium` 1.800 / 1.000 / 0.300; the two non-class-specific channels stayed NULL; `channel_reach` dropped |
+| Frozen package copy | channels carry their weights on the record (verified in the database) |
+| Independent auditor, weighted class | **PASS — 4,900 checks over 84 company-rounds** |
+| Migration guard | the `drop table` carries `-- migration:allow-destructive` with the reason: the contents were copied in the same transaction |
+
+The side table is dropped in the same migration that fills the columns, so no deploy leaves the two shapes
+coexisting.

@@ -75,8 +75,9 @@ would lose the stock between rounds.
 
 Rules on the payload:
 - Server validates the whole payload in one pass and returns **all** errors at once, not the first.
-- **Channels can be weighted per customer class (D108).** `channel_reach(channel, class, weight)` makes a
-  channel's reach a function of the class it is reaching. No row means the channel's own weight, so an
+- **Channels can be weighted per customer class (D108, stored per D109).** A channel record carries
+  `reach_mass` / `reach_mid` / `reach_premium` — its market-specific parameters, on the record itself —
+  making a channel's reach a function of the class it is reaching. No row means the channel's own weight, so an
   untouched template is unchanged. When any weight exists, the served market is carved by class first and
   each class is contested separately: a company can lead one class and trail another on the same product.
   A weight of 0 means the channel cannot reach that class.

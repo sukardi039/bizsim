@@ -695,10 +695,11 @@ public class ScoringEngine {
     /**
      * Marketing reach: weighted spend against a reference spend, square-rooted for diminishing returns.
      *
-     * <p>D107: {@code segment} selects the class the reach is being measured for. A channel that states
-     * no weight for that class contributes its own {@code reachWeight}, so a template with no
-     * `channel_reach` rows produces exactly the number this method produced before — which is what lets
-     * the change ship without re-calibrating every existing template.
+     * <p>D107/D109: {@code segment} selects the class the reach is being measured for. A channel that
+     * states no weight for that class contributes its own {@code reachWeight}, so a template whose
+     * channels are not class-specific produces exactly the number this method produced before — which is
+     * what lets the change ship without re-calibrating every existing template. The weights live on the
+     * channel record itself, so "what does this channel reach this class with" needs no second lookup.
      */
     private double reach(Scenario scenario, Plan plan, String segment) {
         BigDecimal weighted = ZERO;

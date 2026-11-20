@@ -168,18 +168,23 @@ class Run:
             "select code, base_size, base_purchasing_power, income_elasticity, trend_affinity "
             "from customer_segment where scenario_key = %s",
             (self.scenario_key,)).fetchall()}
-        self.channels = {r["code"]: r for r in cur.execute(
-            "select code, reach_weight, brand_alpha from channel where scenario_key = %s",
-            (self.scenario_key,)).fetchall()}
-        # D107: per-class reach weights, attached to the channel they belong to. Absent for every
-        # template that has never used them, which is what keeps the older arithmetic valid.
-        per_class: dict[str, dict[str, str]] = {}
-        for row in cur.execute(
-                "select channel_code, segment_code, weight from channel_reach where scenario_key = %s",
-                (self.scenario_key,)).fetchall():
-            per_class.setdefault(row["channel_code"], {})[row["segment_code"]] = row["weight"]
-        for code, channel in self.channels.items():
-            channel["reach_by_segment"] = per_class.get(code, {})
+        # D109: the market-specific weights are columns on the channel record itself. They are read here
+        # by **class position** (the template's catalogue order), exactly as the engine does, so a
+        # template that renamed its classes still maps its three columns to the right classes.
+        classes = [r["code"] for r in cur.execute(
+            "select code from customer_segment where scenario_key = %s order by sort_order, code",
+            (self.scenario_key,)).fetchall()]
+        self.channels = {}
+        for r in cur.execute(
+                "select code, reach_weight, brand_alpha, reach_mass, reach_mid, reach_premium "
+                "from channel where scenario_key = %s", (self.scenario_key,)).fetchall():
+            row = dict(r)
+            by_segment: dict[str, str] = {}
+            for position, column in enumerate(("reach_mass", "reach_mid", "reach_premium")):
+                if position < len(classes) and row[column] is not None:
+                    by_segment[classes[position]] = row[column]
+            row["reach_by_segment"] = by_segment
+            self.channels[row["code"]] = row
         self.projects = {r["code"]: r for r in cur.execute(
             "select code, target_product, advantage_type, advantage_value, hidden_cost, "
             "duration_months, partial_benefit, benefit_curve, benefit_exponent, overfunding "

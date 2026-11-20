@@ -122,7 +122,8 @@ product and every class alike, so the choice is *how much* and *which channel mi
 channel** is the neutral point: below it you are less attractive than the reference company, and each
 further dollar buys less (reach is square-rooted, and enters attraction at a power of 0.7).
 
-**You can make channels class-specific** (Settings → Channels, one column per customer class). A stated
+**You can make channels class-specific** (Templates → Channels, one column per customer class; the
+weights belong to the channel record, one set per channel). A stated
 weight replaces the channel's own for that class only; leave a cell blank and the channel stays
 class-blind for it; enter **0** and that channel cannot reach the class at all. With weights in place the
 market is contested **class by class**, so a company can be strong in the mass market and weak in the
