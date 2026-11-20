@@ -78,6 +78,26 @@ class MarketSharePieTest {
         assertThat(pie.slices()).hasSize(1);
         assertThat(pie.slices().get(0).sharePercent()).isEqualByComparingTo("60.0");
         assertThat(pie.unservedPercent()).as("the 200 nobody could buy").isEqualByComparingTo("40.0");
+
+        // D112: the *drawing* must show that gap, not just the legend. The ring is swept on the served
+        // market, so the wedges cover 60 % of the circle and 40 % stays empty. Drawing it on units sold
+        // closed the ring while the legend reported 40 % unserved — the chart contradicted itself.
+        String html = MarketShareDonut.render("en", pie, "Basic", "Demand the class could not serve",
+                "—", "share of market");
+        assertThat(sweptDegrees(html)).as("60 %% of the ring, not a closed circle")
+                .isCloseTo(216.0, org.assertj.core.data.Offset.offset(1.0));
+    }
+
+    /** Total degrees the company wedges sweep, summed from the sweeps the renderer records. */
+    private static double sweptDegrees(String html) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("data-sweep=\"([0-9.]+)\"")
+                .matcher(html);
+        double total = 0;
+        while (m.find()) {
+            total += Double.parseDouble(m.group(1));
+        }
+        return total;
     }
 
     /** An auto player keeps its company name; the bot's own name never reaches the chart. */

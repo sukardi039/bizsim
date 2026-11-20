@@ -60,14 +60,16 @@ public final class MarketShareDonut {
         out.append("<svg viewBox=\"0 0 ").append(SIZE).append(' ').append(SIZE).append("\" role=\"img\"")
                 .append(" aria-label=\"").append(esc(title)).append("\">");
 
-        // 1. Coverage arc: the part of the served market the class actually supplied, in muted fill.
+        // 1. No separate "coverage" arc. The ring below is drawn on the served market, so the part the
+        //    class did not supply is simply not drawn: the gap *is* the coverage. A second grey arc at a
+        //    different radius read as the unserved slice and contradicted the legend (reported 20 Nov).
         double coverage = totalSold.doubleValue() / pie.servedMarket().doubleValue() * 100.0;
         coverage = Math.min(100.0, Math.max(0.0, coverage));
-        if (coverage > 0) {
-            out.append(ring(-90, coverage * 3.6, COVER_OUTER, COVER_INNER, "#2f3947"));
-        }
 
-        // 2. The ring itself: each company's share of what was sold, so it always fills the circle.
+        // 2. The ring itself: each company's share of the **served market**, so demand the class could
+        //    not supply is a real gap in the circle rather than a label contradicting a closed ring.
+        //    Drawing it on `totalSold` (as this did) always sums to 100 % and hides the gap the legend
+        //    reports — reported 20 Nov 2026: P1 showed a full ring beside "24.9 % unserved".
         double start = -90;
         int colour = 0;
         for (MarketSharePie.Slice slice : pie.slices()) {
@@ -75,25 +77,28 @@ public final class MarketShareDonut {
                 colour++;
                 continue;
             }
-            double share = totalSold.signum() == 0 ? 0
-                    : slice.sold().doubleValue() / totalSold.doubleValue() * 100.0;
+            double share = pie.servedMarket().signum() == 0 ? 0
+                    : slice.sold().doubleValue() / pie.servedMarket().doubleValue() * 100.0;
             double sweep = share * 3.6;
             if (sweep > 0) {
                 out.append(ring(start, sweep, OUTER, INNER,
-                        slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length]));
+                        slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length],
+                        sweep));
                 start += sweep;
             }
             colour++;
         }
         out.append("</svg>");
 
+        // One number per company. There were two — share of the served market and share of what was
+        // actually sold — which are the same figure renormalised, identical whenever nothing is unserved
+        // (reported 20 Nov 2026: "two numbers after the company name, what are they?"). The served-market
+        // share is the one the ring is drawn from, so it is the one the legend states.
         out.append("<table class=\"share-legend\"><thead><tr><th></th><th></th>")
                 .append("<th class=\"num\">").append(esc(coverageLabel)).append("</th>")
-                .append("<th class=\"num\">of sales</th></tr></thead><tbody>");
+                .append("</tr></thead><tbody>");
         colour = 0;
         for (MarketSharePie.Slice slice : pie.slices()) {
-            double ofSales = totalSold.signum() == 0 ? 0
-                    : slice.sold().doubleValue() / totalSold.doubleValue() * 100.0;
             out.append("<tr><td><span class=\"swatch\" style=\"background:")
                     .append(slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length])
                     .append("\"></span></td><td>").append(esc(slice.label()));
@@ -102,24 +107,31 @@ public final class MarketShareDonut {
             // chart measures. The colour difference stays, so the facilitator can still see a seat was
             // machine-played without the projection putting a label on it.
             out.append("</td><td class=\"num\">").append(fmt(slice.sharePercent()))
-                    .append("</td><td class=\"num\">").append(fmt(BigDecimal.valueOf(ofSales)))
                     .append("</td></tr>");
             colour++;
         }
         out.append("</tbody><tfoot><tr><td></td><td>").append(esc(unservedLabel))
                 .append("</td><td class=\"num\">").append(fmt(pie.unservedPercent()))
-                .append("</td><td class=\"num muted\">—</td></tr>")
-                .append("<tr><td></td><td class=\"muted\">").append(esc(coverageLabel))
-                .append("</td><td class=\"num\">").append(fmt(BigDecimal.valueOf(coverage)))
-                .append("</td><td></td></tr></tfoot></table>");
+                .append("</td></tr></tfoot></table>");
         out.append("</figure>");
         return out.toString();
     }
 
     /** A ring segment between two radii, `from` in degrees clockwise from twelve o'clock. */
     private static String ring(double from, double sweep, double outer, double inner, String colour) {
+        return ring(from, sweep, outer, inner, colour, null);
+    }
+
+    /**
+     * @param recorded the sweep to publish as `data-sweep`, or null. Recording it makes the drawing
+     *                 measurable from outside: a test can prove that a class which under-serves leaves a
+     *                 real gap, instead of a closed circle contradicting its own legend.
+     */
+    private static String ring(double from, double sweep, double outer, double inner, String colour,
+                               Double recorded) {
+        String marker = recorded == null ? "" : " data-sweep=\"" + n(recorded) + "\"";
         if (sweep >= 359.999) {
-            return "<circle cx=\"" + CX + "\" cy=\"" + CY + "\" r=\"" + ((outer + inner) / 2)
+            return "<circle" + marker + " cx=\"" + CX + "\" cy=\"" + CY + "\" r=\"" + ((outer + inner) / 2)
                     + "\" fill=\"none\" stroke=\"" + colour + "\" stroke-width=\"" + (outer - inner) + "\"/>";
         }
         double to = from + sweep;
@@ -132,7 +144,7 @@ public final class MarketShareDonut {
                 + " A" + n(outer) + " " + n(outer) + " 0 " + large + " 1 " + n(a2[0]) + " " + n(a2[1])
                 + " L" + n(b2[0]) + " " + n(b2[1])
                 + " A" + n(inner) + " " + n(inner) + " 0 " + large + " 0 " + n(b1[0]) + " " + n(b1[1])
-                + " Z\" fill=\"" + colour + "\"/>";
+                + " Z\" fill=\"" + colour + "\"" + marker + "/>";
     }
 
     private static double[] point(double degrees, double radius) {

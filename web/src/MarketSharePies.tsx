@@ -48,16 +48,19 @@ function Donut({ pie }: { pie: MarketPie }) {
   const coverage =
     Number(pie.servedMarket) > 0 ? Math.min(100, (totalSold / Number(pie.servedMarket)) * 100) : 0;
 
+  // The ring is swept on the **served market**, not on units sold. Swept on units sold it always closes
+  // the circle, so demand the class could not supply disappears from the drawing while the legend
+  // reports it — a chart contradicting itself (reported 20 Nov 2026).
+  const served = Number(pie.servedMarket) || 0;
   let cursor = -90;
   let colour = 0;
   const arcs = pie.slices.map((slice) => {
     const mine = slice.autoPlayer ? AUTO : PALETTE[colour % PALETTE.length];
     colour += 1;
-    const ofSales = totalSold > 0 ? (Number(slice.sold) / totalSold) * 100 : 0;
-    const sweep = ofSales * 3.6;
+    const sweep = served > 0 ? (Number(slice.sold) / served) * 360 : 0;
     const path = sweep > 0 ? ring(cursor, sweep, OUTER, INNER) : null;
     cursor += sweep;
-    return { slice, mine, ofSales, path };
+    return { slice, mine, sweep, path };
   });
 
   return (
@@ -68,7 +71,9 @@ function Donut({ pie }: { pie: MarketPie }) {
           <path d={ring(-90, (coverage / 100) * 360, COVER_OUTER, COVER_INNER)} />
         )}
         {arcs.map(({ slice, mine, path }, index) =>
-          path ? <path key={`${slice.label}-${index}`} d={path} fill={mine} /> : null,
+          path ? (
+            <path key={`${slice.label}-${index}`} d={path} fill={mine} data-sweep={arcs[index].sweep} />
+          ) : null,
         )}
         <text
           x={SIZE / 2}
@@ -84,7 +89,10 @@ function Donut({ pie }: { pie: MarketPie }) {
       </svg>
       <table className="market-pie-legend">
         <tbody>
-          {arcs.map(({ slice, mine, ofSales }, index) => (
+          {/* One number per company: its share of the served market — the figure the ring is drawn
+              from. There used to be a second column (share of what was actually sold), which is the same
+              figure renormalised and identical whenever nothing is unserved. */}
+          {arcs.map(({ slice, mine }, index) => (
             <tr key={`${slice.label}-${index}`}>
               <td>
                 <span className="swatch" style={{ background: mine }} />
@@ -92,7 +100,6 @@ function Donut({ pie }: { pie: MarketPie }) {
               {/* Company name only. Nothing here says "auto". */}
               <td>{slice.label}</td>
               <td className="num">{number(Number(slice.sharePercent), 1)}</td>
-              <td className="num">{number(ofSales, 1)}</td>
             </tr>
           ))}
           {Number(pie.unserved) > 0 && (
@@ -102,7 +109,6 @@ function Donut({ pie }: { pie: MarketPie }) {
               </td>
               <td>{t("debrief.unserved")}</td>
               <td className="num">{number(Number(pie.unservedPercent), 1)}</td>
-              <td className="num">—</td>
             </tr>
           )}
         </tbody>

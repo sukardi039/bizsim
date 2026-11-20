@@ -914,3 +914,24 @@ Evidence: 232 tests, 0 failures (`MarketSharePieTest` covers sums-to-100, the st
 company-only label, an idle company being absent rather than a zero wedge, and a sole holder drawing a full
 ring); live run with a real bot seat renders 71 arcs across 4 rounds × 3 products, 12 unserved labels,
 24 coverage labels, zero auto markers, zero personas.
+
+**D113 — The donut's gap is drawn, and the legend states one number (reported 21 Nov 2026).** Two faults from
+a facilitator's screenshot of the D112 pies:
+
+1. **Two numbers after each company name.** The legend had *share of the served market* and *share of what
+   was actually sold*. They are the same figure renormalised, and identical whenever nothing is unserved —
+   which is why P3 read `55.8 / 55.8` and `44.2 / 44.2`. Ruled: **one number**, the served-market share, the
+   one the ring is drawn from.
+2. **The gap was missing from the circle.** The ring was swept on *units sold*, which always sums to 100 %,
+   so a full circle sat beside a legend reading "24.9 % unserved". The separate grey coverage band at a
+   different radius made it worse: it read as the unserved slice and was not in the pie at all. Ruled:
+   **the ring is swept on the served market**, so demand the class could not supply is simply not drawn —
+   the gap *is* the coverage — and the second grey arc is gone.
+
+Proof on the reported numbers (Benny 32.2, Charlie 42.9, unserved 24.9): the ring now sweeps **270.4°**
+with an **89.6° gap**, where it previously closed at 360°. `MarketSharePieTest` asserts the sweep, and the
+assertion was checked against the old code — it fails there (360° vs 216°), so it is a real guard rather
+than a test that agrees with whatever the code does.
+
+The console pie (`MarketSharePies.tsx`) had both faults copied from the same design and is fixed the same
+way, including a `data-sweep` attribute so the drawing stays measurable from outside.
