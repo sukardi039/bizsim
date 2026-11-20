@@ -75,6 +75,10 @@ would lose the stock between rounds.
 
 Rules on the payload:
 - Server validates the whole payload in one pass and returns **all** errors at once, not the first.
+- **The shipped channels are market-specific (D111).** `standard-v1` and its presets state a reach
+  weight per class, derived as `reach_weight × {1.6, 1.0, 0.4}` by how well the channel suits the class
+  (Trade → mass, Field → affluent, Digital → mass and middle). The middle column equals the channel's own
+  weight by construction, and every other template stays segment-blind until a trainer fills a cell.
 - **Channels can be weighted per customer class (D108, stored per D109).** A channel record carries
   `reach_mass` / `reach_mid` / `reach_premium` — its market-specific parameters, on the record itself —
   making a channel's reach a function of the class it is reaching. No row means the channel's own weight, so an

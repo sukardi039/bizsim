@@ -32,10 +32,15 @@ class SegmentChannelTest extends PostgresTestBase {
     @Autowired
     org.springframework.jdbc.core.JdbcTemplate jdbc;
 
-    /** No weights = the pre-D107 engine: identical demand for two companies that differ only in reach. */
+    /**
+     * D111: the shipped template now states its market reach, so the segment-blind path is proved on a
+     * template that genuinely has no weights — the shipped one, stripped. That keeps the guarantee
+     * honest: "no weights means the pre-D107 arithmetic" must hold for *any* such template, not just for
+     * the one we happened to ship before.
+     */
     @Test
     void a_template_without_segment_weights_is_unchanged() {
-        Scenario base = scenarios.load("standard-v1");
+        Scenario base = withoutSegmentWeights(scenarios.load("standard-v1"));
         assertThat(base.channels()).allMatch(c -> !c.segmentSpecific());
         assertThat(base.channel("TRADE").orElseThrow().reachFor("SEG-BASIC"))
                 .as("no stated weight falls back to the channel's own")
@@ -173,6 +178,15 @@ class SegmentChannelTest extends PostgresTestBase {
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** The same scenario with every channel's market-specific weights removed — the pre-D111 economy. */
+    private static Scenario withoutSegmentWeights(Scenario base) {
+        List<Scenario.ChannelSpec> channels = base.channels().stream()
+                .map(c -> new Scenario.ChannelSpec(c.code(), c.name(), c.reachWeight(), c.brandAlpha()))
+                .toList();
+        return new Scenario(base.key(), base.params(), base.products(), channels, base.projects(),
+                base.rounds(), base.segments(), base.events());
+    }
 
     private BigDecimal demandOf(ScoringEngine.RoundResult result, long teamId, String product) {
         return result.teams().stream().filter(t -> t.teamId() == teamId).findFirst().orElseThrow()

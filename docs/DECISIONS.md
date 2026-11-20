@@ -829,3 +829,52 @@ Evidence:
 
 The side table is dropped in the same migration that fills the columns, so no deploy leaves the two shapes
 coexisting.
+
+**D111 — The shipped template's channels state their market-specific reach (ruled and built 21 Nov 2026).**
+D109 put the market-specific columns on the channel record and D110 stopped the editor inventing values,
+which left the shipped template with all nine blank: the feature existed and did nothing on the economy
+every class is actually played on. The owner's ruling: **populate the shipped templates with a real,
+defensible model; leave tenant drafts blank.**
+
+**The numbers are derived, not tuned.** One rule, applied identically to all three channels:
+
+1. A channel's market weight is its own `reach_weight` × a fit multiplier of **1.6 / 1.0 / 0.4**
+   (best / neutral / poor), the same three multipliers for every channel so none is favoured by the
+   encoding.
+2. Fit follows the class's own economics, which the template already states: SEG-BASIC is the
+   price-sensitive, largest class (income elasticity 0.40, pool 4,000); SEG-MID is neutral by
+   construction (1.00); SEG-PREMIUM is the least price-sensitive, smallest class (1.80, pool 600).
+3. Channel nature: **TRADE** (wholesale counters) reaches mass best and affluent worst →
+   1.6 / 1.0 / 0.4. **FIELD** (personal selling) reaches affluent and middle best, price-driven mass
+   worst → 0.4 / 1.0 / 1.6. **DIGITAL** reaches the largest, most reachable audience and the middle well,
+   affluent least → 1.6 / 1.6 / 0.4.
+
+| channel | own weight | mass | middle | premium |
+|---|---|---|---|---|
+| DIGITAL | 1.000 | 1.600 | 1.000 | 0.400 |
+| TRADE | 1.200 | 1.920 | 1.200 | 0.480 |
+| FIELD | 0.800 | 0.320 | 0.800 | 1.280 |
+
+The middle column equals the channel's own weight for every channel **by rule**, which is what makes the
+encoding auditable rather than arbitrary.
+
+**What this changes, stated as a decision.** The channels used to differ only in *total* reach
+(Trade 1.2 > Digital 1.0 > Field 0.8); they now differ in **who** they reach. The consequence is real and
+visible: two companies with identical plans can win different numbers of pieces in different customer
+classes. One existing test had assumed the opposite ("at most one whole piece on the largest-remainder
+tie-break") and measured a 3.37 M profit gap; the assertion now says what it meant — the *purchase*
+never touches profit, and any gap is bounded by the revenue difference the allocation produced.
+
+**Scope.** `standard-v1` and the three presets cloned from it. Tenant drafts are left blank: seeding
+somebody's own economy with numbers they did not choose would be unattributable, and the editor shows a
+blank cell as "not specific to this market", which is the truth for a draft.
+
+Evidence:
+
+| Check | Result |
+|---|---|
+| Suite | **227 tests, 0 failures** |
+| Presets still invert (D100's claim) | COST +1.97 bn vs +1.76; DIFF +0.88 bn vs −1.27; FOCUS +1.72 bn vs +1.24 |
+| Segment-blind guarantee | proved on the shipped template **stripped of its weights**, so the guarantee does not depend on what we happen to ship |
+| Independent auditor, shipped template in play | **PASS — 2,106 checks over 36 company-rounds** |
+| Tenant drafts | 0 populated (verified against a live-shaped database) |

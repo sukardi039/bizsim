@@ -963,15 +963,25 @@ class RoundFlowApiTest extends PostgresTestBase {
 
         assertThat((BigDecimal) one.get("capacity_cost")).isEqualByComparingTo("120000000");
         assertThat((BigDecimal) one.get("machine_workers")).isEqualByComparingTo("3");
-        // Cash only: the purchase changes the bank, never the profit line. The two companies are
-        // identical, so the only difference demand allocation may produce is one whole piece going
-        // to one of them on the largest-remainder tie-break (D34). Cash follows sales, so the bank
-        // difference is the 120M purchase less that one piece's *revenue* (not its margin).
+        // Cash only: the purchase changes the bank, never the profit line.
+        //
+        // D111 changed what "the two companies are identical" buys us. The shipped template now states
+        // market-specific channel reach, so the same plan competes separately in each customer class and
+        // an identical company can win a different number of pieces in each — the old "at most one whole
+        // piece on the largest-remainder tie-break" no longer bounds the gap (measured: 3.37 M).
+        //
+        // The rule under test is that the *purchase* does not touch profit, so the comparison is now made
+        // against the same company's own trading, with the machine cost factored out: profit differs only
+        // by what demand allocation gave one company and not the other, and that is bounded by the whole
+        // demand gap between them (every extra piece sold earns at most its price).
         BigDecimal revenueGap = ((BigDecimal) one.get("revenue"))
                 .subtract((BigDecimal) two.get("revenue"));
+        assertThat(revenueGap)
+                .as("the machine purchase must not create revenue by itself")
+                .isGreaterThanOrEqualTo(BigDecimal.ZERO);
         assertThat(((BigDecimal) one.get("profit")).subtract((BigDecimal) two.get("profit")).abs())
-                .as("machines cost cash, not profit")
-                .isLessThanOrEqualTo(new BigDecimal("1000000"));
+                .as("machines cost cash, not profit — any gap is demand allocation, never the purchase")
+                .isLessThanOrEqualTo(revenueGap.abs().max(new BigDecimal("1000000")));
         assertThat(((BigDecimal) two.get("cash_after")).subtract((BigDecimal) one.get("cash_after")))
                 .as("the 120M purchase, less the revenue of one whole piece")
                 .isEqualByComparingTo(new BigDecimal("120000000").subtract(revenueGap));
