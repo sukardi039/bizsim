@@ -174,7 +174,15 @@ const FUNCTIONS = ["PRODUCTION", "SALES", "RND", "ADMIN"] as const;
  * reference every class plays on.
  */
 export default function TemplateEditor({ templateKey, onLeave }: { templateKey: string; onLeave: () => void }) {
-  const { t, number: fmt, money } = useI18n();
+  const { t, locale, number: fmt, money } = useI18n();
+
+  /**
+   * D87: a customer class carries its own words per language. The Channels table headed its columns
+   * with `segment.name` — the authored (English) name — so the Chinese console showed "MASS MARKET"
+   * over a class the database already had a translation for. Ask for the console's language first.
+   */
+  const segmentLabel = (segment: TemplateSegment) =>
+    segment.texts?.find((text) => text.lang === locale)?.name || segment.name || segment.code;
   const [detail, setDetail] = useState<TemplateDetail | null>(null);
   const [tab, setTab] = useState<
     "settings" | "environment" | "segments" | "events" | "products" | "channels" | "projects"
@@ -926,7 +934,12 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                       with. Blank means "same as the channel's own", which is the segment-blind default. */}
                   {segments.map((segment) => (
                     <th key={segment.code} className="num" title={t("field.reachBySegmentHint")}>
-                      {segment.name || segment.code}
+                      {segmentLabel(segment)}
+                      {/* The blank cell is the common case and it is invisible: say what it means, in the
+                          header, rather than in a tooltip nobody hovers. */}
+                      <small className="muted" style={{ display: "block", fontWeight: 400 }}>
+                        {t("editor.reachUsesChannelWeight")}
+                      </small>
                     </th>
                   ))}
                   <th className="num">{t("field.brandAlpha")}</th>
@@ -945,7 +958,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                       <td key={segment.code}>
                         <input
                           className="num"
-                          placeholder="—"
+                          placeholder={String(row.reachWeight)}
                           disabled={locked}
                           value={row.reachBySegment?.[segment.code] === undefined ? "" : String(row.reachBySegment[segment.code])}
                           onChange={(e) => setChannels((c) => c.map((r, i) => {
