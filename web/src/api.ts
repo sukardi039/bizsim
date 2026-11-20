@@ -425,6 +425,11 @@ export interface TemplateChannel {
   name: string;
   reachWeight: number;
   brandAlpha: number;
+  /**
+   * D107: reach weight per customer class. A class left out uses `reachWeight`, so an empty map is the
+   * segment-blind behaviour every template had before.
+   */
+  reachBySegment?: Record<string, number>;
 }
 
 export interface TemplateProject {

@@ -25,6 +25,9 @@ import urllib.request
 API = os.environ.get("BIZSIM_API", "http://127.0.0.1:8099")
 TENANT = os.environ.get("BIZSIM_TENANT", "demo")
 PW = os.environ.get("BIZSIM_AUDIT_PW", "")
+# Which session to drive. Run 1 is the seeded one; a second (e.g. a weighted template's class) is
+# picked explicitly so the auditor can be pointed at whichever session the claim is about.
+RUN_ID = int(os.environ.get("BIZSIM_RUN_ID", "1"))
 
 
 FIELD = bytes([112, 97, 115, 115]).decode() + "word"  # the login field name, assembled to dodge redaction
@@ -306,19 +309,19 @@ def main() -> None:
         print("done — now run scripts/audit_financials.py")
         return
 
-    print(f"run 1: {rounds} rounds, {len(names)} companies")
+    print(f"run {RUN_ID}: {rounds} rounds, {len(names)} companies")
     # `play` takes the seats it drives: one per company, each with the email that signs in for it.
     # The old call passed bare e-mail lists with a name table, which no longer matches the signature.
     # The seed seats playerN@<tenant>.test on company N in creation order, and the staff user list
     # does not carry trainees, so the emails come from that convention rather than an API read.
     admin = login("admin@" + TENANT + ".test")
-    run = call("/api/runs/1", token=admin)
+    run = call(f"/api/runs/{RUN_ID}", token=admin)
     teams = sorted(run["teams"], key=lambda team: team["id"])
     if len(teams) != len(names):
-        raise SystemExit(f"run 1 seats {len(teams)} companies, expected {len(names)} strategies")
+        raise SystemExit(f"run {RUN_ID} seats {len(teams)} companies, expected {len(names)} strategies")
     seats = [{"id": team["id"], "email": f"player{index + 1}@{TENANT}.test", "name": names[index]}
              for index, team in enumerate(teams)]
-    play(1, seats, strategies, rounds)
+    play(RUN_ID, seats, strategies, rounds)
     print("done — now run scripts/audit_financials.py")
 
 

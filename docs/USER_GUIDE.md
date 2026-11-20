@@ -117,11 +117,17 @@ The three channels differ in **reach** and in **brand**, not in audience:
 | Digital | 1.0 — the reference | **1.6 — builds the most brand, one round later** |
 | Field sales | 0.8 — reaches least | 0.8 |
 
-Marketing is **one company-wide number**: whatever you spend, wherever, lifts your share in every product
-and every customer class **alike**. There is no "advertise Digital only to the premium class" — so the
-choice you are teaching is *how much* and *which channel mix*, never *which audience*. About **20 M in
-one channel** is the neutral point: below it you are less attractive than the reference company, and each
+**By default** marketing is one company-wide number: spend in any channel lifts your share in every
+product and every class alike, so the choice is *how much* and *which channel mix*. About **20 M in one
+channel** is the neutral point: below it you are less attractive than the reference company, and each
 further dollar buys less (reach is square-rooted, and enters attraction at a power of 0.7).
+
+**You can make channels class-specific** (Settings → Channels, one column per customer class). A stated
+weight replaces the channel's own for that class only; leave a cell blank and the channel stays
+class-blind for it; enter **0** and that channel cannot reach the class at all. With weights in place the
+market is contested **class by class**, so a company can be strong in the mass market and weak in the
+premium one on the same product — which is what lets a differentiated position be *earned* rather than
+assumed. The company's published share is still one number; the classes are how it was earned.
 
 **Markets are whole numbers of items.** The editor refuses a fractional market — a customer class is a
 count of buyers, not a quantity — and says which field to fix, so `4000.5` becomes a question rather than

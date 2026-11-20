@@ -377,118 +377,208 @@ public class ScoringEngine {
         double baselineShare = scenario.params().baselineShare().doubleValue();
 
         for (Scenario.ProductSpec spec : scenario.products()) {
-            double[] attractiveness = new double[teams.size()];
             // D89: a company that does not carry the product does not compete for it. It used to be
             // given a share of a market it could not serve, which inflated lost sales and took demand
             // away from the companies that do hold the line.
             boolean[] carries = new boolean[teams.size()];
-            double sum = 0;
             for (int i = 0; i < teams.size(); i++) {
                 carries[i] = carries(teams.get(i), spec.code());
-                if (!carries[i]) {
-                    continue;
-                }
-                attractiveness[i] = attractiveness(scenario, spec.code(), teams.get(i), plans.get(i));
-                sum += attractiveness[i];
             }
             // D34: the market is a whole number of pieces and it is divided in whole pieces. A share
             // of a pool used to be rounded to two decimals, which left companies holding 0.94 of a
             // product while another product stocked out -- numbers nobody can act on.
             BigDecimal pool = pools.getOrDefault(spec.code(), ZERO);
             int n = teams.size();
+            // D107: when no channel weights reach by class, this product's market is one pool allocated
+            // once — exactly the arithmetic before D107, kept in one place so the two paths cannot drift.
+            // When channels *are* weighted, the pool is carved by class first (`segmentPools`) and each
+            // class is allocated on its own attractiveness.
             // The cohort serves (1 - baselineShare) of the pool; the rest is the market this class
             // never sees. The allocation has to add up to exactly that target in whole pieces.
             BigDecimal target = pool.multiply(ONE.subtract(bd(baselineShare)))
                     .setScale(0, RoundingMode.HALF_UP);
-            if (sum <= 0 || n == 0 || target.signum() <= 0) {
-                for (TeamInput team : teams) {
-                    result.get(team.teamId()).put(spec.code(), 0d);
-                }
+            // `n` is the class size; whether anybody is attractive is now decided per class, inside
+            // `allocateWithin`, so this guard only covers the empty-cohort and empty-market cases.
+            if (n == 0 || target.signum() <= 0) {
+                addDemand(result, teams, spec.code(), new BigDecimal[n]);
                 continue;
             }
-            BigDecimal[] raw = new BigDecimal[n];
+
+            // D107: the classes this product's market is carved into. With no segment weighting the
+            // market is served whole, exactly as before; with weighting each class is contested on its
+            // own attractiveness, so a company can be strong in one and weak in another.
+            List<String> classes = segmentWeighted(scenario)
+                    ? segmentPools(scenario, spec, target) : List.of(WHOLE_MARKET);
+            Map<String, BigDecimal> shareOf = segmentShares(scenario, spec, target, classes, environment);
+
             BigDecimal[] pieces = new BigDecimal[n];
-            BigDecimal assigned = ZERO;
-            // D99: loyalty. The contest above is what this round's price, quality and reach deserve;
-            // the share a company already held is what its customers did last month. With inertia the
-            // served market is split λ : 1−λ between the two, so a rival's price cut (or a company's
-            // own mistake) takes more than one month to move the whole market. λ = 0 — the default,
-            // and every template written before D99 — leaves the contest numbers untouched.
-            double lambda = scenario.params().inertia().doubleValue();
-            boolean blended = lambda > 0 && previousShare != null && !previousShare.isEmpty();
-            double[] weight = new double[n];
-            double weightSum = 0;
-            for (int i = 0; i < n; i++) {
-                double contest = attractiveness[i] / sum;
-                weight[i] = contest;
-                if (blended && carries[i]) {
-                    Map<String, Double> held = previousShare.getOrDefault(teams.get(i).teamId(), Map.of());
-                    weight[i] = lambda * held.getOrDefault(spec.code(), 0d) + (1 - lambda) * contest;
+            java.util.Arrays.fill(pieces, ZERO);
+            for (String segment : classes) {
+                BigDecimal classTarget = shareOf.get(segment);
+                if (classTarget == null || classTarget.signum() <= 0) {
+                    continue;
                 }
-                weightSum += weight[i];
-            }
-            for (int i = 0; i < n; i++) {
-                // Normalising keeps the pieces adding up to the target when last month's shares did
-                // not: they are what customers actually bought, so a company that stocked out held
-                // less than it was allocated and the blend would otherwise under-serve the market.
-                double share = blended && weightSum > 0 ? weight[i] / weightSum : weight[i];
-                raw[i] = target.multiply(bd(share));
-                pieces[i] = raw[i].setScale(0, RoundingMode.DOWN);
-                assigned = assigned.add(pieces[i]);
-            }
-            // Largest remainder: the units the pool still has go to the companies whose fractional
-            // part was cut most, one each, ties by team order. The piece counts then add up to the
-            // market exactly instead of quietly losing or inventing units.
-            int leftover = target.subtract(assigned).min(BigDecimal.valueOf(n)).intValue();
-            List<Integer> order = new ArrayList<>();
-            for (int i = 0; i < n; i++) {
-                order.add(i);
-            }
-            order.sort((a, b) -> {
-                int byRemainder = raw[b].subtract(pieces[b]).compareTo(raw[a].subtract(pieces[a]));
-                return byRemainder != 0 ? byRemainder : Integer.compare(a, b);
-            });
-            // D106: only companies that carry the product can be given a piece of its market — a
-            // non-carrier gets no share at all (D89). The previous loop walked the remainder order and
-            // `continue`d past non-carriers without re-issuing their piece. That was **not** a live defect:
-            // leftover is at most n and non-carriers are at most n-1, so the loop always found a carrier.
-            // It was correct by an argument the code did not state. This version states it — carriers only,
-            // in even passes — and refuses to finish with a piece unallocated, so a future change to the
-            // bound or the ordering fails loudly instead of shrinking a market by a unit.
-            List<Integer> carriers = new ArrayList<>();
-            for (int index : order) {
-                if (carries[index]) {
-                    carriers.add(index);
+                BigDecimal[] classPieces = allocateWithin(scenario, teams, plans, spec, segment, classTarget,
+                        carries, previousShare, environment);
+                for (int i = 0; i < n; i++) {
+                    pieces[i] = pieces[i].add(classPieces[i]);
                 }
-            }
-            if (!carriers.isEmpty()) {
-                // Largest remainder among the carriers, one piece each while the pool still has units.
-                // Rounds of the same order keep the distribution fair when there are more pieces than
-                // carriers: each round gives every carrier at most one, so the surplus spreads evenly
-                // instead of landing on whoever happens to sort first.
-                int pass = 0;
-                while (leftover > 0) {
-                    int start = pass % carriers.size();
-                    for (int offset = 0; offset < carriers.size() && leftover > 0; offset++) {
-                        int index = carriers.get((start + offset) % carriers.size());
-                        pieces[index] = pieces[index].add(ONE);
-                        leftover--;
-                    }
-                    pass++;
-                }
-            }
-            if (leftover > 0) {
-                // The market is whole pieces and every one of them belongs to somebody who carries it.
-                // Reaching here means the pool and the pieces disagree, which is a defect, not a rounding:
-                // say so rather than serve a class a market that does not add up.
-                throw new IllegalStateException("market for " + spec.code() + " left " + leftover
-                        + " unit(s) unallocated: the pool and the shares disagree");
             }
             for (int i = 0; i < n; i++) {
                 result.get(teams.get(i).teamId()).put(spec.code(), pieces[i].doubleValue());
             }
         }
         return result;
+    }
+
+    /** The allocation's "class" when a template does not weight reach by class: the market is one pool. */
+    private static final String WHOLE_MARKET = "";
+
+    private void addDemand(Map<Long, Map<String, Double>> result, List<TeamInput> teams,
+                           String product, BigDecimal[] pieces) {
+        for (int i = 0; i < teams.size(); i++) {
+            result.get(teams.get(i).teamId()).put(product,
+                    pieces[i] == null ? 0d : pieces[i].doubleValue());
+        }
+    }
+
+    /**
+     * D107: how a product's served market is divided between the customer classes.
+     *
+     * <p>The product's own class takes the market it is made for; `crossSegmentPct` is the share of the
+     * other classes' purchasable demand it also competes for. Each class's share of the served market is
+     * therefore a property of the template, not of the round's performance — which is what keeps the
+     * classes comparable across rounds and lets the auditor re-derive the split from the catalogue alone.
+     */
+    private Map<String, BigDecimal> segmentShares(Scenario scenario, Scenario.ProductSpec spec,
+                                                  BigDecimal target, List<String> classes,
+                                                  EnvironmentService.RoundEnvironment environment) {
+        if (classes.size() == 1 && WHOLE_MARKET.equals(classes.get(0))) {
+            return Map.of(WHOLE_MARKET, target);
+        }
+        // Weight each class by the demand the product can reach there: its own class in full, the
+        // others only through `crossSegmentPct` (D81).
+        Map<String, BigDecimal> weights = new java.util.LinkedHashMap<>();
+        BigDecimal total = ZERO;
+        for (String code : classes) {
+            Scenario.SegmentSpec segment = scenario.segments().stream()
+                    .filter(s -> s.code().equals(code)).findFirst().orElse(null);
+            if (segment == null) {
+                continue;
+            }
+            BigDecimal size = nz(segment.baseSize())
+                    .multiply(environment.segmentSize(code))
+                    .multiply(environment.segmentPurchasingPower(code));
+            boolean own = spec.targetSegment() != null && spec.targetSegment().equals(code);
+            BigDecimal weight = own ? size : size.multiply(nz(spec.crossSegmentPct()));
+            weights.put(code, weight);
+            total = total.add(weight);
+        }
+        if (total.signum() <= 0) {
+            return Map.of();
+        }
+        // Whole pieces, by largest remainder, so the classes add up to the served market exactly.
+        Map<String, BigDecimal> out = new java.util.LinkedHashMap<>();
+        List<String> order = new ArrayList<>(weights.keySet());
+        BigDecimal assigned = ZERO;
+        Map<String, BigDecimal> raw = new java.util.LinkedHashMap<>();
+        for (String code : order) {
+            BigDecimal exact = target.multiply(weights.get(code)).divide(total, 6, RoundingMode.HALF_UP);
+            raw.put(code, exact);
+            BigDecimal whole = exact.setScale(0, RoundingMode.DOWN);
+            out.put(code, whole);
+            assigned = assigned.add(whole);
+        }
+        int leftover = target.subtract(assigned).intValue();
+        List<String> byRemainder = new ArrayList<>(order);
+        byRemainder.sort((a, b) -> raw.get(b).subtract(out.get(b)).compareTo(raw.get(a).subtract(out.get(a))));
+        for (int k = 0; k < byRemainder.size() && leftover > 0; k++) {
+            out.merge(byRemainder.get(k), ONE, BigDecimal::add);
+            leftover--;
+        }
+        return out;
+    }
+
+    /** Which classes this product's market is carved into (D107). */
+    private List<String> segmentPools(Scenario scenario, Scenario.ProductSpec spec, BigDecimal target) {
+        return scenario.segments().stream().map(Scenario.SegmentSpec::code).toList();
+    }
+
+    /**
+     * The market pieces one class of one product hands to each company — the original allocation, now
+     * scoped to a class. Split out so the segment-blind and segment-weighted paths share one arithmetic.
+     */
+    private BigDecimal[] allocateWithin(Scenario scenario, List<TeamInput> teams, List<Plan> plans,
+                                        Scenario.ProductSpec spec, String segment, BigDecimal target,
+                                        boolean[] carries, Map<Long, Map<String, Double>> previousShare,
+                                        EnvironmentService.RoundEnvironment environment) {
+        int n = teams.size();
+        BigDecimal[] pieces = new BigDecimal[n];
+        java.util.Arrays.fill(pieces, ZERO);
+
+        double[] attractiveness = new double[n];
+        double sum = 0;
+        for (int i = 0; i < n; i++) {
+            if (!carries[i]) {
+                continue;
+            }
+            attractiveness[i] = attractiveness(scenario, spec.code(), segment, teams.get(i), plans.get(i));
+            sum += attractiveness[i];
+        }
+        if (sum <= 0) {
+            return pieces;
+        }
+
+        BigDecimal[] raw = new BigDecimal[n];
+        BigDecimal assigned = ZERO;
+        // D99: loyalty. The contest above is what this round's price, quality and reach deserve; the
+        // share a company already held is what its customers did last month. λ = 0 leaves it untouched.
+        double lambda = scenario.params().inertia().doubleValue();
+        boolean blended = lambda > 0 && previousShare != null && !previousShare.isEmpty();
+        double[] weight = new double[n];
+        double weightSum = 0;
+        for (int i = 0; i < n; i++) {
+            double contest = attractiveness[i] / sum;
+            weight[i] = contest;
+            if (blended && carries[i]) {
+                Map<String, Double> held = previousShare.getOrDefault(teams.get(i).teamId(), Map.of());
+                weight[i] = lambda * held.getOrDefault(spec.code(), 0d) + (1 - lambda) * contest;
+            }
+            weightSum += weight[i];
+        }
+        for (int i = 0; i < n; i++) {
+            double share = blended && weightSum > 0 ? weight[i] / weightSum : weight[i];
+            raw[i] = target.multiply(bd(share));
+            pieces[i] = raw[i].setScale(0, RoundingMode.DOWN);
+            assigned = assigned.add(pieces[i]);
+        }
+        // Largest remainder among the carriers (D106), so the pieces add up to the class's market.
+        int leftover = target.subtract(assigned).intValue();
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < n; i++) {
+            if (carries[i]) {
+                order.add(i);
+            }
+        }
+        order.sort((a, b) -> {
+            int byRemainder = raw[b].subtract(pieces[b]).compareTo(raw[a].subtract(pieces[a]));
+            return byRemainder != 0 ? byRemainder : Integer.compare(a, b);
+        });
+        int pass = 0;
+        while (leftover > 0 && !order.isEmpty()) {
+            int start = pass % order.size();
+            for (int offset = 0; offset < order.size() && leftover > 0; offset++) {
+                pieces[order.get((start + offset) % order.size())] =
+                        pieces[order.get((start + offset) % order.size())].add(ONE);
+                leftover--;
+            }
+            pass++;
+        }
+        if (leftover > 0) {
+            throw new IllegalStateException("market for " + spec.code() + " left " + leftover
+                    + " unit(s) unallocated: the pool and the shares disagree");
+        }
+        return pieces;
     }
 
     /** Each product's market for the round, in whole pieces — allocation and market share agree. */
@@ -575,12 +665,17 @@ public class ScoringEngine {
                 .multiply(cohortScale(companies)));
     }
 
-    private double attractiveness(Scenario scenario, String productCode, TeamInput team, Plan plan) {
+    /**
+     * How attractive this company's offer is for one product in one customer class (D107). With no
+     * segment weighting the class argument changes nothing: the reach is the same number for every class.
+     */
+    private double attractiveness(Scenario scenario, String productCode, String segment,
+                                  TeamInput team, Plan plan) {
         Scenario.Params p = scenario.params();
         BigDecimal price = plan.prices().get(productCode);
         BigDecimal quality = plan.effectiveQuality().get(productCode);
         BigDecimal brand = nz(team.brand()).max(ONE);
-        double reach = reach(scenario, plan);
+        double reach = reach(scenario, plan, segment);
 
         double a = Math.pow(div(nz(referencePrice(scenario, productCode)), price).doubleValue(),
                 p.priceElasticity().doubleValue());
@@ -597,18 +692,30 @@ public class ScoringEngine {
         return scenario.product(productCode).map(Scenario.ProductSpec::basePrice).orElse(ONE);
     }
 
-    /** Marketing reach: weighted spend against a reference spend, square-rooted for diminishing returns. */
-    private double reach(Scenario scenario, Plan plan) {
+    /**
+     * Marketing reach: weighted spend against a reference spend, square-rooted for diminishing returns.
+     *
+     * <p>D107: {@code segment} selects the class the reach is being measured for. A channel that states
+     * no weight for that class contributes its own {@code reachWeight}, so a template with no
+     * `channel_reach` rows produces exactly the number this method produced before — which is what lets
+     * the change ship without re-calibrating every existing template.
+     */
+    private double reach(Scenario scenario, Plan plan, String segment) {
         BigDecimal weighted = ZERO;
         for (Scenario.ChannelSpec channel : scenario.channels()) {
             weighted = weighted.add(nz(plan.spendByChannel().get(channel.code()))
-                    .multiply(nz(channel.reachWeight())));
+                    .multiply(channel.reachFor(segment)));
         }
         BigDecimal reference = nz(scenario.params().referenceSpend());
         if (reference.signum() <= 0) {
             return 1;
         }
         return Math.sqrt(div(weighted, reference).doubleValue());
+    }
+
+    /** Whether any channel in this template weights reach by class — the switch for the whole feature. */
+    private static boolean segmentWeighted(Scenario scenario) {
+        return scenario.channels().stream().anyMatch(Scenario.ChannelSpec::segmentSpecific);
     }
 
     // ------------------------------------------------------------------ settlement

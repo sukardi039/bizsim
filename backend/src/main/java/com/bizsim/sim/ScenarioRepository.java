@@ -115,12 +115,25 @@ public class ScenarioRepository {
                         rs.getString("target_segment"), rs.getBigDecimal("cross_segment_pct"),
                         productTexts.getOrDefault(rs.getString("code"), Map.of())), key);
 
+        // D107: per-class reach weights. A channel with no rows here is segment-blind, which is how
+        // every template behaved before, so an untouched template loads into exactly the old behaviour.
+        Map<String, Map<String, java.math.BigDecimal>> reachBySegment = new java.util.LinkedHashMap<>();
+        jdbc.query("""
+                select channel_code, segment_code, weight from channel_reach
+                where scenario_key = ? order by channel_code, segment_code
+                """, rs -> {
+            reachBySegment
+                    .computeIfAbsent(rs.getString("channel_code"), k -> new java.util.LinkedHashMap<>())
+                    .put(rs.getString("segment_code"), rs.getBigDecimal("weight"));
+        }, key);
+
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
                 where scenario_key = ? order by code
                 """, (rs, i) -> new Scenario.ChannelSpec(
                         rs.getString("code"), rs.getString("name"), rs.getBigDecimal("reach_weight"),
-                        rs.getBigDecimal("brand_alpha")), key);
+                        rs.getBigDecimal("brand_alpha"),
+                        reachBySegment.getOrDefault(rs.getString("code"), java.util.Map.of())), key);
 
         List<Scenario.ProjectSpec> projects = jdbc.query("""
                 select code, name, lang, target_product,
@@ -461,6 +474,13 @@ public class ScenarioRepository {
                        trend_affinity, sort_order
                 from customer_segment where scenario_key = ?
                 """, key, sourceKey);
+        // D107: per-class reach weights belong to (channel, class), so they can only be copied once
+        // **both** exist. Placed here, after `channel` and after `customer_segment`; anywhere earlier
+        // the foreign key rejects the insert, which is how this ordering was found.
+        jdbc.update("""
+                insert into channel_reach (scenario_key, channel_code, segment_code, weight)
+                select ?, channel_code, segment_code, weight from channel_reach where scenario_key = ?
+                """, key, sourceKey);
         jdbc.update("""
                 insert into environment_event_effect (scenario_key, event_code, segment_code,
                                                       size_multiplier, purchasing_power_multiplier)
@@ -597,7 +617,16 @@ public class ScenarioRepository {
                              BigDecimal trendAffinity, int sortOrder, List<TextRow> texts) {
     }
 
-    public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
+    /**
+     * A channel as the editor sees it. D107: {@code reachBySegment} is the per-class weighting; empty
+     * means "the channel reaches every class equally", which is what every template had before.
+     */
+    public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
+                             Map<String, BigDecimal> reachBySegment) {
+
+        public ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
+            this(code, name, reachWeight, brandAlpha, Map.of());
+        }
     }
 
     public record ProjectRow(String code, String name, String lang, String targetProduct,
@@ -643,11 +672,20 @@ public class ScenarioRepository {
     }
 
     public List<ChannelRow> channels(String key) {
+        // D107: the per-class weights travel with the channel row, so the editor can show one table.
+        Map<String, Map<String, BigDecimal>> byCode = new java.util.LinkedHashMap<>();
+        jdbc.query("""
+                select channel_code, segment_code, weight from channel_reach
+                where scenario_key = ? order by channel_code, segment_code
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs -> byCode
+                .computeIfAbsent(rs.getString("channel_code"), k -> new java.util.LinkedHashMap<>())
+                .put(rs.getString("segment_code"), rs.getBigDecimal("weight")), key);
         return jdbc.query("""
                 select code, name, reach_weight, brand_alpha from channel
                 where scenario_key = ? order by code
                 """, (rs, i) -> new ChannelRow(rs.getString("code"), rs.getString("name"),
-                rs.getBigDecimal("reach_weight"), rs.getBigDecimal("brand_alpha")), key);
+                rs.getBigDecimal("reach_weight"), rs.getBigDecimal("brand_alpha"),
+                byCode.getOrDefault(rs.getString("code"), Map.of())), key);
     }
 
     public List<ProjectRow> projects(String key) {
@@ -778,6 +816,19 @@ public class ScenarioRepository {
                     insert into channel (scenario_key, code, name, reach_weight, brand_alpha)
                     values (?, ?, ?, ?, ?)
                     """, key, row.code(), row.name(), row.reachWeight(), row.brandAlpha());
+            // D107: per-class weights, if any were sent. A class left out is "use the channel's own
+            // weight" — the same meaning as a missing row, so the editor can clear one cell.
+            if (row.reachBySegment() != null) {
+                for (Map.Entry<String, BigDecimal> entry : row.reachBySegment().entrySet()) {
+                    if (entry.getValue() == null) {
+                        continue;
+                    }
+                    jdbc.update("""
+                            insert into channel_reach (scenario_key, channel_code, segment_code, weight)
+                            values (?, ?, ?, ?)
+                            """, key, row.code(), entry.getKey(), entry.getValue());
+                }
+            }
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }

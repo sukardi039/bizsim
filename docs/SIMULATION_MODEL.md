@@ -75,6 +75,11 @@ would lose the stock between rounds.
 
 Rules on the payload:
 - Server validates the whole payload in one pass and returns **all** errors at once, not the first.
+- **Channels can be weighted per customer class (D108).** `channel_reach(channel, class, weight)` makes a
+  channel's reach a function of the class it is reaching. No row means the channel's own weight, so an
+  untouched template is unchanged. When any weight exists, the served market is carved by class first and
+  each class is contested separately: a company can lead one class and trail another on the same product.
+  A weight of 0 means the channel cannot reach that class.
 - **Units are whole pieces (D104).** Production, stock, demand, sold and lost are integers. When the
   workforce or the cash cannot carry the plan, output is curtailed and **floored** to whole units — a cut
   can cost output, never invent a unit. Worker-equivalents (`capacityUsed`) may still be fractional,

@@ -171,6 +171,15 @@ class Run:
         self.channels = {r["code"]: r for r in cur.execute(
             "select code, reach_weight, brand_alpha from channel where scenario_key = %s",
             (self.scenario_key,)).fetchall()}
+        # D107: per-class reach weights, attached to the channel they belong to. Absent for every
+        # template that has never used them, which is what keeps the older arithmetic valid.
+        per_class: dict[str, dict[str, str]] = {}
+        for row in cur.execute(
+                "select channel_code, segment_code, weight from channel_reach where scenario_key = %s",
+                (self.scenario_key,)).fetchall():
+            per_class.setdefault(row["channel_code"], {})[row["segment_code"]] = row["weight"]
+        for code, channel in self.channels.items():
+            channel["reach_by_segment"] = per_class.get(code, {})
         self.projects = {r["code"]: r for r in cur.execute(
             "select code, target_product, advantage_type, advantage_value, hidden_cost, "
             "duration_months, partial_benefit, benefit_curve, benefit_exponent, overfunding "
@@ -455,8 +464,19 @@ def seasonality(run: Run, round_number: int) -> D:
     return D(values[(round_number - 1) % max(1, len(values))])
 
 
-def reach(run: Run, body: dict) -> float:
-    weighted = sum((body["spend"].get(code, ZERO) * D(channel["reach_weight"])
+def channel_weight(channel: dict, segment: str | None) -> D:
+    """D107: this channel's reach for one customer class; its own weight when none is stated."""
+    stated = (channel.get("reach_by_segment") or {}).get(segment) if segment else None
+    return D(stated if stated is not None else channel["reach_weight"])
+
+
+def segment_weighted(run: Run) -> bool:
+    """True when any channel weights reach by class — the switch for the weighted allocation."""
+    return any(ch.get("reach_by_segment") for ch in run.channels.values())
+
+
+def reach(run: Run, body: dict, segment: str | None = None) -> float:
+    weighted = sum((body["spend"].get(code, ZERO) * channel_weight(channel, segment)
                     for code, channel in run.channels.items()), ZERO)
     reference = D(run.params.get("referenceSpend") or 0)
     if reference <= 0:
@@ -464,7 +484,7 @@ def reach(run: Run, body: dict) -> float:
     return float(weighted / reference) ** 0.5
 
 
-def attractiveness(run: Run, code: str, team: Team, body: dict) -> float:
+def attractiveness(run: Run, code: str, team: Team, body: dict, segment: str | None = None) -> float:
     params = run.params
     price = float(body["prices"][code])
     quality = float(body["quality"][code])
@@ -472,7 +492,7 @@ def attractiveness(run: Run, code: str, team: Team, body: dict) -> float:
     value = (float(D(run.products[code]["base_price"]) / D(str(price))) ** float(run.elasticity.get("price", 1)))
     value *= (quality / float(params.get("referenceQuality") or 1)) ** float(run.elasticity.get("quality", 1))
     value *= (brand / 50.0) ** float(run.elasticity.get("brand", 1))
-    value *= max(reach(run, body), 0.01) ** float(run.elasticity.get("marketing", 1))
+    value *= max(reach(run, body, segment), 0.01) ** float(run.elasticity.get("marketing", 1))
     value *= float(body["effects"]["attract"].get(code, ONE))
     return value
 
@@ -488,34 +508,86 @@ def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict],
     inertia = float(run.params.get("inertia") or 0)
     blended = inertia > 0 and bool(previous)
     for code in run.products:
-        scores = [attractiveness(run, code, team, body) for team, body in zip(teams, bodies)]
-        total = sum(scores)
         pool = whole_pool(run, code, env, n)
         target = (pool * D(str(1 - baseline))).quantize(D(1), ROUND_HALF_UP)
-        if total <= 0 or n == 0 or target <= 0:
+        if n == 0 or target <= 0:
             for team in teams:
                 result[team.id][code] = 0
             continue
-        weights = []
+        # D107: with no channel weighting the market is one pool, allocated once — the arithmetic this
+        # file has always used. With weighting, the classes carve the pool first and each is contested
+        # on its own reach, which is the whole point of the feature.
+        classes = (list(run.segments) if segment_weighted(run) else [None])
+        class_targets = segment_targets(run, code, env, target, classes) if classes != [None] \
+            else {None: target}
+        total_for = {team.id: 0 for team in teams}
+        for segment in classes:
+            class_target = class_targets.get(segment, ZERO)
+            if class_target <= 0:
+                continue
+            scores = [attractiveness(run, code, team, body, segment)
+                      for team, body in zip(teams, bodies)]
+            total = sum(scores)
+            if total <= 0:
+                continue
+            weights = []
+            for i, team in enumerate(teams):
+                contest = scores[i] / total
+                if blended:
+                    held = (previous or {}).get(team.id, {}).get(code, 0.0)
+                    weights.append(inertia * held + (1 - inertia) * contest)
+                else:
+                    weights.append(contest)
+            weight_total = sum(weights)
+            raw = [class_target * D(str(weights[i] / weight_total if blended and weight_total > 0
+                                       else weights[i])) for i in range(n)]
+            pieces = [value.quantize(D(1), ROUND_DOWN) for value in raw]
+            assigned = sum(pieces, ZERO)
+            leftover = int(min(class_target - assigned, D(n)))
+            order = sorted(range(n), key=lambda i: (-(raw[i] - pieces[i]), i))
+            for k in range(leftover):
+                pieces[order[k]] += ONE
+            for i, team in enumerate(teams):
+                total_for[team.id] += int(pieces[i])
         for i, team in enumerate(teams):
-            contest = scores[i] / total
-            if blended:
-                held = (previous or {}).get(team.id, {}).get(code, 0.0)
-                weights.append(inertia * held + (1 - inertia) * contest)
-            else:
-                weights.append(contest)
-        weight_total = sum(weights)
-        raw = [target * D(str(weights[i] / weight_total if blended and weight_total > 0
-                             else weights[i])) for i in range(n)]
-        pieces = [value.quantize(D(1), ROUND_DOWN) for value in raw]
-        assigned = sum(pieces, ZERO)
-        leftover = int(min(target - assigned, D(n)))
-        order = sorted(range(n), key=lambda i: (-(raw[i] - pieces[i]), i))
-        for k in range(leftover):
-            pieces[order[k]] += ONE
-        for i, team in enumerate(teams):
-            result[team.id][code] = int(pieces[i])
+            result[team.id][code] = total_for[team.id]
     return result
+
+
+def segment_targets(run: Run, code: str, env: dict, target: D, classes: list) -> dict:
+    """D107: how a product's served market splits between customer classes.
+
+    The product's own class in full, the others through `cross_segment_pct` (D81) — then whole pieces by
+    largest remainder, so the classes add up to the served market exactly.
+    """
+    spec = run.products[code]
+    weights: dict[str, D] = {}
+    for segment in classes:
+        row = run.segments.get(segment)
+        if row is None:
+            continue
+        season = seasonality(run, env["round"])
+        index, pp = env["segments"].get(segment, (ONE, ONE))
+        size = D(row["base_size"]) * index * pp
+        own = spec.get("target_segment") == segment
+        weights[segment] = size if own else size * D(spec.get("cross_segment_pct") or 0)
+    total = sum(weights.values(), ZERO)
+    if total <= 0:
+        return {}
+    out, raw = {}, {}
+    assigned = ZERO
+    for segment, weight in weights.items():
+        exact = (target * weight / total).quantize(D("0.000001"), ROUND_HALF_UP)
+        raw[segment] = exact
+        out[segment] = exact.quantize(D(1), ROUND_DOWN)
+        assigned += out[segment]
+    leftover = int(target - assigned)
+    for segment in sorted(weights, key=lambda s: -(raw[s] - out[s])):
+        if leftover <= 0:
+            break
+        out[segment] += ONE
+        leftover -= 1
+    return out
 
 
 def previous_shares(statements: dict, round_number: int, run: Run) -> dict:

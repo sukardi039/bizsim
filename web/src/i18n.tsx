@@ -484,7 +484,11 @@ export const en: Dict = {
   "field.unitsPerWorker": "Units per worker",
   "field.incomeElasticity": "Income elasticity",
   "field.trendAffinity": "Trend affinity",
-  "field.reachWeight": "Reach",
+  "field.reachWeight": "Reach weight",
+  "field.reachBySegmentHint":
+    "Reach weight for this customer class. Blank uses the channel's own weight; 0 means the channel cannot reach that class at all.",
+  "editor.channelSegmentNote":
+    "A channel reaches every class equally unless you give it a weight in that class's column. Marketing spend lifts share in every product and class alike — these weights change how far a channel reaches each class, not which products it advertises.",
   "field.brandAlpha": "Brand effect",
   "field.targetProduct": "Target",
   "field.advantageType": "Advantage",
@@ -1182,7 +1186,10 @@ export const zh: Dict = {
   "field.unitsPerWorker": "人均产量",
   "field.incomeElasticity": "收入弹性",
   "field.trendAffinity": "趋势偏好",
-  "field.reachWeight": "覆盖面",
+  "field.reachWeight": "触达权重",
+  "field.reachBySegmentHint": "该客户群中的触达权重。留空表示使用渠道自身权重；0 表示该渠道完全无法触达该客户群。",
+  "editor.channelSegmentNote":
+    "除非在某个客户群的列中填写权重，否则渠道对各客户群的触达完全相同。营销投入会同等地提升所有产品与客户群中的份额——这些权重改变的是渠道对各客户群的触达程度，而非投放对象。",
   "field.brandAlpha": "品牌效应",
   "field.targetProduct": "目标产品",
   "field.advantageType": "优势类型",

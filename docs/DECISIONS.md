@@ -761,3 +761,39 @@ The structural point, which is why this is a design question rather than an edit
 segment moves the unit of competition from *(product)* to *(product, segment)*, so "your market share"
 stops being one number — and the three presets' winners were measured on the current carving. The release
 cannot ship until all three invert again under the new allocation, by the same acceptance test.
+
+**D108 — Channel reach is weighted per customer class (ruled and built 21 Nov 2026).** D107 part 2, decided
+on the five recommendations in `docs/SEGMENT_CHANNELS.md`: a full `reach_weight(channel × class)` matrix,
+segment demand still governed by D81 (`target_segment` + `cross_segment_pct`), the company's market share
+still one number with a per-class breakdown to follow, brand still company-wide, and all three D100
+presets re-proved.
+
+- **The switch is data.** `channel_reach` (migration `V39`) holds a weight per (channel, class). **No row
+  means "use the channel's own weight"**, so every existing template — and any template a trainer never
+  touches — produces *exactly* the pre-D108 arithmetic. That is what makes the change safe on a running
+  class, and it is proved by the whole suite passing unchanged (223 tests before the new ones).
+- **The allocation unit moved** from *(product)* to *(product, class)*: the served market is carved by
+  class first (`segmentShares`, whole pieces by largest remainder), then each class is contested on its own
+  attractiveness. A company can now be strong in the mass market and weak in the premium one on the same
+  product — `SegmentChannelTest` shows two companies with identical spend trading places between P1 and P3.
+- **The studio can set it.** The template editor's Channels tab gains one column per customer class;
+  blank = the channel's own weight, **0 = the channel cannot reach that class at all** (a real strategy
+  lever). Negative weights and unknown classes are refused with the field and value named.
+
+**A defect found by writing the test, not by reading the code.** Publishing froze the template but did
+**not** copy `channel_reach`, so a class played from a package silently fell back to segment-blind
+marketing — the first "weighted" audit was really a second unweighted one, and passed for the wrong
+reason. The copy is now part of `cloneInto`, placed **after** `customer_segment` (the foreign key needs
+both sides to exist — the first attempt put it too early and the constraint rejected it). The test that
+caught it asserts a frozen copy keeps its weights.
+
+Evidence, two classes played six/eight rounds through the real API and re-derived independently:
+
+| Check | Result |
+|---|---|
+| Suite | **227 tests, 0 failures** |
+| Segment-blind templates | unchanged: 223 pre-existing tests pass untouched |
+| Independent auditor, unweighted class | PASS — 2,106 checks over 36 company-rounds |
+| Independent auditor, **weighted** class | PASS — within 4,900 checks over 84 company-rounds |
+| Frozen copy | carries all 6 weights (verified in the database) |
+| Refusals | negative weight → 400; unknown class → 400 naming it |

@@ -915,12 +915,20 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
           </form>
         ) : tab === "channels" ? (
           <form onSubmit={(event) => saveCatalogue(event, () => api.saveTemplateChannels(templateKey, channels))}>
+            <p className="muted">{t("editor.channelSegmentNote")}</p>
             <table>
               <thead>
                 <tr>
                   <th>{t("field.code")}</th>
                   <th>{t("field.name")}</th>
                   <th className="num">{t("field.reachWeight")}</th>
+                  {/* D107: one column per customer class — the weight this channel reaches that class
+                      with. Blank means "same as the channel's own", which is the segment-blind default. */}
+                  {segments.map((segment) => (
+                    <th key={segment.code} className="num" title={t("field.reachBySegmentHint")}>
+                      {segment.name || segment.code}
+                    </th>
+                  ))}
                   <th className="num">{t("field.brandAlpha")}</th>
                   <th />
                 </tr>
@@ -931,6 +939,25 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={row.code} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, code: e.target.value } : r))} /></td>
                     <td><input value={row.name} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
                     <td><input value={String(row.reachWeight)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, reachWeight: Number(e.target.value) } : r))} /></td>
+                    {/* Blank = "use the channel's weight". 0 is meaningful: the channel cannot reach
+                        that class at all, which is a strategy lever a trainer may want. */}
+                    {segments.map((segment) => (
+                      <td key={segment.code}>
+                        <input
+                          className="num"
+                          placeholder="—"
+                          disabled={locked}
+                          value={row.reachBySegment?.[segment.code] === undefined ? "" : String(row.reachBySegment[segment.code])}
+                          onChange={(e) => setChannels((c) => c.map((r, i) => {
+                            if (i !== index) return r;
+                            const next = { ...(r.reachBySegment ?? {}) };
+                            if (e.target.value.trim() === "") delete next[segment.code];
+                            else next[segment.code] = Number(e.target.value);
+                            return { ...r, reachBySegment: next };
+                          }))}
+                        />
+                      </td>
+                    ))}
                     <td><input value={String(row.brandAlpha)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, brandAlpha: Number(e.target.value) } : r))} /></td>
                                         <td>
                         <button type="button" className="ghost" disabled={locked || channels.length <= 1}

@@ -185,7 +185,36 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
         }
     }
 
-    public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
+    /**
+     * A channel. {@code reachBySegment} is D107's per-class weighting: an empty map means the channel is
+     * segment-blind, which is the behaviour every template had before it and the default for a new one.
+     *
+     * <p>Kept as a map on the channel rather than a separate structure because every place that needs a
+     * weight already has the channel in hand — the engine, the editor and the audit all ask the same
+     * question: "what does this channel reach this class with?"
+     */
+    public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
+                              Map<String, BigDecimal> reachBySegment) {
+
+        public ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
+            this(code, name, reachWeight, brandAlpha, Map.of());
+        }
+
+        /** The weight this channel reaches {@code segment} with; the channel's own when none is stated. */
+        public BigDecimal reachFor(String segment) {
+            BigDecimal stated = reachBySegment == null || segment == null
+                    ? null : reachBySegment.get(segment);
+            return stated == null ? nz(reachWeight) : stated;
+        }
+
+        /** True when any class has its own weight — the only case where segment-specific maths matters. */
+        public boolean segmentSpecific() {
+            return reachBySegment != null && !reachBySegment.isEmpty();
+        }
+
+        private static BigDecimal nz(BigDecimal value) {
+            return value == null ? BigDecimal.ZERO : value;
+        }
     }
 
     public record ProjectSpec(String code, String name, String lang, String targetProduct,

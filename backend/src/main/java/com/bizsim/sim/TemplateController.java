@@ -173,7 +173,8 @@ public class TemplateController {
         ScenarioRepository.TemplateRow row = requireEditable(me, key);
         requireUnused(me, key);
         List<ScenarioRepository.ChannelRow> channels = request == null ? null : request.channels();
-        validateChannels(channels);
+        validateChannels(channels, scenarios.segments(key).stream()
+                .map(ScenarioRepository.SegmentRow::code).collect(java.util.stream.Collectors.toSet()));
         scenarios.saveChannels(key, channels);
         return detail(me, row);
     }
@@ -339,7 +340,8 @@ public class TemplateController {
         }
     }
 
-    private static void validateChannels(List<ScenarioRepository.ChannelRow> channels) {
+    private static void validateChannels(List<ScenarioRepository.ChannelRow> channels,
+                                         java.util.Set<String> knownSegments) {
         if (channels == null || channels.isEmpty()) {
             throw catalogInvalid("a template needs at least one channel", "field", "channels");
         }
@@ -353,6 +355,27 @@ public class TemplateController {
                         "field", "code", "code", channel.code());
             }
             requirePositive(channel.reachWeight(), "reachWeight", channel.code());
+            // D107: a per-class weight may be zero (the channel cannot reach that class — a real
+            // strategy lever) but never negative, and it must name a class the template has.
+            if (channel.reachBySegment() != null) {
+                for (java.util.Map.Entry<String, java.math.BigDecimal> entry
+                        : channel.reachBySegment().entrySet()) {
+                    java.math.BigDecimal weight = entry.getValue();
+                    if (weight == null) {
+                        continue;
+                    }
+                    if (weight.signum() < 0) {
+                        throw catalogInvalid("a channel weight cannot be negative: " + weight.toPlainString(),
+                                "field", "reachBySegment", "channel", channel.code(),
+                                "segment", entry.getKey());
+                    }
+                    if (!knownSegments.contains(entry.getKey())) {
+                        throw catalogInvalid("no customer class called " + entry.getKey(),
+                                "field", "reachBySegment", "channel", channel.code(),
+                                "segment", entry.getKey());
+                    }
+                }
+            }
         }
     }
 
