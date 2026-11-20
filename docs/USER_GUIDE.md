@@ -107,6 +107,10 @@ who wins:
 All three carry half of last round's share (the `inertia` setting above, 0.5), so a position has to be
 defended month after month. Copy a preset and edit it exactly like the standard template.
 
+**Markets are whole numbers of items.** The editor refuses a fractional market — a customer class is a
+count of buyers, not a quantity — and says which field to fix, so `4000.5` becomes a question rather than
+a silent change. Stock and production are whole for the same reason: an item is an item.
+
 ### 3.2 The seven tabs
 
 **Settings** — the class-level numbers.

@@ -448,13 +448,41 @@ public class ScoringEngine {
                 int byRemainder = raw[b].subtract(pieces[b]).compareTo(raw[a].subtract(pieces[a]));
                 return byRemainder != 0 ? byRemainder : Integer.compare(a, b);
             });
-            for (int k = 0; k < n && leftover > 0; k++) {
-                int index = order.get(k);
-                if (!carries[index]) {
-                    continue;
+            // D106: only companies that carry the product can be given a piece of its market — a
+            // non-carrier gets no share at all (D89). The previous loop walked the remainder order and
+            // `continue`d past non-carriers without re-issuing their piece. That was **not** a live defect:
+            // leftover is at most n and non-carriers are at most n-1, so the loop always found a carrier.
+            // It was correct by an argument the code did not state. This version states it — carriers only,
+            // in even passes — and refuses to finish with a piece unallocated, so a future change to the
+            // bound or the ordering fails loudly instead of shrinking a market by a unit.
+            List<Integer> carriers = new ArrayList<>();
+            for (int index : order) {
+                if (carries[index]) {
+                    carriers.add(index);
                 }
-                pieces[index] = pieces[index].add(ONE);
-                leftover--;
+            }
+            if (!carriers.isEmpty()) {
+                // Largest remainder among the carriers, one piece each while the pool still has units.
+                // Rounds of the same order keep the distribution fair when there are more pieces than
+                // carriers: each round gives every carrier at most one, so the surplus spreads evenly
+                // instead of landing on whoever happens to sort first.
+                int pass = 0;
+                while (leftover > 0) {
+                    int start = pass % carriers.size();
+                    for (int offset = 0; offset < carriers.size() && leftover > 0; offset++) {
+                        int index = carriers.get((start + offset) % carriers.size());
+                        pieces[index] = pieces[index].add(ONE);
+                        leftover--;
+                    }
+                    pass++;
+                }
+            }
+            if (leftover > 0) {
+                // The market is whole pieces and every one of them belongs to somebody who carries it.
+                // Reaching here means the pool and the pieces disagree, which is a defect, not a rounding:
+                // say so rather than serve a class a market that does not add up.
+                throw new IllegalStateException("market for " + spec.code() + " left " + leftover
+                        + " unit(s) unallocated: the pool and the shares disagree");
             }
             for (int i = 0; i < n; i++) {
                 result.get(teams.get(i).teamId()).put(spec.code(), pieces[i].doubleValue());
@@ -517,6 +545,23 @@ public class ScoringEngine {
         return poolFor(scenario, spec, environment.round(), companies)
                 .multiply(nz(environment.demandByProduct().getOrDefault(spec.code(), ONE)))
                 .setScale(0, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * The market the class is served for one product, as the engine computes it: the pool scaled by the
+     * share of the market this cohort ever sees (D34). Exposed so a test can hold the allocation to the
+     * same number the pool was built from, rather than to one typed into the test.
+     */
+    public BigDecimal servedMarket(Scenario scenario, EnvironmentService.RoundEnvironment environment,
+                                   String productCode, int companies) {
+        for (Scenario.ProductSpec spec : scenario.products()) {
+            if (spec.code().equals(productCode)) {
+                return wholePool(scenario, spec, environment, companies)
+                        .multiply(ONE.subtract(nz(scenario.params().baselineShare())))
+                        .setScale(0, RoundingMode.HALF_UP);
+            }
+        }
+        return ZERO;
     }
 
     private static BigDecimal cohortScale(int companies) {

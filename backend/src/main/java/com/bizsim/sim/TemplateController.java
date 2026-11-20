@@ -310,6 +310,32 @@ public class TemplateController {
             requirePositive(product.basePrice(), "basePrice", product.code());
             requirePositive(product.baseUnitCost(), "baseUnitCost", product.code());
             requirePositive(product.unitsPerWorker(), "unitsPerWorker", product.code());
+            // The columns are NOT NULL, so a client that omits them used to get a database error dressed
+            // as a conflict (409) telling it nothing. These are the fields the editor always sends; a
+            // request that leaves them out is a bad request, and should say which field.
+            if (product.incomeElasticity() == null) {
+                throw catalogInvalid("product " + product.code() + " needs incomeElasticity",
+                        "field", "incomeElasticity", "code", product.code());
+            }
+            // D106: a market is a count of items. Refused rather than floored: silently changing a
+            // trainer's 4000.5 to 4000 hides a mistake they can still fix in front of them.
+            requireWholeMarket(product.baseDemand(), "baseDemand", product.code());
+        }
+    }
+
+    /** The market for a product or a customer class must be a whole number of items (D106). */
+    private static void requireWholeMarket(java.math.BigDecimal value, String field, String code) {
+        if (value == null) {
+            throw catalogInvalid("a market must be stated: " + field, "field", field, "code", code);
+        }
+        if (value.signum() < 0) {
+            throw catalogInvalid("a market cannot be negative: " + value.toPlainString(),
+                    "field", field, "code", code);
+        }
+        if (value.stripTrailingZeros().scale() > 0) {
+            throw catalogInvalid("a market is a whole number of items, not " + value.toPlainString()
+                            + " — enter a count of items",
+                    "field", field, "code", code, "value", value.toPlainString());
         }
     }
 
@@ -460,6 +486,8 @@ public class TemplateController {
                         "code", segment.code());
             }
             requirePositive(segment.baseSize(), "baseSize", segment.code());
+            // D106: a customer class is a number of buyers — a whole number of items.
+            requireWholeMarket(segment.baseSize(), "baseSize", segment.code());
             requirePositive(segment.basePurchasingPower(), "basePurchasingPower", segment.code());
             validateTexts(segment.texts(), segment.code());
             if (segment.incomeElasticity() == null || segment.incomeElasticity().signum() < 0) {

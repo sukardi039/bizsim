@@ -708,3 +708,36 @@ What this means, stated so nobody is surprised later:
 - the **stored** value is the truth; the screen rounds for reading;
 - the independent auditor reads stored values, so it stays exact;
 - no migration is added, and nothing may silently "repair" those rows.
+
+**D106 — The market is a whole number of items, in the schema and at the editor (ruled and built
+20 Nov 2026).** D104 made *stock* whole; the market it is drawn from was still `numeric(14,2)`, so the
+schema said a market could be 4,000.5 items and the template editor would accept it. Nothing shipped
+used a fraction — which is exactly why the rule was worth making real: it held only because nobody had
+broken it.
+
+- **Columns are integers.** `product.base_demand` and `customer_segment.base_size` become `integer`
+  (migration `V38`).
+- **Existing values are floored, not rounded.** A value of 4000.5 that was never meant becomes 4000,
+  not 4001: the safe direction is fewer items, and `::integer` alone would round half away from zero.
+- **The editor and the API refuse a fractional market** rather than flooring it silently, with a message
+  naming the field and the value (`a market is a whole number of items, not 4000.5 — enter a count of
+  items`). A trainer can still fix what they typed; a silent floor would hide it.
+- **The derived market is whole and adds up.** Every path in `wholePool` ends in a whole number, and the
+  pieces handed to the class equal the market they were drawn from.
+
+**A second defect fell out of writing the test.** `saveProducts` passed an explicit `null` for
+`income_elasticity`, defeating the column's default and failing NOT NULL — so a client that omitted the
+field got `409 db.conflict, duplicate or conflicting value`, which tells nobody anything. It now defaults
+to 1 (and `trendAffinity` to 0), and a request that leaves the field out is refused as a bad request
+naming the field.
+
+Evidence, on a full eight-round six-company session played by the audit strategies:
+
+| Check | Result |
+|---|---|
+| Column types | `product.base_demand integer`, `customer_segment.base_size integer` |
+| Independent auditor | **PASS — 2,794 checks over 48 company-rounds** |
+| Fractional market values | 0 of 8 products, 0 of 12 segments |
+| Fractional `produced` / `closingStock` / `demand` | 0 of 144 statement lines |
+| Fractional company stock | 0 of 18 rows |
+| Suite | 225 tests, 0 failures (`IntegerMarketTest` covers the type, the two refusals and the sum) |

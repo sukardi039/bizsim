@@ -683,8 +683,12 @@ public class ScenarioRepository {
                                          target_segment, cross_segment_pct)
                     values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, key, row.code(), row.name(), row.basePrice(), row.baseUnitCost(),
-                    row.baseQuality(), row.baseDemand(), row.unitsPerWorker(), row.incomeElasticity(),
-                    row.trendAffinity(), row.targetSegment(),
+ row.baseQuality(), row.baseDemand(), row.unitsPerWorker(),
+ // D106: these columns have defaults; passing an explicit null defeats them and fails
+ // the NOT NULL check with a database error the client cannot act on.
+ row.incomeElasticity() == null ? java.math.BigDecimal.ONE : row.incomeElasticity(),
+ row.trendAffinity() == null ? java.math.BigDecimal.ZERO : row.trendAffinity(),
+ row.targetSegment(),
                     row.crossSegmentPct() == null ? BigDecimal.ZERO : row.crossSegmentPct());
             // D87: the name per language travels with the product; the code and the numbers are one row.
             jdbc.update("delete from product_text where scenario_key = ? and product_code = ?",
