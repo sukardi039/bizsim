@@ -105,6 +105,14 @@ const STRING_KEYS = [
   "debrief.quadrantPremiumStrong",
   "debrief.quadrantStuck",
   "debrief.quadrantOverpriced",
+  "debrief.unserved",
+  // D112: the pie's two readings. Without these the shared page rendered the unserved slice and the
+  // coverage figure with no label at all — an unnamed slice is worse than no slice, because the reader
+  // cannot tell whether the gap is demand or a drawing error.
+  "debrief.coverage",
+  "debrief.coverage",
+  "debrief.ofSales",
+  "debrief.noMarket",
   "debrief.company",
   "debrief.share",
   "debrief.round",

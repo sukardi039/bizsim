@@ -609,6 +609,12 @@ public class RoundRepository {
         // PGobject, and the scoreboard contract should be stable fields, not whatever is in the blob.
         return jdbc.queryForList("""
                 select r.number as round, rr.team_id, t.company_name,
+                       -- D112: a bot seat is a player row with a brain attached. The pie shows the company
+                       -- and never the brain, so the class sees "a company the system played" without
+                       -- learning which persona it was.
+                       exists (select 1 from player p
+                               where p.run_id = r.run_id and p.team_id = rr.team_id
+                                 and p.bot_profile_id is not null) as auto_player,
                        (rr.score->>'profit')::numeric            as profit,
                        (rr.score->>'cumulativeProfit')::numeric  as cumulative_profit,
                        (rr.score->>'revenue')::numeric           as revenue,

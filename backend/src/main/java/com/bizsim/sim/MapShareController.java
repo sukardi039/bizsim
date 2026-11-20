@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,6 +51,21 @@ public class MapShareController {
      * Freezes the run's picture into a link. The response carries the absolute URL, built from the
      * request, so the console does not have to know its own public address.
      */
+    /**
+     * D112: the facilitator's per-product market-share pies, for the console.
+     *
+     * <p>Same access rule as sharing ({@link RunShareAccess#requireReader}): a facilitator reads any
+     * round of their run, a trainee their own. The shapes returned are the ones the shared page draws —
+     * one definition, so the console and a shared link can never disagree about a company's share.
+     */
+    @GetMapping("/api/runs/{runId}/market-pies")
+    public List<MarketSharePie.Pie> pies(@PathVariable long runId,
+                                         @RequestParam(required = false) Integer round) {
+        TenantContext.Principal me = TenantContext.require();
+        access.requireReader(me, runId);
+        return maps.pies(me.tenantId(), runId, round);
+    }
+
     @PostMapping("/api/runs/{runId}/map-share")
     public ShareResponse share(@PathVariable long runId, @RequestBody(required = false) ShareRequest body) {
         TenantContext.Principal me = TenantContext.require();

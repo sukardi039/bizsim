@@ -878,3 +878,39 @@ Evidence:
 | Segment-blind guarantee | proved on the shipped template **stripped of its weights**, so the guarantee does not depend on what we happen to ship |
 | Independent auditor, shipped template in play | **PASS — 2,106 checks over 36 company-rounds** |
 | Tenant drafts | 0 populated (verified against a live-shaped database) |
+
+**D112 — Per-product market share, as pies the facilitator shows and shares (built 21 Nov 2026).**
+The owner asked for a pie chart of market share, **one per product**, for every company including auto
+players, in the facilitator's view, shareable to the class under the facilitator's control.
+
+**What a slice measures.** The statement's own share (D97) is `sold / pool` — the *whole* market,
+including the `baselineShare` (18 %) no company in the class can reach. A pie on that denominator tops out
+around 82 % and every stockout vanishes from it. The pie is therefore drawn on the **served market**
+(`pool × (1 − baselineShare)`), and whatever the class failed to supply is drawn as **its own slice**.
+Slices then add to the whole by construction, and a stockout is visible as the gap it is — the single most
+useful thing a facilitator can point at. Measured on a played class: slices + unserved = 100.0 % for each
+product.
+
+**Auto players.** A bot seat is a `player` row with `bot_profile_id` set, so it owns a company and holds
+share like any other. It is labelled by **company name only** — never "(auto)", never the persona or
+profile (owner's ruling). The colour still differs, so the facilitator can see a seat was machine-played
+without the projection saying so.
+
+**Two consumers, one definition.** `MarketSharePie` builds the slices; `MapShareService.piesOf` serves both
+the shared page (`MarketShareDonut`) and the console (`GET /api/runs/{id}/market-pies`). The console panel
+and a shared link therefore cannot disagree about a company's share, because they are handed the same
+objects.
+
+**Defects found while building:**
+
+1. The shared page rendered the unserved slice and the coverage figure with **no label at all** —
+   `debrief.coverage` was never added to the template's string list, and a stale template in the jar meant
+   even the ones that existed came through empty. An unnamed slice is worse than no slice: the reader
+   cannot tell a demand gap from a drawing error.
+2. The first cut marked the auto seat `(auto)` in the legend, which is exactly what the ruling forbids. The
+   test that asserted the marker was rewritten to assert its **absence**, and to assert no persona leaks.
+
+Evidence: 232 tests, 0 failures (`MarketSharePieTest` covers sums-to-100, the stockout slice, the
+company-only label, an idle company being absent rather than a zero wedge, and a sole holder drawing a full
+ring); live run with a real bot seat renders 71 arcs across 4 rounds × 3 products, 12 unserved labels,
+24 coverage labels, zero auto markers, zero personas.

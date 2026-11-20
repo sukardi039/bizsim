@@ -420,6 +420,24 @@ export interface TemplateProduct {
   trendAffinity: number;
 }
 
+/** D112: one slice of a product's market. `autoPlayer` only tints the colour — it is never a label. */
+export interface MarketPieSlice {
+  label: string;
+  sold: number;
+  sharePercent: number;
+  autoPlayer: boolean;
+}
+
+/** D112: one product's pie. `unserved` is demand the class could not supply, shown as its own slice. */
+export interface MarketPie {
+  product: string;
+  productName: string;
+  servedMarket: number;
+  slices: MarketPieSlice[];
+  unserved: number;
+  unservedPercent: number;
+}
+
 export interface TemplateChannel {
   code: string;
   name: string;
@@ -741,6 +759,12 @@ export const api = {
   financials: (runId: number, teamId: number) =>
     request<Financials>(`/runs/${runId}/teams/${teamId}/financials`),
   /** D103: freezes the session's picture into a link the class can open without an account. */
+  /** D112: the per-product market-share pies the facilitator shows the class. */
+  marketPies: (runId: number, round?: number) =>
+    request<MarketPie[]>(
+      `/runs/${runId}/market-pies` +
+        (round === undefined ? "" : `?round=${round}`),
+    ),
   shareMap: (runId: number, round?: number, title?: string) =>
     request<{ id: number; token: string; url: string; title: string; round?: number; expiresAt: string }>(
       `/runs/${runId}/map-share`,

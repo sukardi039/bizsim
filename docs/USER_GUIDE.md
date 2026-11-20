@@ -133,6 +133,13 @@ market is contested **class by class**, so a company can be strong in the mass m
 premium one on the same product — which is what lets a differentiated position be *earned* rather than
 assumed. The company's published share is still one number; the classes are how it was earned.
 
+**Market share by product (D112).** The debrief's pie charts show who holds each product's market. The
+circle is the **served market** — the pieces the class actually competed for — and whatever the class failed
+to supply appears as its own slice, so the slices add up and a stockout is visible rather than hidden. Each
+product gets its own pie; every company appears, including seats played by the system, which are shown by
+**company name only**. To show the class, use **Share this map**: the link carries the pies and the position
+map for every computed round, opens with no sign-in, and can be withdrawn.
+
 **Markets are whole numbers of items.** The editor refuses a fractional market — a customer class is a
 count of buyers, not a quantity — and says which field to fix, so `4000.5` becomes a question rather than
 a silent change. Stock and production are whole for the same reason: an item is an item.

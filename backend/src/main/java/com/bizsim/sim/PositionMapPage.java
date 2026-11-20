@@ -293,6 +293,18 @@ public class PositionMapPage {
                   .position-map figcaption h3{margin:0 0 .15rem;font-size:1rem}
                   .position-map figcaption p{margin:0 0 .4rem;font-size:.9rem;color:#8b96a6}
                   .position-map svg{width:min(620px,92vw);height:auto;display:block;margin:0 auto}
+                  /* D112: one donut per product, side by side on a wide screen and stacked on a phone. */
+                  .share-pies{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:0 0 .8rem}
+                  .share-pie{margin:0;background:#161b23;border:1px solid #2a313d;border-radius:10px;padding:.6rem}
+                  .share-pie figcaption{font-size:.86rem;font-weight:600;margin:0 0 .35rem}
+                  .share-pie svg{width:100%%;max-width:220px;height:auto;display:block;margin:0 auto}
+                  .share-legend{width:100%%;border-collapse:collapse;font-size:.78rem;margin-top:.35rem}
+                  .share-legend td{padding:.13rem .3rem;border-bottom:1px solid #232a35}
+                  .share-legend td.num{text-align:right;font-variant-numeric:tabular-nums}
+                  .share-legend th{font-weight:400;color:#8b96a6;font-size:.72rem;text-align:left;padding:.1rem .3rem}
+                  .share-legend th.num{text-align:right}
+                  .swatch{display:inline-block;width:.7rem;height:.7rem;border-radius:2px;vertical-align:middle}
+                  .muted{color:#8b96a6}
                 </style></head><body><main>
                   <h1>%s</h1><p class="sub">%s</p>
                   %s

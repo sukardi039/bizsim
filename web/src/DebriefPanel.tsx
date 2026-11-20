@@ -4,6 +4,7 @@ import {
   downloadDebrief,
   downloadEvaluation,
   type DecisionInput,
+  type MarketPie,
   type RunPlayer,
   type ScoreRow,
   type StatementRow,
@@ -13,6 +14,7 @@ import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import FinancialStatements from "./FinancialStatements";
 import PositionMap, { positionsFrom, verticalAxisFor, withTrails } from "./PositionMap";
+import { MarketSharePies } from "./MarketSharePies";
 import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
@@ -39,6 +41,8 @@ export default function DebriefPanel({
   const [round, setRound] = useState(Math.max(1, currentRound || 1));
   const [board, setBoard] = useState<ScoreRow[]>([]);
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
+  /** D112: the per-product market-share pies for the selected round (facilitator's own view). */
+  const [pies, setPies] = useState<MarketPie[]>([]);
   /** What each company sent for the selected round, so the detail can show cause before result (D42). */
   const [decisions, setDecisions] = useState<Record<number, DecisionInput | null>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -109,6 +113,13 @@ export default function DebriefPanel({
     try {
       const rows = await api.scoreboard(runId, round);
       setBoard(rows);
+      // D112: the pies are a second call on purpose. A failure here must leave the scoreboard and the
+      // statements readable rather than blanking the debrief, so it is caught on its own.
+      try {
+        setPies(await api.marketPies(runId, round));
+      } catch {
+        setPies([]);
+      }
       // A separate call on purpose: the statements are the result and must still render if the
       // decisions cannot be read.
       try {
@@ -370,6 +381,11 @@ export default function DebriefPanel({
         </p>
       )}
       {problem && <p className="error">{problem}</p>}
+
+      {/* D112: who holds each product's market. Drawn on the served market, so the slices add up and a
+          stockout appears as its own slice instead of vanishing. Facilitator only — a trainee reaches
+          this through the share link the facilitator makes. */}
+      <MarketSharePies pies={pies} />
 
       {/* D98/D101: the round's competitive picture — price against quality (or brand), bubble by share.
           Each earlier round is placed the same way, so the map draws the path a company took instead
