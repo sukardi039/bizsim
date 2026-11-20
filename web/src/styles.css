@@ -73,6 +73,11 @@ label input { margin-top: .25rem; }
 }
 
 .muted { color: var(--muted); }
+
+/* D109/reported 20 Nov: an unset per-class reach cell must not read as a typed value. Greyed *and*
+   italic, because colour alone disappears for a colour-blind reader or a washed-out screen. */
+input.inherited { color: var(--muted); font-style: italic; }
+input.inherited::placeholder { color: var(--muted); font-style: italic; opacity: 1; }
 .error { color: var(--bad); }
 .positive { color: var(--good); }
 .negative { color: var(--bad); }

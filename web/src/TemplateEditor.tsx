@@ -953,12 +953,22 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                     <td><input value={row.name} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
                     <td><input value={String(row.reachWeight)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, reachWeight: Number(e.target.value) } : r))} /></td>
                     {/* Blank = "use the channel's weight". 0 is meaningful: the channel cannot reach
-                        that class at all, which is a strategy lever a trainer may want. */}
+                        that class at all, which is a strategy lever a trainer may want.
+                        An unset cell must *look* unset. The placeholder used to print the inherited
+                        weight in the same colour and weight as a typed value, so a trainer reading the
+                        table saw 1.2 / 1.2 / 1.2 and concluded the channel was class-specific with equal
+                        weights — when in fact nothing was stored at all (reported 20 Nov 2026). The
+                        inherited number is now spelled out as "uses 1.2" and greyed, and the input carries
+                        an `inherited` class so the distinction does not rest on colour alone. */}
                     {segments.map((segment) => (
                       <td key={segment.code}>
                         <input
-                          className="num"
-                          placeholder={String(row.reachWeight)}
+                          className={row.reachBySegment?.[segment.code] === undefined
+                            ? "num inherited" : "num"}
+                          placeholder={t("editor.usesChannelWeight", { weight: String(row.reachWeight) })}
+                          title={row.reachBySegment?.[segment.code] === undefined
+                            ? t("editor.usesChannelWeight", { weight: String(row.reachWeight) })
+                            : undefined}
                           disabled={locked}
                           value={row.reachBySegment?.[segment.code] === undefined ? "" : String(row.reachBySegment[segment.code])}
                           onChange={(e) => setChannels((c) => c.map((r, i) => {
