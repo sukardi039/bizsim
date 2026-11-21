@@ -35,6 +35,13 @@ public class AuthController {
     }
 
     /**
+     * D120: the stable code a sign-in failure carries. The console renders it in the class language; the
+     * answer itself is still identical for every cause, so the form cannot be used to enumerate tenants
+     * or accounts.
+     */
+    public static final String AUTH_INVALID = "auth.invalid_credentials";
+
+    /**
      * One failure answer for every bad login. Unknown tenant, unknown email, wrong password and a
      * deactivated account all return the same 401 body — otherwise the endpoint enumerates tenants
      * and accounts.
@@ -48,8 +55,10 @@ public class AuthController {
                 // discoverable from the login form.
                 .filter(u -> !"AUTO_WORKER".equals(u.role()))
                 .filter(u -> encoder.matches(request.password(), u.passwordHash()))
+                // D120: a code, so the sign-in screen says it in the class language. The one answer for
+                // every failure is kept exactly as before — only the wording stopped being English-only.
                 .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED, "invalid credentials"));
+                        HttpStatus.UNAUTHORIZED, AUTH_INVALID));
 
         String token = jwt.issue(user.id(), user.tenantId(), request.tenantCode(), user.role());
         return new LoginResponse(token, jwt.ttl().toSeconds(), request.tenantCode(), user.role());

@@ -16,7 +16,14 @@ export function describeError(error: unknown, t: Translate): string {
   }
 
   if (error.problems.length > 0) {
-    return error.problems.map((problem) => translate(problem.code, problem.params, problem.message, t)).join(" · ");
+    return error.problems
+      .map((problem) => {
+        const params = fieldParams(problem.params, t);
+        // D120: an empty field is "please fill this in", not the generic "not valid".
+        const code = params?.required ? "request.field_required" : problem.code;
+        return translate(code, params, problem.message, t);
+      })
+      .join(" · ");
   }
 
   if (error.code) {
@@ -24,6 +31,31 @@ export function describeError(error: unknown, t: Translate): string {
   }
 
   return error.message;
+}
+
+/**
+ * D120: a field problem names a field; the name is a word the reader should see in their own language.
+ * `email` reads 邮箱 in a Chinese class, and an unknown field keeps its own name rather than disappearing.
+ * A constraint that was about an empty value says so, instead of the generic "not valid".
+ */
+function fieldParams(
+  params: Record<string, string | number> | undefined,
+  t: Translate,
+): Record<string, string | number> | undefined {
+  if (!params) {
+    return params;
+  }
+  const next = { ...params };
+  if (typeof next.field === "string") {
+    const key = `field.${next.field}`;
+    const label = t(key);
+    if (label !== key) {
+      next.field = label;
+    }
+  }
+  next.required =
+    next.violation === "NotBlank" || next.violation === "NotNull" || next.violation === "NotEmpty" ? 1 : 0;
+  return next;
 }
 
 function translate(

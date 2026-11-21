@@ -659,8 +659,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           <div>
             <h2 style={{ marginBottom: ".2rem" }}>{team.companyName}</h2>
             <p className="muted" style={{ margin: 0 }}>
-              {t("player.round", { round: context.round, total: run.rounds })} · {context.market.outlook} ·{" "}
-              {context.market.trendLabel}
+              {/* D116/D120: the outlook's label only — the server's code (STEADY) is an identifier, not a
+                  word a trainee reads, and it was printing beside its own translation. */}
+              {t("player.round", { round: context.round, total: run.rounds })} · {context.market.trendLabel}
             </p>
             <ClockBadge run={run} />
           </div>
