@@ -60,11 +60,7 @@ export default function TemplatesPanel() {
   return (
     <section className="card">
       <h2>{t("templates.title")}</h2>
-      <p className="muted">
-        A template is the economy a session is played on: environment, product catalogue, channels, R&amp;D
-        projects and the simulation settings. The shipped <strong>standard</strong> template is global and
-        read-only — copy it to get your own draft you can change.
-      </p>
+      <p className="muted">{t("templates.intro")}</p>
       {notice && <p className="banner good">{notice}</p>}
       {problem && <p className="error">{problem}</p>}
       <table>

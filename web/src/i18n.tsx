@@ -88,6 +88,45 @@ export const en: Dict = {
   "nav.noRuns": "no runs yet",
   "app.signOut": "sign out",
   "app.signedInAs": "the role you are signed in as",
+  "app.signInAgain": "Sign in again",
+  "app.signingIn": "Signing in…",
+  "app.runRow": "{id} · {companies} companies",
+  "app.runRowRound": "{status} · round {round}/{rounds}",
+  "app.runTitle": "Run {id}",
+  "app.runSubtitle": "{status} · round {round} of {rounds} · {cycles} cycles of {perCycle}",
+  "app.live": "Live",
+  "app.liveWaiting": "waiting for events…",
+  "status.OPEN": "Open",
+  "status.FINISHED": "Finished",
+  "outlook.EXPANDING": "Expanding",
+  "outlook.CONTRACTING": "Contracting",
+  "outlook.STEADY": "Steady",
+  "effect.UNIT_COST_DOWN": "unit cost down",
+  "effect.QUALITY_UP": "quality up",
+  "effect.CAPACITY_UP": "capacity up",
+  "effect.ATTRACTIVENESS_UP": "attractiveness up",
+  "slides.esc": "Esc",
+  "people.admin": "Admin",
+  "people.initialPassword": "Initial password (8+ characters)",
+  "people.initialPasswordPlaceholder": "hand this to the trainee",
+  "player.traineeFallback": "trainee",
+  "rndStatus.ACTIVE": "active",
+  "rndStatus.COMPLETED": "completed",
+  "rndStatus.FAILED": "failed",
+  "player.overfundingRefunded": " · over-funding refunded",
+  "player.noRunTitle": "No simulation yet",
+  "player.noRunBody":
+    "Your facilitator has not opened a simulation for your company. This page checks again every 10 seconds.",
+  "player.unassignedTitle": "Not assigned to a company",
+  "player.unassignedBody":
+    "You are signed in, but no company in this simulation is yours yet. Ask your facilitator to assign you.",
+  "player.projectTerms": "{effect} · {months} months · published estimate {low}–{high}",
+  "player.forecastRound": "Round {round}",
+  "player.forecastRow": "{outlook} · {trend} · demand {demand} · costs {costs}",
+  "player.committedOf":
+    "of {cash} · payroll, materials and holding cost are charged when the round is computed.",
+  "templates.intro":
+    "A template is the economy a session is played on: environment, product catalogue, channels, R&D projects and the simulation settings. The shipped template is global and read-only — copy it to get your own draft you can change.",
   "people.adminOnly":
     "You are not an admin: you can add trainees, but staff accounts (facilitator, builder, admin) and role changes are an administrator's job.",
 
@@ -814,6 +853,42 @@ export const zh: Dict = {
   "nav.noRuns": "暂无模拟",
   "app.signOut": "退出登录",
   "app.signedInAs": "当前登录的角色",
+  "app.signInAgain": "重新登录",
+  "app.signingIn": "正在登录…",
+  "app.runRow": "{id} · {companies} 家公司",
+  "app.runRowRound": "{status} · 第 {round}/{rounds} 轮",
+  "app.runTitle": "第 {id} 场模拟",
+  "app.runSubtitle": "{status} · 第 {round}/{rounds} 轮 · {cycles} 个周期，每周期 {perCycle} 轮",
+  "app.live": "实时",
+  "app.liveWaiting": "等待事件…",
+  "status.OPEN": "进行中",
+  "status.FINISHED": "已结束",
+  "outlook.EXPANDING": "扩张",
+  "outlook.CONTRACTING": "收缩",
+  "outlook.STEADY": "平稳",
+  "effect.UNIT_COST_DOWN": "单位成本下降",
+  "effect.QUALITY_UP": "质量提升",
+  "effect.CAPACITY_UP": "产能提升",
+  "effect.ATTRACTIVENESS_UP": "吸引力提升",
+  "slides.esc": "Esc",
+  "people.admin": "管理员",
+  "people.initialPassword": "初始密码（至少 8 位）",
+  "people.initialPasswordPlaceholder": "交给学员",
+  "player.traineeFallback": "学员",
+  "rndStatus.ACTIVE": "进行中",
+  "rndStatus.COMPLETED": "已完成",
+  "rndStatus.FAILED": "未达成",
+  "player.overfundingRefunded": " · 超额投入将退回",
+  "player.noRunTitle": "尚无模拟",
+  "player.noRunBody": "教员尚未为你的公司开启模拟。本页每 10 秒重新检查。",
+  "player.unassignedTitle": "尚未分配公司",
+  "player.unassignedBody": "你已登录，但本次模拟中还没有公司属于你。请联系教员分配。",
+  "player.projectTerms": "{effect} · {months} 个月 · 公布区间 {low}–{high}",
+  "player.forecastRound": "第 {round} 轮",
+  "player.forecastRow": "{outlook} · {trend} · 需求 {demand} · 成本 {costs}",
+  "player.committedOf": "（可用现金 {cash}）· 人工、材料与仓储成本在结算时扣除。",
+  "templates.intro":
+    "模板是场次所运行的经济环境：市场环境、产品目录、渠道、研发项目与模拟设置。内置模板为全局只读——复制一份即可得到可修改的草稿。",
   "people.adminOnly": "您不是管理员：可以添加学员，但员工账号（教师、构建者、管理员）与角色变更需由管理员操作。",
 
   "login.title": "bizsim",
@@ -1458,6 +1533,22 @@ export const zh: Dict = {
 };
 
 const catalogs: Record<Locale, Dict> = { en, zh };
+
+/**
+ * D116: a value the server sends as a code (OPEN, STEADY, CAPACITY_UP) reads in the class's language.
+ * A code with no entry stays as it came rather than turning into a raw i18n key on screen — an
+ * untranslated word is honest, "status.OPEN" is not.
+ */
+export function enumLabel(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  group: string,
+  value: string | null | undefined,
+): string {
+  if (!value) return "";
+  const key = `${group}.${value}`;
+  const label = t(key);
+  return label === key ? value : label;
+}
 
 function isLocale(value: string | null | undefined): value is Locale {
   return value === "en" || value === "zh";

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useI18n } from "./i18n";
+import { useI18n, enumLabel } from "./i18n";
 import { describeError } from "./errors";
 import StatementDetail from "./StatementDetail";
 import { StatementDialog, type StatementKind } from "./FinancialStatements";
@@ -339,9 +339,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
 
   const signOut = (
     <div className="brand">
-      <h1>bizsim · {team?.companyName ?? "trainee"}</h1>
+      <h1>bizsim · {team?.companyName ?? t("player.traineeFallback")}</h1>
       <button className="link muted" onClick={onSignOut}>
-        sign out
+        {t("app.signOut")}
       </button>
     </div>
   );
@@ -351,8 +351,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       <div className="player">
         {signOut}
         <div className="card">
-          <h2>No simulation yet</h2>
-          <p className="muted">Your facilitator has not opened a simulation for your company. This page checks again every 10 seconds.</p>
+          <h2>{t("player.noRunTitle")}</h2>
+          <p className="muted">{t("player.noRunBody")}</p>
         </div>
       </div>
     );
@@ -363,8 +363,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       <div className="player">
         {signOut}
         <div className="card">
-          <h2>Not assigned to a company</h2>
-          <p className="muted">You are signed in, but no company in this simulation is yours yet. Ask your facilitator to assign you.</p>
+          <h2>{t("player.unassignedTitle")}</h2>
+          <p className="muted">{t("player.unassignedBody")}</p>
         </div>
       </div>
     );
@@ -842,16 +842,20 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             <div>
               <strong>{project.name}</strong>
               <p className="muted">
-                {project.advantageType.replaceAll("_", " ").toLowerCase()} {plain(project.advantageValue)} ·{" "}
-                {project.durationMonths} months · published estimate {money(project.hintLow)}–{money(project.hintHigh)}
+                {t("player.projectTerms", {
+                  effect: `${enumLabel(t, "effect", project.advantageType)} ${plain(project.advantageValue)}`,
+                  months: project.durationMonths,
+                  low: money(project.hintLow),
+                  high: money(project.hintHigh),
+                })}
               </p>
               <p className="muted">
                 {t("player.investedSoFar", {
                   invested: money(project.invested),
                   months: project.monthsInvested,
-                  status: project.status.toLowerCase(),
+                  status: enumLabel(t, "rndStatus", project.status),
                 })}
-                {project.overfunding === "REFUND" ? " · over-funding refunded" : ""}
+                {project.overfunding === "REFUND" ? t("player.overfundingRefunded") : ""}
               </p>
             </div>
             <label className="project-input">
@@ -899,9 +903,13 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           <ul className="forecast">
             {report.forecast.map((row) => (
               <li key={row.round}>
-                <span className="muted">Round {row.round}</span>{" "}
-                {row.outlook} · {row.trendLabel} · demand{" "}
-                {plain(row.demandIndex)} · costs {plain(row.costIndex)}
+                <span className="muted">{t("player.forecastRound", { round: row.round })}</span>{" "}
+                {t("player.forecastRow", {
+                  outlook: enumLabel(t, "outlook", row.outlook),
+                  trend: row.trendLabel,
+                  demand: plain(row.demandIndex),
+                  costs: plain(row.costIndex),
+                })}
               </li>
             ))}
           </ul>
@@ -912,7 +920,7 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
         <div>
           <p className="muted" style={{ margin: 0 }}>
             {t("player.committedCash")}: <strong className={overCash ? "negative" : ""}>{money(committed)}</strong>{" "}
-            of {money(context.cash)} · payroll, materials and holding cost are charged when the round is computed.
+            {t("player.committedOf", { cash: money(context.cash) })}
           </p>
         </div>
         <button className="primary" type="submit" disabled={busy}>

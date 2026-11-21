@@ -11,7 +11,7 @@ import CompaniesPanel from "./CompaniesPanel";
 import PackagesPanel from "./PackagesPanel";
 import DebriefPanel from "./DebriefPanel";
 import SessionTools from "./SessionTools";
-import { useI18n, LOCALES, type Locale } from "./i18n";
+import { useI18n, enumLabel, LOCALES, type Locale } from "./i18n";
 import { describeError } from "./errors";
 import {
   api,
@@ -296,14 +296,14 @@ export default function App() {
     return (
       <div className="card login">
         <p className="error">{identityProblem}</p>
-        <button onClick={signOut}>Sign in again</button>
+        <button onClick={signOut}>{t("app.signInAgain")}</button>
       </div>
     );
   }
   if (!identity) {
     return (
       <div className="card login">
-        <p className="muted">Signing in…</p>
+        <p className="muted">{t("app.signingIn")}</p>
       </div>
     );
   }
@@ -386,9 +386,13 @@ export default function App() {
           {runs.map((run) => (
             <li key={run.id} className={selected?.id === run.id ? "active" : ""}>
               <button className="link" onClick={() => setSelectedId(run.id)}>
-                <span>{run.id} · {run.teams.length} companies</span>
+                <span>{t("app.runRow", { id: run.id, companies: run.teams.length })}</span>
                 <small>
-                  {run.status} · round {run.currentRound}/{run.rounds}
+                  {t("app.runRowRound", {
+                    status: enumLabel(t, "status", run.status),
+                    round: run.currentRound,
+                    rounds: run.rounds,
+                  })}
                 </small>
               </button>
             </li>
@@ -422,11 +426,15 @@ export default function App() {
           <>
             <header className="run-head">
               <div>
-                <h1>Run {selected.id}</h1>
+                <h1>{t("app.runTitle", { id: selected.id })}</h1>
                 <p className="muted">
-                  {selected.status} · round {selected.currentRound} of {selected.rounds}
-                  {" · "}
-                  {selected.cycles} cycles of {selected.rounds / Math.max(1, selected.cycles)}
+                  {t("app.runSubtitle", {
+                    status: enumLabel(t, "status", selected.status),
+                    round: selected.currentRound,
+                    rounds: selected.rounds,
+                    cycles: selected.cycles,
+                    perCycle: selected.rounds / Math.max(1, selected.cycles),
+                  })}
                 </p>
               </div>
               <div className="buttons">
@@ -523,7 +531,7 @@ export default function App() {
             />
 
             <section className="card">
-              <h2>Live</h2>
+              <h2>{t("app.live")}</h2>
               <ul className="feed">
                 {feed.map((item) => (
                   <li key={item.id}>
@@ -532,7 +540,7 @@ export default function App() {
                     {item.text}
                   </li>
                 ))}
-                {feed.length === 0 && <li className="muted">waiting for events…</li>}
+                {feed.length === 0 && <li className="muted">{t("app.liveWaiting")}</li>}
               </ul>
             </section>
           </>

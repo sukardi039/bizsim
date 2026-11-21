@@ -190,7 +190,7 @@ export default function PeoplePanel() {
                       <option value="PLAYER">{t("people.player")}</option>
                       <option value="FACILITATOR">{t("people.facilitator")}</option>
                       <option value="BUILDER">{t("people.builder")}</option>
-                      <option value="ADMIN">Admin</option>
+                      <option value="ADMIN">{t("people.admin")}</option>
                     </select>
                   ) : (
                     user.role.toLowerCase()
@@ -244,12 +244,12 @@ export default function PeoplePanel() {
             />
           </label>
           <label>
-            Initial password (8+ characters)
+            {t("people.initialPassword")}
             <input
               type="text"
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
-              placeholder="hand this to the trainee"
+              placeholder={t("people.initialPasswordPlaceholder")}
               required
             />
           </label>

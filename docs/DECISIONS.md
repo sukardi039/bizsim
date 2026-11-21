@@ -1039,3 +1039,58 @@ weights at all — the engine allocated one pool for that whole class, and the e
 `weighted: false` for it. A class-blind template therefore shows one muted line saying there is nothing to
 split (D101's rule, that a chart with nothing to say must say so) rather than staying silent. `ClassShareApiTest.a_round_computed_before_the_breakdown_says_so_rather_than_looking_class_blind`
 strips `classes` from a stored statement and asserts the distinction.
+
+
+**D116 — Every word a person reads comes from a dictionary (reported 21 Nov 2026, built same day).** A
+trainee in a Chinese class read the console with an English **"sign out"** in its header while the body
+around it was Chinese. The suspicion was a language-resolution defect; it was not. `applySession` fires with
+the run's package locale and the priority order (session language over the person's own, never persisted)
+works exactly as D84 ruled — the strings were **literals that never went through `t()`**.
+
+Found, and fixed as whole sentences rather than glued fragments:
+
+| Where | What a Chinese class was reading |
+|---|---|
+| `PlayerConsole` header | `sign out`; `trainee` when no company name |
+| `PlayerConsole` empty states | "No simulation yet" + body; "Not assigned to a company" + body |
+| `PlayerConsole` R&D card | `CAPACITY UP 0.2 · 4 months · published estimate …`; `active`; `over-funding refunded` |
+| `PlayerConsole` forecast | `Round 3 · STEADY · demand 1.02 · costs 1.00` |
+| `PlayerConsole` commit bar | "of 178,242,280 · payroll, materials and holding cost are charged…" |
+| `App` shell | "Run 1", `FINISHED · round 8 of 8 · 2 cycles of 4`, "Live", "waiting for events…", "Sign in again", "Signing in…" |
+| `PeoplePanel` | `Admin`; "Initial password (8+ characters)"; placeholder "hand this to the trainee" |
+| `TemplatesPanel` | the whole introduction paragraph |
+| `DebriefSlides` | `Esc` |
+
+- **Server codes are translated too, not just sentences.** `OPEN/FINISHED`, `EXPANDING/CONTRACTING/STEADY`,
+  `UNIT_COST_DOWN/QUALITY_UP/CAPACITY_UP/ATTRACTIVENESS_UP` and the R&D status `ACTIVE/COMPLETED/FAILED` are
+  sent as codes and were printed raw. `enumLabel(t, group, value)` in `i18n.tsx` reads the dictionary and
+  **falls back to the code** when an entry is missing — an untranslated word is honest, `status.OPEN` on
+  screen is not.
+- **Fragments became sentences.** `{n} companies`, `· round {r} of {n}`, `cycles of {n}` were three text nodes
+  with an expression between them; a translator could not reorder them. Each is now one key with
+  placeholders (`app.runSubtitle`), so Chinese can read 第 4/8 轮 · 2 个周期，每周期 4 轮 without the English
+  word order surviving in the middle.
+- **The gate is a build step, not a habit.** `web/scripts/check-i18n.mjs` parses every `.tsx` with
+  TypeScript's own parser (so multi-line text and nested expressions cannot hide) and **fails `npm run build`**
+  on any JSX text node containing a word that is not allowlisted (brand and punctuation only). Proved to bite:
+  a probe file with `<h2>This text bypassed the dictionary</h2>` exits **1** and is named by file and line;
+  removing it exits **0**.
+- **Coverage stated plainly:** the gate inspects JSX *text nodes*. Values glued into an expression
+  (`t("…", { status: project.status })`) are not visible to it — that is how `active` and
+  `over-funding refunded` survived the first pass. They were found by dumping the **rendered** screen and
+  looking for Latin words, which is the check to repeat after adding a card.
+
+Verified in a real browser (local Chromium, zh class, six companies):
+
+| Surface | Before | After |
+|---|---|---|
+| Trainee header | `sign out` | 退出登录 |
+| Trainee marketing card | — (channel names from D114) | 数字营销 / 直销团队 / 经销商渠道 |
+| Trainee R&D card | `产能提升 0.2 · 4 months …`, `active` | 产能提升 0.2 · 4 个月 · 公布区间 …；进行中 · 超额投入将退回 |
+| Facilitator run list | `1 · 6 companies` / `FINISHED · round 8/8` | 1 · 6 家公司 / 进行中 · 第 4/8 轮 |
+| Facilitator run head | `Run 1`, `FINISHED · round 8 of 8 · 2 cycles of 4` | 第 1 场模拟；进行中 · 第 4/8 轮 · 2 个周期，每周期 4 轮 |
+| Facilitator section | `Live` | 实时 |
+
+Evidence: `evidence/d116-run-head-zh.png`, plus the DOM dumps taken while checking each string. `npm run build`
+passes the new gate; `tsc -b` clean; nothing on the backend changed (no Java file touched since v0.27.2's
+242-green suite).

@@ -168,7 +168,7 @@ export default function DebriefSlides({
         </span>
         <span className="muted">
           {t("slides.page", { page, of: 2 })} · ← → {t("slides.pagesHint")} · ↑ ↓{" "}
-          {t("slides.roundsHint")} · Esc
+          {t("slides.roundsHint")} · {t("slides.esc")}
         </span>
       </footer>
     </div>
