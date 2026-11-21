@@ -526,6 +526,26 @@ button.danger:hover { background: rgba(255, 120, 120, .12); }
 .card.guided { border-color: rgba(120, 180, 255, .45); background: rgba(90, 140, 220, .08); }
 .card.guided .buttons { margin-top: .5rem; }
 
+/* D117: the way back to the chart the facilitator is showing. Floating, because the trainee may be
+   scrolled anywhere in their results when they close the pop-up and decides to look again. */
+.card.show-bar {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 55;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  max-width: min(30rem, calc(100vw - 2rem));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .45);
+}
+.card.show-bar strong { font-size: .85rem; }
+.card.show-bar .buttons { margin: 0; }
+@media (max-width: 640px) {
+  .card.show-bar { left: 1rem; right: 1rem; justify-content: space-between; }
+}
+
 /* The submission detail unfolds from the company's own line (D67). */
 .detail-row td { background: rgba(255, 255, 255, .03); border-top: none; padding-top: .25rem; }
 
