@@ -18,8 +18,15 @@ import type { ClassShareRow } from "./api";
 export default function ClassShares({ weighted, rows }: { weighted: boolean; rows: ClassShareRow[] }) {
   const { t, number } = useI18n();
   if (!weighted) {
-    // A class-blind template has one pool: there is no breakdown to show and nothing to explain.
-    return null;
+    // A class-blind template has one pool: there is no breakdown to show. Say so rather than leaving a
+    // facilitator to wonder where the table went — D101's rule for the position map, applied here: a chart
+    // that has nothing to say must admit it, and so must this one.
+    return (
+      <section className="class-shares">
+        <h3>{t("debrief.classTitle")}</h3>
+        <p className="muted">{t("debrief.classNotWeighted")}</p>
+      </section>
+    );
   }
   if (rows.length === 0) {
     // Weighted, but this round carries no class rows: it was computed before the breakdown was recorded,

@@ -513,8 +513,9 @@ Under the scoreboard, for any computed round:
    as a share of that class's served market** — the pieces the class actually contested — with the awarded
    pieces underneath. It is *not* units sold: a company that stocked out still won its share of the class and
    sold less, and that shortfall appears on its product line as lost sales. The tables exist only on a
-   template that weights channel reach by class; on a class-blind template the market is one pool and there is
-   nothing to break down. A round computed **before release 0.27.0** has no class split — the allocation was
+   template that weights channel reach by class; on a class-blind template (any class played from a package
+   published before the weights existed) the market is one pool, and one muted line says so rather than
+   leaving the panel blank. A round computed **before release 0.27.0** has no class split — the allocation was
    not stored then and cannot be rebuilt — so the panel says so in one line rather than showing an empty
    table. Every round computed after the upgrade carries it.
 

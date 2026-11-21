@@ -1034,5 +1034,8 @@ tenant that is every round: the first look at the deployed feature showed an emp
 would read as a broken feature. The endpoint therefore answers `{weighted, rows}` rather than a bare list —
 `weighted: false` means a class-blind template (nothing to explain, the panel stays away), `weighted: true`
 with no rows means the round predates the record, and the debrief says exactly that instead of drawing
-nothing. `ClassShareApiTest.a_round_computed_before_the_breakdown_says_so_rather_than_looking_class_blind`
+nothing. Verified on live: run 24's frozen package was published before D111, so its channels carry no class
+weights at all — the engine allocated one pool for that whole class, and the endpoint correctly answers
+`weighted: false` for it. A class-blind template therefore shows one muted line saying there is nothing to
+split (D101's rule, that a chart with nothing to say must say so) rather than staying silent. `ClassShareApiTest.a_round_computed_before_the_breakdown_says_so_rather_than_looking_class_blind`
 strips `classes` from a stored statement and asserts the distinction.
