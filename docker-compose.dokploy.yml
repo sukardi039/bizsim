@@ -45,8 +45,9 @@ services:
 
   web:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      # D119: the repository root, so the console's build can read backend/src/main/resources/limits.json.
+      context: .
+      dockerfile: web/Dockerfile
       args:
         # Empty means "call /api on my own origin", which is what nginx proxies. Set it only for a
         # split deployment, and then also set BIZSIM_CORS_ORIGINS on the api service.

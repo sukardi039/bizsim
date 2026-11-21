@@ -17,9 +17,9 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { readLimits } from "./limits.mjs";
 
-const root = resolve(process.cwd(), "..");
-const limits = JSON.parse(readFileSync(resolve(root, "backend/src/main/resources/limits.json"), "utf8"));
+const limits = readLimits();
 const max = limits.classSize.max;
 
 const problems = [];

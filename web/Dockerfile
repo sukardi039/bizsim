@@ -4,12 +4,16 @@
 
 # ---------------------------------------------------------------- 1. build
 FROM node:22-alpine AS build
-WORKDIR /app
+# D119: the build context is the repository root, not web/, because the console's build reads
+# backend/src/main/resources/limits.json — the same file the server validates and serves. Copying the
+# limits into web/ instead would be the second copy this ruling exists to prevent.
+WORKDIR /src/web
 
-COPY package.json package-lock.json ./
+COPY web/package.json web/package-lock.json ./
 RUN npm ci
 
-COPY . .
+COPY web/ ./
+COPY backend/src/main/resources/limits.json ../backend/src/main/resources/limits.json
 
 # Optional: only set this if the browser must call the API on a different origin (e.g. a separately
 # hosted API). Left empty, the console calls "/api" on its own origin and nginx forwards it.
@@ -22,7 +26,7 @@ RUN npm run build
 # ---------------------------------------------------------------- 2. serve
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=build /src/web/dist /usr/share/nginx/html
 
 EXPOSE 80
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \

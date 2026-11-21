@@ -21,6 +21,7 @@ import { dirname, resolve } from "node:path";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import PositionMap, { verticalAxisFor } from "../src/PositionMap";
+import { readLimits } from "./limits.mjs";
 import { Context as I18nContext, en, zh } from "../src/i18n";
 
 // The output is written to the working directory, which is `web/` for `npm run` and for the test —
@@ -46,8 +47,7 @@ const VERTICAL_STEPS = [0.7413, 0.8621, 0.9319, 1.0217, 1.1333];
  * validates and the console reads. Deriving it here from the grid (6 x 5 = 30) was the last place the
  * ceiling was stated a second time.
  */
-const LIMITS = JSON.parse(readFileSync(
-  resolve(process.cwd(), "..", "backend", "src", "main", "resources", "limits.json"), "utf8"));
+const LIMITS = readLimits();
 const SLOT_COUNT = LIMITS.classSize.max;
 
 const SLOTS = Array.from({ length: SLOT_COUNT }, (_, index) => {

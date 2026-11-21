@@ -12,6 +12,9 @@ WORKDIR /src
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
+# D119: limits.json is the single authority for the class-size ceiling, and the map template's slot count
+# comes from it. The resolver looks for it at ../backend/... relative to the console, i.e. /backend here.
+COPY backend/src/main/resources/limits.json /backend/src/main/resources/limits.json
 RUN node scripts/build-map-template.mjs
 
 # ---------------------------------------------------------------- 1. build
