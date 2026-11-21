@@ -611,6 +611,59 @@ public class RoundService {
         return visible;
     }
 
+    /**
+     * D117: put the per-product market share on the class's own screens.
+     *
+     * <p>The facilitator's screen and the frozen link (D103) were the only ways a chart reached a trainee,
+     * and neither is a push: one is the projector, the other a URL somebody has to open. This is the
+     * sibling of the class-table reveal (D52) — a per-run state the trainee console reads, broadcast over
+     * the run's own event stream so it appears at once instead of on the next poll.
+     *
+     * <p>Re-opening replaces the round rather than refusing: a facilitator moving the class's attention to
+     * another round should move their screen, not meet a conflict.
+     */
+    @Transactional
+    public Map<String, Object> openShow(long tenantId, long actorId, long runId, Integer round) {
+        RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        int number = round == null ? run.currentRound() : round;
+        runs.openShow(runId, "MARKET_PIES", number, actorId);
+        rounds.audit(tenantId, runId, number, null, "SHOW_OPEN", null, null, actorId);
+        Map<String, Object> state = show(runId);
+        events.publishAfterCommit(runId, "show.opened", state);
+        return state;
+    }
+
+    /** Ends the show on every screen. Closing a show that never opened publishes nothing to undo. */
+    @Transactional
+    public Map<String, Object> closeShow(long tenantId, long actorId, long runId) {
+        runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        boolean closed = runs.closeShow(runId);
+        if (closed) {
+            rounds.audit(tenantId, runId, null, null, "SHOW_CLOSE", null, null, actorId);
+        }
+        Map<String, Object> state = show(runId);
+        events.publishAfterCommit(runId, "show.closed", state);
+        return state;
+    }
+
+    /**
+     * What is on the class's screens right now — the one source the trainee console polls and the
+     * facilitator's button reads, so the two cannot disagree about whether a show is running.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> show(long runId) {
+        Map<String, Object> state = new LinkedHashMap<>();
+        runs.findShow(runId).ifPresentOrElse(shown -> {
+            state.put("open", true);
+            state.put("kind", shown.kind());
+            state.put("round", shown.round());
+            state.put("openedAt", shown.openedAt());
+        }, () -> state.put("open", false));
+        return state;
+    }
+
     @Transactional(readOnly = true)
     public List<Map<String, Object>> statements(long tenantId, long userId, String role,
                                              long runId, long teamId) {

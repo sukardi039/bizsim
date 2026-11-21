@@ -5,6 +5,7 @@ import {
   downloadEvaluation,
   type DecisionInput,
   type ClassSharePage,
+  type ClassShow,
   type MarketPie,
   type RunPlayer,
   type ScoreRow,
@@ -47,6 +48,8 @@ export default function DebriefPanel({
   const [pies, setPies] = useState<MarketPie[]>([]);
   /** D115: the award per (product, class) for the selected round, and whether classes exist at all. */
   const [classShares, setClassShares] = useState<ClassSharePage>({ weighted: false, rows: [] });
+  /** D117: what is on the class's screens right now — the push, and the state of its button. */
+  const [show, setShow] = useState<ClassShow>({ open: false });
   /** What each company sent for the selected round, so the detail can show cause before result (D42). */
   const [decisions, setDecisions] = useState<Record<number, DecisionInput | null>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -129,6 +132,12 @@ export default function DebriefPanel({
         setClassShares(await api.classShares(runId, round));
       } catch {
         setClassShares({ weighted: false, rows: [] });
+      }
+      // D117: whether a chart is already on the class's screens, so the button reads as the truth.
+      try {
+        setShow(await api.show(runId));
+      } catch {
+        setShow({ open: false });
       }
       // A separate call on purpose: the statements are the result and must still render if the
       // decisions cannot be read.
@@ -352,6 +361,38 @@ export default function DebriefPanel({
           >
             {downloading === "xlsx" ? t("debrief.exporting") : t("debrief.excel")}
           </button>
+          {/* D117: the push. The same pies, on the class's own screens, at the round on this screen. */}
+          {show.open ? (
+            <button
+              className="share"
+              title={t("debrief.hideFromClass")}
+              onClick={async () => {
+                setProblem(null);
+                try {
+                  setShow(await api.closeShow(runId));
+                } catch (error) {
+                  setProblem(describeError(error, t));
+                }
+              }}
+            >
+              {t("debrief.hideFromClass")}
+            </button>
+          ) : (
+            <button
+              className="share"
+              title={t("debrief.showToClass")}
+              onClick={async () => {
+                setProblem(null);
+                try {
+                  setShow(await api.openShow(runId, round));
+                } catch (error) {
+                  setProblem(describeError(error, t));
+                }
+              }}
+            >
+              {t("debrief.showToClass")}
+            </button>
+          )}
           {/* D103: the map is what the class asks for on their phones — one link, every round, no login. */}
           <button
             className="share"
@@ -380,6 +421,11 @@ export default function DebriefPanel({
         </div>
       </div>
       <p className="muted">{t("debrief.hint")}</p>
+      {show.open && (
+        <p className="muted">
+          <strong>{t("debrief.showingToClass", { round: show.round ?? 0 })}</strong>
+        </p>
+      )}
       {shareLink && (
         <p className="muted share-link">
           {t("debrief.shareMapDone")}{" "}

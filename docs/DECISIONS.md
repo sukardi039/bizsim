@@ -1094,3 +1094,49 @@ Verified in a real browser (local Chromium, zh class, six companies):
 Evidence: `evidence/d116-run-head-zh.png`, plus the DOM dumps taken while checking each string. `npm run build`
 passes the new gate; `tsc -b` clean; nothing on the backend changed (no Java file touched since v0.27.2's
 242-green suite).
+
+
+**D117 — A show is pushed to the class's own screens (ruled and built 21 Nov 2026).** The owner's correction:
+sharing the market-share pies was "not really sharing — it is displayed on the facilitator's projection with
+a URL". The two existing paths prove him right. The frozen link (D103) is a page somebody has to open, and the
+projector is the facilitator's own screen; neither puts anything on a trainee's console. The one feature that
+does — the class-table reveal (D52) — is a per-run flag the trainee console reads.
+
+So this is D52's sibling, for the pies:
+
+- **The show is state of the run**, in `run_show` (V44): kind, round, who opened it, when. One row while a show
+  is up; closing deletes it. A trainee who reloads, or signs in on another device, still finds it — that is the
+  difference between a push and a pop-up that existed once on one laptop.
+- **It arrives over the run's own event stream**, not on the next poll: `show.opened` / `show.closed` are
+  published after commit, and the trainee console subscribes to those two names. Ten seconds of a facilitator
+  talking over a chart nobody can see yet is a worse defect than it sounds.
+- **It is a pop-up, and it can be dismissed and re-opened.** A trainee reading their own results should not be
+  trapped behind a chart; closing it must not lose it while the facilitator still has it up, so a bar
+  ("the facilitator is showing round N · show the chart again") stays until the show comes down. The pop-up
+  rides on **every** screen the console can show — including the finished/waiting screen, which is exactly the
+  state a class is in while the facilitator debriefs. (The first cut wired it only into the decision form: it
+  worked on the facilitator's screen and nowhere else, which the browser check caught immediately.)
+- **The same component draws it.** `ClassShowPopup` renders `MarketSharePies` — the debrief's own component,
+  fed by the debrief's own endpoint — so the class and the projector cannot show different charts.
+- **The pies are refused to a trainee while nothing is shown.** Until this ruling `GET /api/runs/{id}/market-pies`
+  answered any seated player at any time; no screen called it, so the leak was invisible. A push that leaves
+  that door open is presentation, not a push. The gate is the show itself: `403 show.not_open` otherwise, and
+  the facilitator keeps their own view throughout.
+- **The link stays.** `/share/map` is the record for phones and absentees; the push is for the room. They draw
+  the same figures and neither replaces the other.
+
+Evidence, driven in a real browser (local Chromium, zh class, six companies):
+
+| Check | Result |
+|---|---|
+| Suite | **243 tests, 0 failures** (`ClassShowApiTest`: open reaches both trainees, survives a reload, pies 403 before and after, facilitator still reads them, non-facilitator refused, audit rows `SHOW_OPEN`/`SHOW_CLOSE`) |
+| Push without reload | facilitator POST → trainee pop-up appeared via SSE: 第 3 轮各产品市场份额, 3 pies, arcs 51° / 60° / 73° |
+| Reload mid-show | pop-up still up (state, not a socket) |
+| Dismiss → re-open | pop-up closed, bar read 教员正在投放第 3 轮 · 再次查看图表, clicking it restored the pop-up |
+| Close | pop-up and bar gone with no reload; trainee `market-pies` → **403 show.not_open**; facilitator → 200 |
+| Audit | `facilitator_action` carries SHOW_OPEN / SHOW_CLOSE (the check constraint in V19/V21/V24 had to be extended — found by the test, not by a facilitator's 409) |
+
+**A defect found while writing the migration's test:** `facilitator_action.action` is a check constraint
+enumerating every session control. Recording a new action without extending it fails as a 409 on the button,
+not a compile error — the first test run returned exactly that. V44 extends the constraint in the same
+migration that adds the show.

@@ -448,6 +448,14 @@ export interface ClassShareCompany {
   share: number;
 }
 
+/** D117: the chart the facilitator is showing on the class's screens right now. */
+export interface ClassShow {
+  open: boolean;
+  kind?: string;
+  round?: number;
+  openedAt?: string;
+}
+
 /** D115: the class table for a round, plus whether the template had classes to split at all. */
 export interface ClassSharePage {
   /** False on a class-blind template: there is nothing to break down, and nothing to explain. */
@@ -807,6 +815,18 @@ export const api = {
 
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
+  /** D117: what the facilitator is showing on the class's screens; any reader of the run may ask. */
+  show: (runId: number) => request<ClassShow>(`/runs/${runId}/show`),
+  /** D117: facilitator — put the round's pies on every seated screen. */
+  openShow: (runId: number, round: number) =>
+    request<ClassShow>(`/runs/${runId}/show`, {
+      method: "POST",
+      body: JSON.stringify({ round }),
+    }),
+  /** D117: facilitator — take them down again. */
+  closeShow: (runId: number) =>
+    request<ClassShow>(`/runs/${runId}/show`, { method: "DELETE" }),
+
   /** D115: the award per (product, class), with the flag that says whether classes exist at all. */
   classShares: (runId: number, round?: number) =>
     request<ClassSharePage>(

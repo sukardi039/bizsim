@@ -4,6 +4,7 @@ import com.bizsim.tenant.TenantContext;
 import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -27,15 +28,45 @@ public class SimulationController {
     private final BotRoundService bots;
     private final EvaluationReportService evaluations;
     private final FinancialStatementsService financials;
+    private final RunShareAccess access;
 
     public SimulationController(RoundService rounds, DebriefExportService debrief,
                                 BotRoundService bots, EvaluationReportService evaluations,
-                                FinancialStatementsService financials) {
+                                FinancialStatementsService financials, RunShareAccess access) {
         this.rounds = rounds;
         this.debrief = debrief;
         this.bots = bots;
         this.evaluations = evaluations;
         this.financials = financials;
+        this.access = access;
+    }
+
+    /**
+     * D117: what the facilitator is showing on the class's screens. Any reader of the run may ask — a
+     * trainee's console asks every ten seconds, and after a reload it must still find the show up.
+     */
+    @GetMapping("/show")
+    public Map<String, Object> show(@PathVariable long runId) {
+        TenantContext.Principal me = TenantContext.require();
+        access.requireReader(me, runId);
+        return rounds.show(runId);
+    }
+
+    /** D117: put the market-share pies on every seated screen. The facilitator's own control. */
+    @PostMapping("/show")
+    public Map<String, Object> openShow(@PathVariable long runId,
+                                        @RequestBody(required = false) Map<String, Object> body) {
+        TenantContext.Principal me = requireFacilitator();
+        Integer round = body == null || body.get("round") == null ? null
+                : ((Number) body.get("round")).intValue();
+        return rounds.openShow(me.tenantId(), me.userId(), runId, round);
+    }
+
+    /** D117: take it down again. */
+    @DeleteMapping("/show")
+    public Map<String, Object> closeShow(@PathVariable long runId) {
+        TenantContext.Principal me = requireFacilitator();
+        return rounds.closeShow(me.tenantId(), me.userId(), runId);
     }
 
     @PostMapping("/teams/{teamId}/decisions")

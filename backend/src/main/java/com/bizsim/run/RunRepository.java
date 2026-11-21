@@ -150,6 +150,40 @@ public class RunRepository {
                 .findFirst().orElse("en");
     }
 
+    /**
+     * D117: the chart being shown on the class's screens, if any. One row per run while a show is open.
+     */
+    public record RunShow(long runId, String kind, int round, Long openedBy, java.time.Instant openedAt) {
+    }
+
+    /** Opens (or replaces) the show for a run. Replacing is deliberate: a facilitator changing round mid-show
+     * should move the class's screen, not get a conflict to argue with. */
+    public void openShow(long runId, String kind, int round, Long openedBy) {
+        jdbc.update("""
+                insert into run_show (run_id, kind, round_number, opened_by)
+                values (?, ?, ?, ?)
+                on conflict (run_id) do update
+                    set kind = excluded.kind,
+                        round_number = excluded.round_number,
+                        opened_by = excluded.opened_by,
+                        opened_at = now()
+                """, runId, kind, round, openedBy);
+    }
+
+    /** Ends the show. Deleting the row is what makes "nothing is being shown" the absence of state. */
+    public boolean closeShow(long runId) {
+        return jdbc.update("delete from run_show where run_id = ?", runId) > 0;
+    }
+
+    public java.util.Optional<RunShow> findShow(long runId) {
+        return jdbc.query("""
+                select run_id, kind, round_number, opened_by, opened_at
+                from run_show where run_id = ?
+                """, (rs, i) -> new RunShow(rs.getLong("run_id"), rs.getString("kind"),
+                rs.getInt("round_number"), (Long) rs.getObject("opened_by"),
+                rs.getTimestamp("opened_at").toInstant()), runId).stream().findFirst();
+    }
+
     /** The class language of the package this run came from; null when the package set none. */
     public String localeOf(long runId) {
         List<String> rows = jdbc.queryForList("""

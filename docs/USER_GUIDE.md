@@ -474,6 +474,10 @@ Under the scoreboard, for any computed round:
 
 1. Pick the **Round** in the selector.
 2. Read across: revenue, cost, profit, cash, share, lost sales, capacity used/available.
+3. **Show to the class** (above the scoreboard) puts the round's market-share pies on **every seated
+   trainee's screen** as a pop-up — no link, no URL on the projector (D117). It stays up until you press
+   **Hide from the class**, survives a trainee reloading, and a trainee may close it for themselves and bring
+   it back with the bar above their results. Trainees cannot read those pies while nothing is being shown.
 3. **Detail** on a company expands its month, in reading order:
    - **Submission · round N** — what the company asked for: units, price and quality spend per
      product, marketing per channel, R&D per project, production staff and machines, and whether the
@@ -606,6 +610,16 @@ PDF's *What you sent* table list the products each company actually carries, not
 A feed of what has happened in the session (`round.opened`, `decision.submitted`, `round.closed`).
 
 ---
+
+### 7.4.2 Showing a chart to the class (D117)
+
+**Show to the class** in the debrief pushes the selected round's **per-product market shares** onto every
+seated trainee's screen as a pop-up, instantly — the class reads the same drawing the projector shows, in
+their own language. **Hide from the class** takes it down. A chart that is up when a trainee reloads is still
+there; a trainee can close the pop-up and re-open it from the bar above their results while the show lasts.
+
+Use **Share this map** instead when you need something the class keeps: that link is the frozen record for
+phones and absentees, every round, and needs no account.
 
 ## 8. Trainee — playing a round
 

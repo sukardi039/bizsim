@@ -5,14 +5,18 @@ import StatementDetail from "./StatementDetail";
 import { StatementDialog, type StatementKind } from "./FinancialStatements";
 import NumberInput from "./NumberInput";
 import ClockBadge from "./ClockBadge";
+import ClassShowPopup from "./ClassShowPopup";
 import {
   api,
   ApiError,
   downloadDebrief,
+  eventStreamUrl,
   downloadEvaluation,
   type DecisionFormContext,
   type DecisionInput,
+  type ClassShow,
   type MarketForecast,
+  type MarketPie,
   type Run,
   type StandingsRow,
   type StatementRow,
@@ -146,6 +150,11 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   const [statements, setStatements] = useState<StatementRow[]>([]);
   /** The class table: rank, company and profit — the only competitor figures a trainee may see (D51). */
   const [standings, setStandings] = useState<StandingsRow[]>([]);
+  /** D117: the chart the facilitator has pushed to this screen, and the pies it draws. */
+  const [show, setShow] = useState<ClassShow>({ open: false });
+  const [showPies, setShowPies] = useState<MarketPie[]>([]);
+  /** A round the trainee has closed. Re-opening the show clears it; a new round opens fresh. */
+  const [showDismissed, setShowDismissed] = useState<number | null>(null);
   /** D61: the round whose form arrived pre-filled by the teaching guide, if any. */
   const [guidedRound, setGuidedRound] = useState<number | null>(null);
   const [downloading, setDownloading] = useState<"pdf" | "xlsx" | null>(null);
@@ -203,6 +212,20 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       } catch {
         setStandings([]);
       }
+      // D117: is the facilitator showing a chart? The pies are refused by the server unless it is, so
+      // this state and that call are one permission — never a chart nobody opened.
+      try {
+        const pushed = await api.show(active.id);
+        setShow(pushed);
+        if (pushed.open && pushed.round !== undefined) {
+          setShowPies(await api.marketPies(active.id, pushed.round));
+        } else {
+          setShowPies([]);
+        }
+      } catch {
+        setShow({ open: false });
+        setShowPies([]);
+      }
       if (!next.roundOpen) {
         setNotice(null);
       }
@@ -239,11 +262,42 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
   }, [load]);
 
   // Light poll: the facilitator opens and computes rounds, so the screen has to notice without a
-  // reload. SSE would be nicer, but the player only needs to know "is a round open, is it closed".
+  // reload. The chart push is the exception — a facilitator pressing "show" and waiting ten seconds is
+  // a facilitator talking to a room that is not looking at their screen yet (D117).
   useEffect(() => {
     const timer = window.setInterval(() => void load(), 10_000);
     return () => window.clearInterval(timer);
   }, [load]);
+
+  useEffect(() => {
+    const runId = run?.id;
+    if (!runId) return;
+    let source: EventSource | null = null;
+    let retry: number | undefined;
+    let stopped = false;
+    const connect = async () => {
+      try {
+        const { ticket } = await api.streamTicket(runId);
+        if (stopped) return;
+        source = new EventSource(eventStreamUrl(runId, ticket));
+        for (const name of ["show.opened", "show.closed"]) {
+          source.addEventListener(name, () => void load());
+        }
+        source.onerror = () => {
+          source?.close();
+          if (!stopped) retry = window.setTimeout(connect, 2000);
+        };
+      } catch {
+        if (!stopped) retry = window.setTimeout(connect, 2000);
+      }
+    };
+    void connect();
+    return () => {
+      stopped = true;
+      window.clearTimeout(retry);
+      source?.close();
+    };
+  }, [run?.id, load]);
 
   const workers = useMemo(() => {
     if (!context || !draft) return { available: 0, needed: 0, perProduct: {} as Record<string, number> };
@@ -345,6 +399,29 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </button>
     </div>
   );
+
+  // D117: the push is an overlay, so it has to ride on every screen this console can be showing. A class
+  // whose round is closed reads results while the facilitator talks over the pies — that is the state it
+  // matters in most, and a pop-up wired only into the decision form would never appear there.
+  const showBar = show.open ? (
+    <div className="card show-bar">
+      <strong>{t("player.showUp", { round: show.round ?? 0 })}</strong>
+      <div className="buttons">
+        <button type="button" className="link" onClick={() => setShowDismissed(null)}>
+          {t("player.showOpen")}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  const showPopup =
+    show.open && show.round !== undefined && showPies.length > 0 && showDismissed !== show.round ? (
+      <ClassShowPopup
+        pies={showPies}
+        round={show.round}
+        onClose={() => setShowDismissed(show.round ?? null)}
+      />
+    ) : null;
 
   if (!run) {
     return (
@@ -536,7 +613,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           )}
           {problem && <p className="error">{problem}</p>}
         </div>
+        {showBar}
         {resultsSection}
+        {showPopup}
       </div>
     );
   }
@@ -551,6 +630,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     // the form lets the request through and shows what comes back.
     <form className="player" onSubmit={submit} noValidate>
       {signOut}
+
+      {/* D117: the chart the facilitator pushed, and the way back to it while the show is up. */}
+      {showBar}
 
       {guidedRound === context.round && (
         <div className="card guided">
@@ -929,6 +1011,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       </section>
 
       {resultsSection}
+
+      {showPopup}
     </form>
   );
 }

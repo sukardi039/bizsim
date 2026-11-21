@@ -109,6 +109,11 @@ export const en: Dict = {
   "people.admin": "Admin",
   "people.initialPassword": "Initial password (8+ characters)",
   "people.initialPasswordPlaceholder": "hand this to the trainee",
+  "player.showTitle": "Market share by product, round {round}",
+  "player.showClose": "Close",
+  "player.showHint": "Your facilitator is showing this chart to the whole class.",
+  "player.showOpen": "Show the chart again",
+  "player.showUp": "The facilitator is showing round {round}",
   "player.traineeFallback": "trainee",
   "rndStatus.ACTIVE": "active",
   "rndStatus.COMPLETED": "completed",
@@ -609,6 +614,9 @@ export const en: Dict = {
   "packages.publishing": "Publishing…",
 
   "debrief.title": "Debrief",
+  "debrief.showToClass": "Show to the class",
+  "debrief.hideFromClass": "Hide from the class",
+  "debrief.showingToClass": "Round {round} is on the class's screens",
   "debrief.classTitle": "Share by customer class",
   "debrief.classHint":
     "Each cell is the demand a company was awarded in that class, as a share of the class's served market — the pieces the class actually contested. It is not units sold: a company that stocked out still won its share and sold less, and that shortfall is on its product line as lost sales. The small number is the awarded pieces.",
@@ -874,6 +882,11 @@ export const zh: Dict = {
   "people.admin": "管理员",
   "people.initialPassword": "初始密码（至少 8 位）",
   "people.initialPasswordPlaceholder": "交给学员",
+  "player.showTitle": "第 {round} 轮各产品市场份额",
+  "player.showClose": "关闭",
+  "player.showHint": "教员正在把这张图投放给全班。",
+  "player.showOpen": "再次查看图表",
+  "player.showUp": "教员正在投放第 {round} 轮",
   "player.traineeFallback": "学员",
   "rndStatus.ACTIVE": "进行中",
   "rndStatus.COMPLETED": "已完成",
@@ -1356,6 +1369,9 @@ export const zh: Dict = {
   "packages.publishing": "正在发布…",
 
   "debrief.title": "复盘",
+  "debrief.showToClass": "投放到学员屏幕",
+  "debrief.hideFromClass": "从学员屏幕撤下",
+  "debrief.showingToClass": "第 {round} 轮图表正在学员屏幕上显示",
   "debrief.classTitle": "各客户群份额",
   "debrief.classHint":
     "每个格子是公司在该客户群赢得的商机占该客户群可服务市场（本班实际争夺的那部分）的比例。这不是销量：缺货的公司同样赢得了份额，只是卖得更少，缺口已作为流失销售记在它的产品行上。下方小数字为赢得的台数。",

@@ -34,11 +34,14 @@ public class MapShareController {
     private final MapShareService maps;
     private final MapShareRepository shares;
     private final RunShareAccess access;
+    private final RunRepository runs;
 
-    public MapShareController(MapShareService maps, MapShareRepository shares, RunShareAccess access) {
+    public MapShareController(MapShareService maps, MapShareRepository shares, RunShareAccess access,
+                              RunRepository runs) {
         this.maps = maps;
         this.shares = shares;
         this.access = access;
+        this.runs = runs;
     }
 
     public record ShareRequest(Integer round, String title) {
@@ -63,6 +66,13 @@ public class MapShareController {
                                          @RequestParam(required = false) Integer round) {
         TenantContext.Principal me = TenantContext.require();
         access.requireReader(me, runId);
+        // D117: a trainee reads the class's pies only while the facilitator is showing them. Without this
+        // gate the push would be presentation only — the endpoint already answered a seated player at any
+        // time, so a curious trainee could read a chart the facilitator had not shown yet.
+        if ("PLAYER".equals(me.role()) && runs.findShow(runId).isEmpty()) {
+            throw ProblemException.forbidden("show.not_open",
+                    "the facilitator is not showing the market chart");
+        }
         return maps.pies(me.tenantId(), runId, round);
     }
 
