@@ -4,6 +4,7 @@ import {
   downloadDebrief,
   downloadEvaluation,
   type DecisionInput,
+  type ClassShareRow,
   type MarketPie,
   type RunPlayer,
   type ScoreRow,
@@ -15,6 +16,7 @@ import StatementDetail from "./StatementDetail";
 import FinancialStatements from "./FinancialStatements";
 import PositionMap, { positionsFrom, verticalAxisFor, withTrails } from "./PositionMap";
 import { MarketSharePies } from "./MarketSharePies";
+import ClassShares from "./ClassShares";
 import DebriefSlides from "./DebriefSlides";
 import { useI18n } from "./i18n";
 
@@ -43,6 +45,8 @@ export default function DebriefPanel({
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
   /** D112: the per-product market-share pies for the selected round (facilitator's own view). */
   const [pies, setPies] = useState<MarketPie[]>([]);
+  /** D115: the award per (product, class) for the selected round; empty if the template is not weighted. */
+  const [classShares, setClassShares] = useState<ClassShareRow[]>([]);
   /** What each company sent for the selected round, so the detail can show cause before result (D42). */
   const [decisions, setDecisions] = useState<Record<number, DecisionInput | null>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -119,6 +123,12 @@ export default function DebriefPanel({
         setPies(await api.marketPies(runId, round));
       } catch {
         setPies([]);
+      }
+      // D115: also caught on its own — a missing class table must not blank the debrief.
+      try {
+        setClassShares(await api.classShares(runId, round));
+      } catch {
+        setClassShares([]);
       }
       // A separate call on purpose: the statements are the result and must still render if the
       // decisions cannot be read.
@@ -386,6 +396,11 @@ export default function DebriefPanel({
           stockout appears as its own slice instead of vanishing. Facilitator only — a trainee reaches
           this through the share link the facilitator makes. */}
       <MarketSharePies pies={pies} />
+
+      {/* D115: who holds each customer class, product by product — the question segment-weighted
+          marketing makes askable ("strong in mass, weak in premium"). Each cell is demand won against
+          the class's served market, not units sold; the caption says so. */}
+      <ClassShares rows={classShares} />
 
       {/* D98/D101: the round's competitive picture — price against quality (or brand), bubble by share.
           Each earlier round is placed the same way, so the map draws the path a company took instead

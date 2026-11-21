@@ -78,6 +78,22 @@ public class ScoringEngine {
                               BigDecimal share) {
     }
 
+    /**
+     * D115: what one company was awarded in one customer class for one product — the pieces of the
+     * class's served market it won, and what fraction that is.
+     *
+     * <p><strong>What this number is, and what it is not.</strong> {@code demand} is the allocation's
+     * own answer: the pieces the class awarded this company on this round's attractiveness. It is
+     * <em>not</em> units sold — stock is a company-level pool, so a company that stocked out sold fewer
+     * units than it was awarded, and the shortfall is already on the product line as lost sales. Stating
+     * the award under its own name keeps the class table from silently disagreeing with the company's
+     * sold-based share.
+     */
+    public record ClassShare(String product, String segment, BigDecimal market, BigDecimal demand,
+                             /** {@code demand} as a percentage of {@code market}, 2 dp. */
+                             BigDecimal share) {
+    }
+
     public record RndUpdate(String project, BigDecimal invested, int monthsInvested, Integer startedRound,
                             String status, BigDecimal benefitFactor, Integer completedRound,
                             BigDecimal threshold) {
@@ -95,7 +111,9 @@ public class ScoringEngine {
                               BigDecimal capacityUsed, BigDecimal capacityAvailable,
                               List<RndUpdate> rndUpdates,
                               Map<String, BigDecimal> stockValues, BigDecimal stockValueChange,
-                              BigDecimal refund) {
+                              BigDecimal refund,
+                              /** D115: the round's award, class by class; empty when not class-weighted. */
+                              List<ClassShare> classShares) {
     }
 
     public record Commitment(BigDecimal materials, BigDecimal payroll, BigDecimal hiring,
@@ -162,13 +180,20 @@ public class ScoringEngine {
         }
 
         Map<String, BigDecimal> pools = pools(scenario, environment, teams.size());
+        // D115: the per-class breakdown is a by-product of the allocation itself, so it is recorded there
+        // rather than re-derived later from shares that no longer exist.
+        Map<Long, List<ClassShare>> classShares = new LinkedHashMap<>();
+        for (TeamInput team : teams) {
+            classShares.put(team.teamId(), new ArrayList<>());
+        }
         Map<Long, Map<String, Double>> demandByTeam =
-                allocateDemand(scenario, environment, teams, plans, pools, previousShare);
+                allocateDemand(scenario, environment, teams, plans, pools, previousShare, classShares);
 
         List<TeamOutcome> outcomes = new ArrayList<>();
         for (int i = 0; i < teams.size(); i++) {
             outcomes.add(settle(scenario, environment, teams.get(i), plans.get(i),
-                    demandByTeam.get(teams.get(i).teamId()), pools));
+                    demandByTeam.get(teams.get(i).teamId()), pools,
+                    classShares.get(teams.get(i).teamId())));
         }
         return new RoundResult(outcomes);
     }
@@ -369,7 +394,8 @@ public class ScoringEngine {
                                                           EnvironmentService.RoundEnvironment environment,
                                                           List<TeamInput> teams, List<Plan> plans,
                                                           Map<String, BigDecimal> pools,
-                                                          Map<Long, Map<String, Double>> previousShare) {
+                                                          Map<Long, Map<String, Double>> previousShare,
+                                                          Map<Long, List<ClassShare>> classShares) {
         Map<Long, Map<String, Double>> result = new LinkedHashMap<>();
         for (TeamInput team : teams) {
             result.put(team.teamId(), new LinkedHashMap<>());
@@ -423,6 +449,14 @@ public class ScoringEngine {
                 for (int i = 0; i < n; i++) {
                     pieces[i] = pieces[i].add(classPieces[i]);
                 }
+                // D115: a template that does not weight reach by class has one pool, not classes — there
+                // the breakdown would name a split the engine never made, so nothing is recorded.
+                if (!WHOLE_MARKET.equals(segment)) {
+                    for (int i = 0; i < n; i++) {
+                        classShares.get(teams.get(i).teamId()).add(new ClassShare(spec.code(), segment,
+                                classTarget, classPieces[i], percentOf(classPieces[i], classTarget)));
+                    }
+                }
             }
             for (int i = 0; i < n; i++) {
                 result.get(teams.get(i).teamId()).put(spec.code(), pieces[i].doubleValue());
@@ -433,6 +467,14 @@ public class ScoringEngine {
 
     /** The allocation's "class" when a template does not weight reach by class: the market is one pool. */
     private static final String WHOLE_MARKET = "";
+
+    /** {@code part} as a percentage of {@code whole}, 2 dp — the class table's own denominator. */
+    private static BigDecimal percentOf(BigDecimal part, BigDecimal whole) {
+        if (whole.signum() <= 0) {
+            return ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return part.multiply(HUNDRED).divide(whole, 2, RoundingMode.HALF_UP);
+    }
 
     private void addDemand(Map<Long, Map<String, Double>> result, List<TeamInput> teams,
                            String product, BigDecimal[] pieces) {
@@ -723,7 +765,7 @@ public class ScoringEngine {
 
     private TeamOutcome settle(Scenario scenario, EnvironmentService.RoundEnvironment environment,
                                TeamInput team, Plan plan, Map<String, Double> demand,
-                               Map<String, BigDecimal> pools) {
+                               Map<String, BigDecimal> pools, List<ClassShare> classShares) {
         Scenario.Params p = scenario.params();
         int round = environment.round();
         List<ProductLine> lines = new ArrayList<>();
@@ -886,7 +928,7 @@ public class ScoringEngine {
                 money(nz(team.cash())),
                 money(profit), money(cashChange), units(lostSales), plan.capacityUsed(),
                 plan.capacityAvailable(), rndUpdates,
-                stockValues, money(stockValueChange), money(refund));
+                stockValues, money(stockValueChange), money(refund), classShares);
     }
 
     /** Brand is a stock, not a flow: this month's spend is felt next month, and it decays (D5/marketing). */

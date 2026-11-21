@@ -438,9 +438,32 @@ export interface MarketPie {
   unservedPercent: number;
 }
 
+/** D115: one company's award in one customer class for one product. */
+export interface ClassShareCompany {
+  teamId: number;
+  company: string;
+  /** Pieces of the class's served market this company was awarded (demand won, not units sold). */
+  demand: number;
+  /** `demand` as a percentage of `market`. */
+  share: number;
+}
+
+/** D115: one (product, class) cell of the debrief's class table. */
+export interface ClassShareRow {
+  product: string;
+  productName: string;
+  segment: string;
+  segmentName: string;
+  /** The class's served market in whole pieces: what the class actually contested. */
+  market: number;
+  companies: ClassShareCompany[];
+}
+
 export interface TemplateChannel {
   code: string;
   name: string;
+  /** D114: the channel's name per language; a missing language falls back to `name`. */
+  texts?: TemplateText[];
   reachWeight: number;
   brandAlpha: number;
   /**
@@ -777,6 +800,11 @@ export const api = {
 
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
+  /** D115: the award per (product, class) — empty on a template that is not class-weighted. */
+  classShares: (runId: number, round?: number) =>
+    request<ClassShareRow[]>(
+      `/runs/${runId}/class-shares` + (round === undefined ? "" : `?round=${round}`),
+    ),
   context: (runId: number, teamId: number) =>
     request<DecisionFormContext>(`/runs/${runId}/teams/${teamId}/context`),
   /** Facilitator/admin only: makes the account a trainee signs in with. */

@@ -935,3 +935,80 @@ than a test that agrees with whatever the code does.
 
 The console pie (`MarketSharePies.tsx`) had both faults copied from the same design and is fixed the same
 way, including a `data-sweep` attribute so the drawing stays measurable from outside.
+
+
+**D114 — A channel's name is per language, its code is not (ruled and built 21 Nov 2026).** D87 gave products
+a name per language beside a single mechanic. Channels were left out, and a facilitator running a Chinese
+class reported the result: the customer classes read 大众市场 / 中端市场 / 高端客户 and the products 基础款 /
+标准款 / 高端款, while the three marketing channels next to them still read "Trade", "Digital" and
+"Field sales" — the one card that explains where the money goes, mixing two languages.
+
+- **The product pattern, not the card pattern.** A channel's `code` is a foreign key in the economy: a
+  submitted decision's marketing lines name it, and the market-specific reach columns key on it. Duplicating
+  channels into `TRADE-ZH` would fork that identity, exactly as duplicating products would have (D64/D86/D87).
+  So one `channel` row keeps the mechanic, and `channel_text` (migration `V42`) holds a name per language
+  beside it.
+- **A missing translation falls back to the authored name**, never to a blank label or the raw code. A class
+  whose language the trainer has not filled in still reads something a person wrote.
+- **Scope of the seed is the shipped templates** — `standard-v1` and the three presets — the same rule D111
+  used for the market weights. Naming a tenant's own channel 数字营销 when they call it something else would
+  be a translation nobody chose; the editor shows their English name in both languages until they author one.
+- **The editor authors it.** Templates → Channels gains a translations cell per row (the same `TextsCell` the
+  products tab uses), so the words are data and a new language needs no code.
+- **A frozen package copy carries the names by construction**, because `cloneInto` copies `channel_text`
+  after the channel rows it references — the ordering hazard D108 hit is not repeated.
+
+The names follow what each channel *is*, as V41 and the guide's §3.1c table already describe them:
+`DIGITAL` 数字营销 (paid digital media), `TRADE` 经销商渠道 (the wholesale/dealer counter), `FIELD` 直销团队
+(people selling face to face).
+
+Evidence:
+
+| Check | Result |
+|---|---|
+| Suite | **240 tests, 0 failures** (`ChannelNameTest` covers the shipped words, the fallback, the frozen copy and the trainee's context) |
+| Live context, `lang='zh'` | `DIGITAL` 数字营销 · `FIELD` 直销团队 · `TRADE` 经销商渠道, read from the player's own context endpoint |
+| Migrations | 42 |
+
+**D115 — The debrief shows the award by customer class (D-C's option (i), built 21 Nov 2026).** Since D108 the
+engine carves a product's served market by class and contests each class on its own attractiveness, so a
+company can be strong in the mass market and weak in the affluent one on the same product. The debrief said
+nothing about it: the scoreboard showed one share per company, and the per-class breakdown D-C recommended
+"for this release" was never built.
+
+- **The breakdown is a by-product of the allocation, not a re-derivation.** `allocateDemand` records, per
+  (company, product, class), the pieces the class awarded and the class's own served market. The statement
+  detail carries them as `classes`, so a facilitator disputing a cell is disputing the allocation that
+  produced the round.
+- **The number is demand won, and it is labelled that way.** Stock is a company-level pool: a company that
+  stocked out still won its share of a class and sold fewer units, and that shortfall is already on its
+  product line as lost sales. Apportioning *sold* units across classes pro-rata would have produced a second
+  number nobody measured — the pie's stockout slice (D112/D113) exists precisely to avoid that kind of
+  invention. So the table states **award ÷ class's served market**, and the caption says it is not sales.
+- **Only a class-weighted template has a breakdown.** On a template that states no class reach the market is
+  one pool; the engine records nothing rather than splitting a market nobody split. The panel simply does not
+  render, and the auditor fails a round that carries class rows it should not.
+- **Names are resolved server-side, in the run's language** (D87/D114): the console asks
+  `GET /api/runs/{id}/class-shares?round=N` and receives product and class names already in the class's
+  words — one shape for the browser, so no second translation table can drift.
+- **Staff only.** What a rival won in a class is competition data; the endpoint refuses a trainee (`403`),
+  the same rule the scoreboard follows.
+- **Deliberately out of scope:** the PDF/Excel debrief keeps its company table. D-C(i) ruled "one new view",
+  and the exports are the formal record; adding a class table to them is a separate decision, not a silent
+  extension of this one.
+
+Evidence, on an eight-round six-company session played by the audit strategies through the real API on a
+**published package copy** of the shipped template (so the frozen-copy path is exercised too):
+
+| Check | Result |
+|---|---|
+| Suite | **240 tests, 0 failures** (`ClassShareTest`, `ClassShareApiTest`) |
+| Independent auditor | **PASS — 4,474 checks over 48 company-rounds**, including a new per-class check set |
+| Reports auditor | **PASS — 2,064 checks over 48 company-rounds** |
+| The new checks bite | one class award tampered by **+5** → **FAIL** with exactly two disagreements (`P1/SEG-BASIC class award: stored 67 computed 62`; `P1 class awards sum to the line demand: stored 68 computed 63`), restored → PASS |
+| Endpoint | 9 rows (3 products × 3 classes); awards fill each class's market; a seated trainee gets `403` |
+| Unweighted template | request returns `[]`; the panel does not render |
+
+The sums are the point: a company's class awards equal the demand on its product line, and the companies in
+one class equal that class's served market. Both are re-derived by the auditor from the decisions, so a
+breakdown that merely looks plausible fails the audit.

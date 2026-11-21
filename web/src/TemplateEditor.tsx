@@ -941,6 +941,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                 <tr>
                   <th>{t("field.code")}</th>
                   <th>{t("field.name")}</th>
+                  <th>{t("editor.translations")}</th>
                   <th className="num">{t("field.reachWeight")}</th>
                   {/* D107: one column per customer class — the weight this channel reaches that class
                       with. Blank means "same as the channel's own", which is the segment-blind default. */}
@@ -963,6 +964,16 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
                   <tr key={index}>
                     <td><input value={row.code} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, code: e.target.value } : r))} /></td>
                     <td><input value={row.name} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, name: e.target.value } : r))} /></td>
+                    {/* D114: a channel's name is per language, like a product's (D87). A class reads its
+                        own language; a language left blank falls back to the authored name. */}
+                    <td>
+                      <TextsCell
+                        texts={row.texts}
+                        disabled={locked}
+                        withDescription={false}
+                        onChange={(texts) => setChannels((c) => c.map((r, i) => i === index ? { ...r, texts } : r))}
+                      />
+                    </td>
                     <td><input value={String(row.reachWeight)} disabled={locked} onChange={(e) => setChannels((c) => c.map((r, i) => i === index ? { ...r, reachWeight: Number(e.target.value) } : r))} /></td>
                     {/* A channel is market-specific. These three fields hold a real weight for each
                         class, seeded with the channel's own weight, so nothing is ever blank and there is
@@ -1002,7 +1013,7 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               </tbody>
             </table>
             <div className="buttons">
-              <button type="button" disabled={locked} onClick={() => setChannels((c) => [...c, { code: "", name: "", reachWeight: 1, brandAlpha: 1 }])}>
+              <button type="button" disabled={locked} onClick={() => setChannels((c) => [...c, { code: "", name: "", texts: [], reachWeight: 1, brandAlpha: 1 }])}>
                 {t("editor.addRow")}
               </button>
               <button className="primary" type="submit" disabled={locked || busy}>

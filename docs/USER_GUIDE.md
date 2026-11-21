@@ -140,6 +140,11 @@ product gets its own pie; every company appears, including seats played by the s
 **company name only**. To show the class, use **Share this map**: the link carries the pies and the position
 map for every computed round, opens with no sign-in, and can be withdrawn.
 
+**Channel names are translated too.** A channel's *code* is what a decision names (`TRADE`, `DIGITAL`,
+`FIELD`) and never changes with language; its *name* is per language (D114), authored on the Channels tab in
+the same translations cell the products use. The shipped templates carry 数字营销 / 经销商渠道 / 直销团队 for a
+Chinese class. A language nobody filled in falls back to the authored name, so nothing reads as a blank.
+
 **Markets are whole numbers of items.** The editor refuses a fractional market — a customer class is a
 count of buyers, not a quantity — and says which field to fix, so `4000.5` becomes a question rather than
 a silent change. Stock and production are whole for the same reason: an item is an item.
@@ -503,6 +508,14 @@ Under the scoreboard, for any computed round:
    another shows both, separately. The rows add up to the totals above, because they are the same
    stored lines, not a second calculation. Units are whole pieces (D34); the market share stays a
    percentage of the whole market.
+   **Share by customer class** sits above the position map (D115). One small table per product, one row
+   per company, one column per customer class. A cell is **the demand the company was awarded in that class,
+   as a share of that class's served market** — the pieces the class actually contested — with the awarded
+   pieces underneath. It is *not* units sold: a company that stocked out still won its share of the class and
+   sold less, and that shortfall appears on its product line as lost sales. The tables exist only on a
+   template that weights channel reach by class; on a class-blind template the market is one pool and there is
+   nothing to break down.
+
 4. The **Class** footer sums revenue and profit for the whole class.
 
 Every number comes from that round's statements — the debrief cannot disagree with what the engine

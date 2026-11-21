@@ -736,6 +736,9 @@ public class RoundRepository {
     private String detailJson(ScoringEngine.TeamOutcome outcome) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("products", outcome.lines());
+        // D115: the award per (product, class), straight from the allocation that produced the round.
+        // Empty on a template that does not weight reach by class — there the market is one pool.
+        detail.put("classes", outcome.classShares());
         detail.put("rnd", outcome.rndUpdates());
         detail.put("cashChange", outcome.cashChange());
         // D79: the components of the line the trainee sees as 库存与产能变动, so the statement can

@@ -89,6 +89,19 @@ public class SimulationController {
     }
 
     /**
+     * D115: the award per (product, customer class) behind the debrief's class table.
+     *
+     * <p>Staff only, for the same reason the scoreboard is: what a rival won in a class is competition
+     * data, and a trainee reaching this endpoint must not learn it.
+     */
+    @GetMapping("/class-shares")
+    public List<Map<String, Object>> classShares(@PathVariable long runId,
+                                                 @RequestParam(required = false) Integer round) {
+        TenantContext.Principal me = requireStaff();
+        return rounds.classShares(me.tenantId(), runId, round);
+    }
+
+    /**
      * The standings a trainee may read (D51): rank, company, this round's profit. Anything wider —
      * share, cash, stock, another company's statement — stays on the facilitator's screen.
      */

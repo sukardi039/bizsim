@@ -123,6 +123,9 @@ public class ScenarioRepository {
                 "select code from customer_segment where scenario_key = ? order by sort_order, code",
                 String.class, key);
 
+        // D114: a channel keeps one mechanic and carries its name per language beside it, exactly as a
+        // product does (D87) — the code is what a decision's marketing lines name, so it cannot fork.
+        Map<String, Map<String, Scenario.Text>> channelTexts = channelTextsOf(key);
         List<Scenario.ChannelSpec> channels = jdbc.query("""
                 select code, name, reach_weight, brand_alpha, reach_mass, reach_mid, reach_premium
                 from channel where scenario_key = ? order by code
@@ -130,7 +133,8 @@ public class ScenarioRepository {
                         rs.getString("code"), rs.getString("name"), rs.getBigDecimal("reach_weight"),
                         rs.getBigDecimal("brand_alpha"),
                         byClass(classOrder, rs.getBigDecimal("reach_mass"),
-                                rs.getBigDecimal("reach_mid"), rs.getBigDecimal("reach_premium"))), key);
+                                rs.getBigDecimal("reach_mid"), rs.getBigDecimal("reach_premium")),
+                        channelTexts.getOrDefault(rs.getString("code"), Map.of())), key);
 
         List<Scenario.ProjectSpec> projects = jdbc.query("""
                 select code, name, lang, target_product,
@@ -225,6 +229,18 @@ public class ScenarioRepository {
                         .put(rs.getString("lang"), new Scenario.Text(
                                 rs.getString("name"), rs.getString("description"))), key);
         return bySegment;
+    }
+
+    /** Every language's name for each channel of a template (D114). */
+    private Map<String, Map<String, Scenario.Text>> channelTextsOf(String key) {
+        Map<String, Map<String, Scenario.Text>> byChannel = new LinkedHashMap<>();
+        jdbc.query("""
+                select channel_code, lang, name from channel_text
+                where scenario_key = ?
+                """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+                byChannel.computeIfAbsent(rs.getString("channel_code"), k -> new LinkedHashMap<>())
+                        .put(rs.getString("lang"), new Scenario.Text(rs.getString("name"), null)), key);
+        return byChannel;
     }
 
     /** Every language's words for each product of a template (D87). */
@@ -464,6 +480,12 @@ public class ScenarioRepository {
                 select ?, code, name, reach_weight, brand_alpha,
                        reach_mass, reach_mid, reach_premium from channel where scenario_key = ?
                 """, key, sourceKey);
+        // D114: a channel's name per language is catalogue data too. Placed after the channel rows so the
+        // foreign key has both sides — the D108 ordering bug, not repeated.
+        jdbc.update("""
+                insert into channel_text (scenario_key, channel_code, lang, name)
+                select ?, channel_code, lang, name from channel_text where scenario_key = ?
+                """, key, sourceKey);
         jdbc.update("""
                 insert into rnd_project (scenario_key, code, name, lang, target_product,
                                          advantage_type, advantage_value, hidden_cost, hint_band,
@@ -642,10 +664,17 @@ public class ScenarioRepository {
      * means "the channel reaches every class equally", which is what every template had before.
      */
     public record ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
-                             Map<String, BigDecimal> reachBySegment) {
+                             Map<String, BigDecimal> reachBySegment,
+                             /** D114: the channel's name per language, edited beside the single row. */
+                             List<TextRow> texts) {
+
+        public ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
+                          Map<String, BigDecimal> reachBySegment) {
+            this(code, name, reachWeight, brandAlpha, reachBySegment, List.of());
+        }
 
         public ChannelRow(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
-            this(code, name, reachWeight, brandAlpha, Map.of());
+            this(code, name, reachWeight, brandAlpha, Map.of(), List.of());
         }
     }
 
@@ -697,13 +726,15 @@ public class ScenarioRepository {
         List<String> classOrder = jdbc.queryForList(
                 "select code from customer_segment where scenario_key = ? order by sort_order, code",
                 String.class, key);
+        Map<String, Map<String, Scenario.Text>> texts = channelTextsOf(key);
         return jdbc.query("""
                 select code, name, reach_weight, brand_alpha, reach_mass, reach_mid, reach_premium
                 from channel where scenario_key = ? order by code
                 """, (rs, i) -> new ChannelRow(rs.getString("code"), rs.getString("name"),
                 rs.getBigDecimal("reach_weight"), rs.getBigDecimal("brand_alpha"),
                 byClass(classOrder, rs.getBigDecimal("reach_mass"), rs.getBigDecimal("reach_mid"),
-                        rs.getBigDecimal("reach_premium"))), key);
+                        rs.getBigDecimal("reach_premium")),
+                textRows(texts.get(rs.getString("code")))), key);
     }
 
     public List<ProjectRow> projects(String key) {
@@ -844,6 +875,20 @@ public class ScenarioRepository {
                     """, key, row.code(), row.name(), row.reachWeight(), row.brandAlpha(),
                     weightFor(classOrder, weights, 0), weightFor(classOrder, weights, 1),
                     weightFor(classOrder, weights, 2));
+            // D114: the name per language travels with the channel, like a product's (D87). A row with a
+            // blank name is not written — the fallback is the authored name, not an empty label.
+            jdbc.update("delete from channel_text where scenario_key = ? and channel_code = ?",
+                    key, row.code());
+            for (TextRow text : row.texts() == null ? List.<TextRow>of() : row.texts()) {
+                if (text == null || isBlank(text.lang()) || isBlank(text.name())) {
+                    continue;
+                }
+                jdbc.update("""
+                        insert into channel_text (scenario_key, channel_code, lang, name)
+                        values (?, ?, ?, ?)
+                        """, key, row.code(), text.lang().trim().toLowerCase(java.util.Locale.ROOT),
+                        text.name());
+            }
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);
     }

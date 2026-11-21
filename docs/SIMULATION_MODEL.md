@@ -156,6 +156,36 @@ share_ij = A_ij / (Σ_k A_kj + A_baseline_j)
 - Share is computed **before** stock is checked, deliberately: a company with no stock still wins
   demand and then loses it. That is the stockout lesson and it must be visible in the debrief.
 
+### 5.2a The award, per customer class (D107–D109, recorded for the debrief by D115)
+
+A product's served market is carved by customer class **before** it is contested, and each class is then
+allocated on its own attractiveness — the same company can be strong in the mass market and weak in the
+affluent one on the same product:
+
+```
+served_j  = pool_j × (1 − baselineShare)
+market_{j,c} = served_j carved across classes c                    whole pieces, largest remainder
+share_{i,j,c} = A_{i,j,c} / Σ_k A_{k,j,c}                          contested within class c
+demand_{i,j} = Σ_c pieces_{i,j,c}                                  the product's demand for company i
+```
+
+The class carve weights a product's own class in full and every other class by `cross_segment_pct` (D81),
+scaled by that class's size and purchasing power for the round. Reach is read per class from the channel
+record (D109), so the weights change who wins each class, never the size of the market.
+
+- **What is stored.** `round_statement.detail.classes` carries one row per (product, class): the class's
+  served market, the pieces awarded and that award as a percentage of the class's market (2 dp).
+- **Award, not sales.** Stock is a company-level pool. A company that stocks out was still awarded its
+  demand and sold fewer units; the shortfall is `detail.products[].lost`. The class table therefore states
+  **demand won ÷ the class's served market**, and the debrief's caption says so. Units sold are never
+  apportioned across classes by ratio — that would be a number no measurement produced.
+- **No class weights, no breakdown.** A template whose channels state no class reach allocates one pool;
+  `classes` is empty and the debrief shows no class table. See §5.2 for why a split there would be an
+  invention.
+- The breakdown adds up by construction: a company's class awards equal the demand on its product line, and
+  the companies in one class equal that class's served market. `scripts/audit_financials.py` re-derives both
+  independently.
+
 ### 5.3 Brand
 
 ```

@@ -442,6 +442,109 @@ public class RoundService {
     }
 
     /**
+     * D115: the round's award per (product, customer class) — the breakdown D-C ruled the debrief should
+     * gain beside the company share.
+     *
+     * <p>Read from the statements' own {@code detail.classes}: the numbers the engine wrote when it
+     * computed the round. This is a reading of the record, never a second calculation — a facilitator
+     * disputing a cell is disputing the allocation that produced it.
+     *
+     * <p>Names are resolved in the run's own language (D87/D114), which is why the table is assembled
+     * here rather than in the browser. A template that does not weight reach by class has no breakdown at
+     * all and returns an empty list: there the market was one pool, so a per-class split would be invented.
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> classShares(long tenantId, long runId, Integer round) {
+        RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
+                () -> ProblemException.notFound("run.not_found", "no such run"));
+        Scenario scenario = scenarios.load(run.scenarioKey());
+        String lang = runs.langOf(runId);
+
+        Integer at = round;
+        if (at == null) {
+            at = jdbc.query("select max(number) from round where run_id = ? and status = 'COMPUTED'",
+                    rs -> rs.next() ? rs.getObject(1, Integer.class) : null, runId);
+        }
+        if (at == null) {
+            return List.of();
+        }
+        final int target = at;
+
+        // Template order -- product, then class -- so the table reads the same every round and on every
+        // screen. A row exists only once a statement states its market, which keeps products the class
+        // never touched out of the table instead of showing them as zero.
+        Map<String, Map<String, Map<String, Object>>> table = new LinkedHashMap<>();
+        for (Scenario.ProductSpec product : scenario.products()) {
+            Map<String, Map<String, Object>> bySegment = new LinkedHashMap<>();
+            for (Scenario.SegmentSpec segment : scenario.segments()) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("product", product.code());
+                row.put("productName", product.nameIn(lang));
+                row.put("segment", segment.code());
+                row.put("segmentName", segment.nameIn(lang));
+                row.put("market", null);
+                row.put("companies", new ArrayList<Map<String, Object>>());
+                bySegment.put(segment.code(), row);
+            }
+            table.put(product.code(), bySegment);
+        }
+
+        for (RoundRepository.TeamState team : rounds.teams(runId)) {
+            for (Map<String, Object> statement : rounds.statements(runId, team.id())) {
+                if (!(statement.get("round") instanceof Integer number) || number != target) {
+                    continue;
+                }
+                if (!(statement.get("detail") instanceof Map<?, ?> detail)
+                        || !(detail.get("classes") instanceof List<?> rows)) {
+                    continue;
+                }
+                for (Object entry : rows) {
+                    if (!(entry instanceof Map<?, ?> share)) {
+                        continue;
+                    }
+                    Map<String, Object> row = table.getOrDefault(String.valueOf(share.get("product")), Map.of())
+                            .get(String.valueOf(share.get("segment")));
+                    if (row == null) {
+                        // A product or class the template no longer has: the statement is still the record
+                        // it was, but the debrief's table is built on today's catalogue.
+                        continue;
+                    }
+                    row.put("market", number(share.get("market")));
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> companies = (List<Map<String, Object>>) row.get("companies");
+                    Map<String, Object> company = new LinkedHashMap<>();
+                    company.put("teamId", team.id());
+                    company.put("company", team.companyName());
+                    company.put("demand", number(share.get("demand")));
+                    company.put("share", number(share.get("share")));
+                    companies.add(company);
+                }
+            }
+        }
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Map<String, Object>> bySegment : table.values()) {
+            for (Map<String, Object> row : bySegment.values()) {
+                if (row.get("market") != null) {
+                    out.add(row);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** A number from a stored statement detail: kept exact rather than a double's approximation. */
+    private static BigDecimal number(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof BigDecimal exact) {
+            return exact;
+        }
+        return new BigDecimal(String.valueOf(value));
+    }
+
+    /**
      * The standings a trainee may read (D51/D75): rank, company, cash after the round and that round's
      * profit. Staff see the same table; a person who is not seated in the session sees nothing at all.
      */
@@ -567,7 +670,19 @@ public class RoundService {
         body.put("salaries", scenario.params().salaries());
         body.put("fixedCostPerMonth", scenario.params().fixedCostPerMonth());
         body.put("holdingCostPerUnit", scenario.params().holdingCostPerUnit());
-        body.put("channels", scenario.channels());
+        // D114: a channel's code is what the decision names; its name is the class's language. Until this
+        // it was the authored English name in every class, so a Chinese class read 客户群 in Chinese and
+        // the three channels in English in the same card.
+        List<Map<String, Object>> channels = new ArrayList<>();
+        for (Scenario.ChannelSpec spec : scenario.channels()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("code", spec.code());
+            row.put("name", spec.nameIn(productLang));
+            row.put("reachWeight", spec.reachWeight());
+            row.put("brandAlpha", spec.brandAlpha());
+            channels.add(row);
+        }
+        body.put("channels", channels);
         body.put("machineCostPerWorker", scenario.params().machineCostPerWorker());
 
         Map<String, ScoringEngine.RndState> rnd = rounds.rnd(runId).getOrDefault(teamId, Map.of());

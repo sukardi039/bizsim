@@ -194,10 +194,29 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
      * question: "what does this channel reach this class with?"
      */
     public record ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
-                              Map<String, BigDecimal> reachBySegment) {
+                              Map<String, BigDecimal> reachBySegment,
+                              /** D114: the channel's name per language; a missing one falls back to name. */
+                              Map<String, Text> texts) {
+
+        public ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha,
+                           Map<String, BigDecimal> reachBySegment) {
+            this(code, name, reachWeight, brandAlpha, reachBySegment, Map.of());
+        }
 
         public ChannelSpec(String code, String name, BigDecimal reachWeight, BigDecimal brandAlpha) {
-            this(code, name, reachWeight, brandAlpha, Map.of());
+            this(code, name, reachWeight, brandAlpha, Map.of(), Map.of());
+        }
+
+        /**
+         * The channel's name in {@code lang}, falling back to the authored one.
+         *
+         * <p>D114: the class reads its own language. A channel translated only into English is still
+         * readable in a Chinese class rather than blank, which is why the fallback is the authored
+         * name and not the code.
+         */
+        public String nameIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            return text == null || text.name() == null || text.name().isBlank() ? name : text.name();
         }
 
         /** The weight this channel reaches {@code segment} with; the channel's own when none is stated. */

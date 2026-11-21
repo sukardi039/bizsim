@@ -503,7 +503,8 @@ def attractiveness(run: Run, code: str, team: Team, body: dict, segment: str | N
 
 
 def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict],
-             previous: dict | None = None) -> dict:
+             previous: dict | None = None, class_pieces: dict | None = None,
+             class_markets: dict | None = None) -> dict:
     result = {team.id: {} for team in teams}
     baseline = float(run.baseline_share)
     n = len(teams)
@@ -552,6 +553,13 @@ def allocate(run: Run, env: dict, teams: list[Team], bodies: list[dict],
             order = sorted(range(n), key=lambda i: (-(raw[i] - pieces[i]), i))
             for k in range(leftover):
                 pieces[order[k]] += ONE
+            # D115: the auditor keeps its own copy of the class split, so the per-class breakdown stored
+            # in the statement is checked against a second implementation rather than trusted.
+            if segment is not None and class_markets is not None:
+                class_markets[(code, segment)] = int(class_target)
+            if segment is not None and class_pieces is not None:
+                for i, team in enumerate(teams):
+                    class_pieces[(team.id, code, segment)] = int(pieces[i])
             for i, team in enumerate(teams):
                 total_for[team.id] += int(pieces[i])
         for i, team in enumerate(teams):
@@ -859,8 +867,11 @@ def audit_run(cur, run_row, audit: Audit) -> None:
         env = run.environment(round_number)
         bodies = [plan(run, team, decisions.get((round_number, team.id), {}), env)
                   for team in teams]
+        class_pieces: dict = {}
+        class_markets: dict = {}
         demand = allocate(run, env, teams, bodies,
-                          previous_shares(statements, round_number, run))
+                          previous_shares(statements, round_number, run),
+                          class_pieces, class_markets)
         pool = sum((whole_pool(run, code, env, len(teams)) for code in run.products), ZERO)
         # D34: the cohort's demand must add up to the whole pieces the market offers it.
         target_total = sum(((whole_pool(run, code, env, len(teams))
@@ -932,6 +943,56 @@ def audit_run(cur, run_row, audit: Audit) -> None:
                     expected = div(line["sold"] * D(100), product_pool) if product_pool else ZERO
                     audit.check(f"{line['product']} market share", stored_line["share"], expected,
                                 tolerance=TOL, where=where)
+            # D115: the per-class breakdown is stored in the statement detail, so it is re-derived here
+            # from this file's own allocation. The sums are the point: a company's class awards are the
+            # demand on its product line, and the companies in one class are that class's served market.
+            class_rows = detail.get("classes") or []
+            weighted_round = segment_weighted(run)
+            audit.checks += 1
+            if weighted_round and not class_rows:
+                audit.failures.append(f"{where} a class-weighted round stored no per-class breakdown")
+            if not weighted_round and class_rows:
+                audit.failures.append(f"{where} a per-class breakdown on a template that weights nothing")
+            if weighted_round:
+                wanted = {(code, segment) for (team_id, code, segment) in class_pieces
+                          if team_id == team.id}
+                stored_cells = {(row.get("product"), row.get("segment")) for row in class_rows}
+                audit.checks += 1
+                if stored_cells != wanted:
+                    audit.failures.append(
+                        f"{where} class cells {sorted(stored_cells)} != {sorted(wanted)}")
+                for row in class_rows:
+                    product = row.get("product")
+                    segment = row.get("segment")
+                    pieces = class_pieces.get((team.id, product, segment))
+                    market = class_markets.get((product, segment))
+                    # The allocation tie can hand this file one unit where the engine handed another;
+                    # the same one-unit tolerance the product lines carry.
+                    audit.check(f"{product}/{segment} class award", row.get("demand"), pieces,
+                                tolerance=D(1), where=where)
+                    audit.check(f"{product}/{segment} class market", row.get("market"), market,
+                                tolerance=D(0), where=where)
+                    if market:
+                        expected_share = (D(str(pieces)) * HUNDRED / D(str(market))) \
+                            .quantize(D("0.01"), ROUND_HALF_UP)
+                        audit.check(f"{product}/{segment} class share", row.get("share"),
+                                    expected_share, tolerance=D("0.02"), where=where)
+                for code in run.products:
+                    awarded = sum((D(str(row.get("demand") or 0)) for row in class_rows
+                                   if row.get("product") == code), ZERO)
+                    product_demand = next((line["demanded"] for line in outcome["lines"]
+                                           if line["product"] == code), ZERO)
+                    audit.check(f"{code} class awards sum to the line demand", awarded,
+                                product_demand, tolerance=D(0), where=where)
+                for segment in run.segments:
+                    stored_markets = sum((D(str(row.get("market") or 0)) for row in class_rows
+                                          if row.get("segment") == segment), ZERO)
+                    expected_markets = sum((D(str(class_markets[(code, segment)]))
+                                            for code in run.products
+                                            if (code, segment) in class_markets), ZERO)
+                    audit.check(f"{segment} class markets add up", stored_markets,
+                                expected_markets, tolerance=D(0), where=where)
+
             # The identity the whole product rests on: everything profit charges that cash did not
             # pay, plus everything cash paid that profit did not charge. COGS at the round's basis
             # minus materials at the same basis is the inventory term, whatever the basis is.
