@@ -1140,3 +1140,49 @@ Evidence, driven in a real browser (local Chromium, zh class, six companies):
 enumerating every session control. Recording a new action without extending it fails as a 409 on the button,
 not a compile error — the first test run returned exactly that. V44 extends the constraint in the same
 migration that adds the show.
+
+
+**D118 — The class size is the package's number, not a constant (ruled and built 21 Nov 2026).** The owner's
+question: *"we set an arbitrary number to the seats limit as 10 — can this be a default in a package instead
+of hard setting it, so more players can participate in the same simulation?"* He was right that it was
+arbitrary, and it was worse than one place:
+
+| Where | What it was |
+|---|---|
+| **Decision 5** (1 Nov) | *"10 players per simulation, 5 concurrent simulations per tenant"* — a v1 sizing target (500 concurrent users), never a limit of the model |
+| `RunService.createRun` | `teams.size() > 10` → `400 run.too_many_teams`, message citing decision 5 |
+| `PackagesPanel` | `const MAX_COMPANIES = 10` — the builder's picker stopped accepting clicks |
+| `MarketSharePies` | ten hues, assigned `PALETTE[i % 10]` — an eleventh company shared a colour in silence |
+| `map-template.mjs` | **six** hand-written slots, commented "six being the largest class the console seats" |
+
+The last one was a live inconsistency nobody had hit: a **7–10 company class could be created and played but
+its shared position map could not be drawn** (`MapShareService` refused above the renderer's six). The engine
+itself has always iterated over `teams.size()`, so nothing in the economics assumed ten.
+
+**Ruling.** A class size is a teaching decision — the same economy prepared for twelve companies or for thirty
+is the same economy — and the builder is the person who knows the room. So it moves onto the package:
+
+- **`simulation_package.seat_limit`** (V45), `not null default 10`, `check (between 2 and 30)`. Every package
+  published before the column keeps behaving exactly as it did; 2 is the floor because a class of one has no
+  market to compete in.
+- **The ceiling is thirty** (the owner's number), and it is the *console's* ceiling, not the package's choice:
+  thirty palette hues and a position map that still reads. Both were extended to it —
+  `PALETTE` now carries thirty distinct colours, and the map template is **generated** to thirty slots
+  (six price tiers × five vertical steps) instead of six hand-written ones, which also closes the 7–10 gap.
+- **Refused at publish, not at "start"**: a package whose company list is longer than its own limit answers
+  `400 package.too_many_companies` while the builder is still preparing; a limit outside 2–30 answers
+  `400 package.seat_limit_invalid`. A facilitator pressing start is the worst moment to learn a package is
+  oversized.
+- **The limit travels into the run**: `startFromPackage` passes the package's number to `startPrepared` →
+  `createRun`, so `run.too_many_teams` quotes *this package's* limit. A run created without a package (a
+  builder's tool) is bounded by the thirty-company ceiling directly.
+- **Walk-ins cannot exceed the frozen class size** — the market was priced for that many companies, and adding
+  one later re-prices everyone, which is the same reason bots are chosen at publish (D49).
+- **Decision 5's sizing note is superseded, not deleted**: the concurrency target becomes 5 simulations × 20
+  typical seats rather than × 10; the original ruling stands as the v1 target it was.
+
+Verified: `SeatLimitTest` (twelve-seat package published and read back, a thirteen-company list against a
+twelve limit refused, thirty-one refused at the ceiling, a twelve-company session seats twelve, a package-less
+run of thirty created and of thirty-one refused with `max=30`). The map template reports **30 bubbles, 30
+figures, 30 name slots**, and the full suite is green. The builder's Packages screen carries the field
+(default 10) and the picker stops at it.

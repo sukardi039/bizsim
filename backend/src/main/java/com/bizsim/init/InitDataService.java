@@ -172,8 +172,10 @@ public class InitDataService {
         // ---------------------------------------------------------------- package
         String packageName = blankTo(p.packageName(), "Demo programme " + code);
         PackageRepository.PackageRow pkg = packageService.publish(tenantId, code, builderId,
+                // D118: the seeded package states its own class size, so a demo class larger than ten
+                // can be prepared at all — the publish would otherwise refuse its own company list.
                 new PackageService.PublishRequest(packageName, templateKey, profileIds, playerIds,
-                        locale, null));
+                        locale, null, Math.max(2, Math.min(30, profileIds.size()))));
 
         // ---------------------------------------------------------------- session
         String runName = blankTo(p.runName(), "Demo class " + code);

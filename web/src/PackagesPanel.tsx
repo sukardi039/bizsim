@@ -36,6 +36,8 @@ export default function PackagesPanel() {
     locale: String(locale),
     /** D62: extra parts beyond the first. Empty = a single-simulation package. */
     parts: [] as { name: string; templateKey: string }[],
+    /** D118: how many companies this class may have. Ten is the old fixed size; the ceiling is 30. */
+    seatLimit: 10,
   });
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -90,6 +92,7 @@ export default function PackagesPanel() {
         // positional: one entry per company, null where the seat is left open
         traineeIds: draft.companyIds.map((id) => (seats[id] ? Number(seats[id]) : null)),
         locale: draft.locale || null,
+        seatLimit: draft.seatLimit,
         // The first part is the package's own template; extra parts make it a programme.
         parts:
           draft.parts.length === 0
@@ -105,6 +108,7 @@ export default function PackagesPanel() {
         templateKey: draft.templateKey,
         companyIds: [],
         locale: String(locale),
+        seatLimit: 10,
         parts: [],
       });
       setSeats({});
@@ -148,15 +152,16 @@ export default function PackagesPanel() {
     }
   };
 
-  /** A session holds one company per profile and at most ten of them (decision 5). */
-  const MAX_COMPANIES = 10;
-
+  /**
+   * D118: the class size is the package's own number (default 10, ceiling 30) — not a constant. The
+   * picker stops at the limit and the count line says which limit it is.
+   */
   const toggle = (id: number) =>
     setDraft((current) => {
       if (current.companyIds.includes(id)) {
         return { ...current, companyIds: current.companyIds.filter((value) => value !== id) };
       }
-      if (current.companyIds.length >= MAX_COMPANIES) {
+      if (current.companyIds.length >= current.seatLimit) {
         return current; // the count line says why; do not silently drop the click
       }
       return { ...current, companyIds: [...current.companyIds, id] };
@@ -353,7 +358,7 @@ export default function PackagesPanel() {
             <small className="muted">
               {t("packages.companyCount", {
                 count: draft.companyIds.length,
-                max: MAX_COMPANIES,
+                max: draft.seatLimit,
               })}
             </small>
           </h3>
@@ -367,7 +372,7 @@ export default function PackagesPanel() {
                     checked={draft.companyIds.includes(company.id)}
                     disabled={
                       !draft.companyIds.includes(company.id) &&
-                      draft.companyIds.length >= MAX_COMPANIES
+                      draft.companyIds.length >= draft.seatLimit
                     }
                     onChange={() => toggle(company.id)}
                   />
@@ -379,6 +384,23 @@ export default function PackagesPanel() {
               </li>
             ))}
           </ul>
+
+          <label>
+            {t("packages.seatLimit")}
+            <input
+              type="number"
+              min={2}
+              max={30}
+              value={draft.seatLimit}
+              onChange={(e) =>
+                setDraft((current) => ({
+                  ...current,
+                  seatLimit: Math.max(2, Math.min(30, Number(e.target.value) || 10)),
+                }))
+              }
+            />
+            <small className="muted">{t("packages.seatLimitHint")}</small>
+          </label>
 
           <label>
             {t("packages.classLanguage")}

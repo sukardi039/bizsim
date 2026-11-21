@@ -23,6 +23,12 @@ const COVER_INNER = 92;
 const PALETTE = [
   "#4f8ef7", "#f2994a", "#27ae60", "#eb5757", "#9b51e0",
   "#2d9cdb", "#f2c94c", "#56ccf2", "#bb6bd9", "#6fcf97",
+  // D118: a class may seat up to thirty companies, so the palette grows with it. Hues are spaced and
+  // alternate brightness so neighbours in the legend do not blur together on a projector.
+  "#e07a5f", "#3d5a80", "#98c1d9", "#ee6c4d", "#6a994e",
+  "#bc4749", "#a7c957", "#4361ee", "#f4a261", "#7209b7",
+  "#0081a7", "#d62828", "#2a9d8f", "#e9c46a", "#8d99ae",
+  "#c77dff", "#00b4d8", "#ff7b00", "#5f0f40", "#84a98c",
 ];
 const AUTO = "#6b7280";
 

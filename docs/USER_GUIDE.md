@@ -314,6 +314,14 @@ A facilitator does not see **People** at all: the class arrives with the package
 
 ## 6. Builder — Packages (the hand-over)
 
+**Class size (D118).** A package states how many companies its class runs — **2 to 30**, default 10, which
+was the old fixed size. It is a builder's decision because it is a teaching decision: the same template
+prepared for twelve companies or for thirty is the same economy. The picker stops at the number you set, and
+publishing refuses a company list longer than that number. Thirty is the ceiling because that is what the
+console can draw: thirty distinct colours on the pies, thirty numbered bubbles on the shared map. Packages
+published before this release keep behaving as they always did — ten.
+
+
 A package is the immutable bundle you hand to the facilitator: **one template + the companies + the
 class list**.
 
@@ -344,6 +352,11 @@ frozen copies) after a confirmation. Packages that taught a class are never offe
 ---
 
 ## 7. Facilitator — running a class
+
+The class size is already fixed by the package; nothing here changes it. A session runs exactly the
+companies the package carries, and a walk-in list cannot push it past the number the builder chose — the
+market was priced for that many when the package was published, the same reason opponents are chosen then.
+
 
 ### 7.1 Start a session
 

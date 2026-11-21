@@ -557,6 +557,8 @@ export interface SimulationPackage {
    * starting the same part twice would duplicate a class that already exists.
    */
   startedParts?: number[];
+  /** D118: how many companies this package may run — the class size the builder chose. */
+  seatLimit: number;
 }
 
 /** One simulation inside a programme. Omit parts entirely for a single-simulation package. */
@@ -942,6 +944,8 @@ export const api = {
     traineeIds: (number | null)[];
     locale?: string | null;
     parts?: PackagePartInput[];
+    /** D118: the class size; omitted keeps the old ten. */
+    seatLimit?: number;
   }) =>
     request<SimulationPackage>("/packages", { method: "POST", body: JSON.stringify(body) }),
   /** D62: the programme's parts compared — per company and against the class. */

@@ -29,17 +29,36 @@ const OUT = resolve(process.cwd(), "public", "map-template.json");
 const CHECK = process.argv.includes("--check");
 
 /**
- * Six slots, each with a distinct price, a distinct vertical index, a distinct share and a two-step trail
- * — six being the largest class the console seats.
+ * Slots for the largest class the console seats (D118: thirty companies).
+ *
+ * The template is a *layout*, not data: every slot carries a distinct price index and vertical index, a
+ * plausible share and a two-step trail, and the page substitutes the real figures into it. Thirty slots
+ * are generated rather than hand-written so the grid stays even and the file stays reviewable; the six
+ * hand-written slots this replaces were the same idea for a smaller ceiling.
+ *
+ * Price runs across six tiers, vertical across five steps: every pair is unique, which is what the
+ * substitution relies on when it drops the slots a smaller class does not use.
  */
-const SLOTS = [
-  { price: 0.7031, vertical: 0.7413, share: 4.13, trail: [[0.8123, 0.8031], [0.7531, 0.7719]] },
-  { price: 0.8279, vertical: 0.8621, share: 9.37, trail: [[0.9013, 0.9217], [0.8611, 0.8893]] },
-  { price: 0.9187, vertical: 0.9319, share: 14.29, trail: [[0.9721, 0.9337], [0.9433, 0.9321]] },
-  { price: 1.0713, vertical: 1.0217, share: 18.71, trail: [[1.0131, 0.9773], [1.0419, 0.9987]] },
-  { price: 1.1851, vertical: 1.1333, share: 23.47, trail: [[1.1013, 1.0231], [1.1431, 1.0779]] },
-  { price: 1.2917, vertical: 1.2479, share: 29.83, trail: [[1.2113, 1.1831], [1.2531, 1.2173]] },
-];
+const PRICE_TIERS = [0.7031, 0.8279, 0.9187, 1.0713, 1.1851, 1.2917];
+const VERTICAL_STEPS = [0.7413, 0.8621, 0.9319, 1.0217, 1.1333];
+const SLOT_COUNT = PRICE_TIERS.length * VERTICAL_STEPS.length;
+
+const SLOTS = Array.from({ length: SLOT_COUNT }, (_, index) => {
+  const tier = index % PRICE_TIERS.length;
+  const step = Math.floor(index / PRICE_TIERS.length);
+  const price = PRICE_TIERS[tier];
+  const vertical = VERTICAL_STEPS[step];
+  return {
+    price,
+    vertical,
+    // Shares ascend across the class so the template's own figures are plausible in any order.
+    share: 3.11 + index * 0.93,
+    trail: [
+      [price - 0.0413, vertical - 0.0317],
+      [price - 0.0211, vertical - 0.0119],
+    ],
+  };
+});
 
 function provider(locale, children) {
   const dict = locale === "zh" ? zh : en;

@@ -574,6 +574,12 @@ export const en: Dict = {
     "Prepared with the package: one person per company. To change it, publish a new package — seats cannot be changed once the session starts.",
   "start.mapping": "Who sits where",
   "packages.blockedLanguage": "choose the class language",
+  "packages.seatLimit": "Class size (companies)",
+  "packages.seatLimitHint":
+    "How many companies this class may have — 2 to 30. Ten was the old fixed size; the market is frozen for this number when the package is published.",
+  "error.package.seat_limit_invalid": "A class may have between {min} and {max} companies.",
+  "error.package.too_many_companies":
+    "This class allows {max} companies, but {companies} were chosen.",
   "packages.classLanguage": "Class language",
   "packages.classLanguageHint":
     "Fixed when the package is published: the class reads its environment and R&D catalogue in this language.",
@@ -1332,6 +1338,11 @@ export const zh: Dict = {
   "start.classListHint": "随模拟包一同准备：每家公司一位。如需更改，请发布新包——模拟开始后无法调整座位。",
   "start.mapping": "座位安排",
   "packages.blockedLanguage": "请选择课堂语言",
+  "packages.seatLimit": "班级规模（公司数）",
+  "packages.seatLimitHint":
+    "本班最多可有多少家公司——2 到 30 家。10 是原先的固定上限；发布课程包时，市场就按这个家数冻结。",
+  "error.package.seat_limit_invalid": "班级公司数应在 {min} 到 {max} 家之间。",
+  "error.package.too_many_companies": "本班允许 {max} 家公司，但选择了 {companies} 家。",
   "packages.classLanguage": "班级语言",
   "packages.classLanguageHint": "发布时固定：班级以此语言阅读市场环境与研发目录。",
   "packages.languagePerson": "跟随每位学员自己的选择",

@@ -27,6 +27,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class PositionMapPage {
 
+    /**
+     * D118: above this many companies the map labels each bubble with its number and prints the names in a
+     * legend instead. Measured, not guessed: at thirty companies the name labels overlap into a single
+     * unreadable line across the plot, which is a chart that lies about being readable.
+     */
+    public static final int NAME_LIMIT = 12;
+
     /** One company as the picture needs it: where it sits, and how big its bubble is. */
     public record Company(String name, double priceIndex, double qualityIndex, double brand, double share) {
     }
@@ -38,6 +45,16 @@ public class PositionMapPage {
 
     private final ObjectMapper json = new ObjectMapper();
     private volatile JsonNode template;
+    /**
+     * Where the console is served from, when one is beside the jar (D118). Spring's own property, not a
+     * system property: `--bizsim.web.dir=` lands in the environment, not in {@code System.getProperties()}.
+     */
+    private final String webDir;
+
+    public PositionMapPage(
+            @org.springframework.beans.factory.annotation.Value("${bizsim.web.dir:}") String webDir) {
+        this.webDir = webDir;
+    }
 
     /**
      * The build product, read once. Missing means a broken build, and the caller answers 503 rather than
@@ -70,6 +87,16 @@ public class PositionMapPage {
     }
 
     private java.io.InputStream open() throws java.io.IOException {
+        // D118: the console's own copy first when the console is beside us. A locally run jar otherwise
+        // reads whatever template was baked into target/classes on some earlier build — and a stale
+        // six-slot template against a thirty-company class is exactly the silent partial chart this
+        // release removed. The image stage still supplies it for a deployed jar.
+        if (webDir != null && !webDir.isBlank()) {
+            java.io.File besideConsole = new java.io.File(webDir, "map-template.json");
+            if (besideConsole.isFile()) {
+                return new java.io.FileInputStream(besideConsole);
+            }
+        }
         for (String path : new String[] {"map-template.json", "static/map-template.json"}) {
             java.io.File file = new java.io.File(path);
             if (file.isFile()) {
@@ -149,8 +176,12 @@ public class PositionMapPage {
         }
         svg = substitute(svg, template.path("tokens").path("number").asText(), figures);
 
+        // D117/D118: a number on the bubble and a legend beside it, or the name itself when the class is
+        // small enough for the names to fit.
+        boolean compact = companies.size() > NAME_LIMIT;
         for (int i = 0; i < companies.size(); i++) {
-            svg = svg.replace(template.path("slots").get(i).path("name").asText(), escape(companies.get(i).name()));
+            String label = compact ? String.valueOf(i + 1) : companies.get(i).name();
+            svg = svg.replace(template.path("slots").get(i).path("name").asText(), escape(label));
         }
         for (int i = companies.size(); i < slots; i++) {
             svg = dropGroup(svg, template.path("slots").get(i).path("name").asText());
@@ -162,7 +193,17 @@ public class PositionMapPage {
             throw new IllegalStateException("map template did not substitute cleanly: "
                     + namesLeft + " names and " + numbersLeft + " figures left over");
         }
-        return svg;
+        if (!compact) {
+            return svg;
+        }
+        // The legend is what makes the numbers usable: same order as the bubbles were numbered in.
+        StringBuilder legend = new StringBuilder("<ol class=share-legend>");
+        for (Company company : companies) {
+            legend.append("<li><span>").append(escape(company.name())).append("</span><b>")
+                    .append(percentNumber(company.share())).append("%</b></li>");
+        }
+        legend.append("</ol>");
+        return svg + legend;
     }
 
     /**
@@ -233,6 +274,12 @@ public class PositionMapPage {
                   .position-dot.own{fill:rgba(120,220,160,.55);stroke:rgba(140,240,180,.95)}
                   .position-name{fill:#c8cedb;font-size:9px}
                   .position-share{fill:#eef2f8;font-size:10px;font-weight:600}
+                  /* D118: above twelve companies the bubbles are numbered and the names live here.
+                     A grid, not columns+float: the floated share used to collide with the next item's
+                     number and the legend read as one run-on line. */
+                  .share-legend{display:grid;grid-template-columns:1fr 1fr;gap:.05rem 1.4rem;margin:.9rem 0 0;padding-left:1.5rem;font-size:.82rem;color:#c8cedb}
+                  .share-legend li{margin:0}
+                  .share-legend li b{margin-left:.4rem;color:#eef2f8}
                   .position-label{fill:#9aa3b5;font-size:9px}
                   .position-map{margin:0}
                   .position-map figcaption h3{margin:0 0 .15rem;font-size:1rem}
@@ -288,6 +335,12 @@ public class PositionMapPage {
                   .position-dot.own{fill:rgba(120,220,160,.55);stroke:rgba(140,240,180,.95)}
                   .position-name{fill:#c8cedb;font-size:9px}
                   .position-share{fill:#eef2f8;font-size:10px;font-weight:600}
+                  /* D118: above twelve companies the bubbles are numbered and the names live here.
+                     A grid, not columns+float: the floated share used to collide with the next item's
+                     number and the legend read as one run-on line. */
+                  .share-legend{display:grid;grid-template-columns:1fr 1fr;gap:.05rem 1.4rem;margin:.9rem 0 0;padding-left:1.5rem;font-size:.82rem;color:#c8cedb}
+                  .share-legend li{margin:0}
+                  .share-legend li b{margin-left:.4rem;color:#eef2f8}
                   .position-label{fill:#9aa3b5;font-size:9px}
                   .position-map{margin:0}
                   .position-map figcaption h3{margin:0 0 .15rem;font-size:1rem}

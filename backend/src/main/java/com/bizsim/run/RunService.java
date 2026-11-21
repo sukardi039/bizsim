@@ -80,11 +80,17 @@ public class RunService {
         this.packages = packages;
     }
 
+    /**
+     * The console's ceiling (D118). A package states its own class size up to this number; a run created
+     * without a package — a builder's tool — is bounded by it directly.
+     */
+    public static final int MAX_TEAMS = 30;
+
     @Transactional
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles) {
         return createRun(tenantId, facilitatorId, name, scenarioKey, teams, requestedRounds,
-                requestedCycles, null);
+                requestedCycles, null, MAX_TEAMS);
     }
 
     /**
@@ -95,15 +101,26 @@ public class RunService {
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles,
                              String lang) {
+        return createRun(tenantId, facilitatorId, name, scenarioKey, teams, requestedRounds,
+                requestedCycles, lang, MAX_TEAMS);
+    }
+
+    /** D118: {@code maxTeams} is the package's seat limit when a session starts from a package. */
+    @Transactional
+    public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
+                             List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles,
+                             String lang, int maxTeams) {
         if (!runs.scenarioExists(scenarioKey)) {
             throw ProblemException.badRequest("template.unknown", "unknown scenario " + scenarioKey, "template", scenarioKey);
         }
         if (teams == null || teams.isEmpty()) {
             throw ProblemException.badRequest("run.teams_required", "at least one team is required");
         }
-        if (teams.size() > 10) {
+        if (teams.size() > maxTeams) {
+            // D118: the number is the package's, not a constant. Decision 5's "10 players" was a sizing
+            // target for v1; the engine always competed over teams.size().
             throw ProblemException.badRequest("run.too_many_teams",
-                    "at most 10 teams per run (decision 5)", "max", 10);
+                    "at most " + maxTeams + " teams per run", "max", maxTeams);
         }
         // D21: one facilitator, one simulation at a time. A second concurrent simulation needs a
         // second facilitator account, so this is a refusal rather than a filter on the screen.
@@ -173,6 +190,15 @@ public class RunService {
     public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
                                  List<Long> profileIds, List<Long> traineeIds,
                                  Integer requestedRounds, Integer requestedCycles, String lang) {
+        return startPrepared(tenantId, facilitatorId, name, templateKey, profileIds, traineeIds,
+                requestedRounds, requestedCycles, lang, MAX_TEAMS);
+    }
+
+    /** D118: a session started from a package carries that package's seat limit into the run cap. */
+    public RunView startPrepared(long tenantId, long facilitatorId, String name, String templateKey,
+                                 List<Long> profileIds, List<Long> traineeIds,
+                                 Integer requestedRounds, Integer requestedCycles, String lang,
+                                 int maxTeams) {
         // A package's template is a frozen copy, which the library hides on purpose; existence is the
         // right question here, not visibility.
         if (!scenarios.existsForTenant(tenantId, templateKey)) {
@@ -227,7 +253,7 @@ public class RunService {
         }
 
         RunView view = createRun(tenantId, facilitatorId, name, templateKey, teams,
-                requestedRounds, requestedCycles, lang);
+                requestedRounds, requestedCycles, lang, maxTeams);
 
         for (int i = 0; i < chosen.size(); i++) {
             List<String> productLine = chosen.get(i).products();
@@ -288,6 +314,13 @@ public class RunService {
             }
         }
         List<Long> effective = traineeIds == null || traineeIds.isEmpty() ? seats : traineeIds;
+        // D118: the class size the builder prepared this package for. A walk-in list cannot exceed it —
+        // the market was frozen for that many companies, and adding a company later re-prices everyone.
+        if (effective.size() > pkg.seatLimit()) {
+            throw ProblemException.badRequest("run.too_many_teams",
+                    "this package allows " + pkg.seatLimit() + " companies; " + effective.size()
+                            + " were given", "max", pkg.seatLimit());
+        }
 
         List<PackageRepository.PartRow> parts = pkg.parts();
         int position = partPosition == null ? 1 : partPosition;
@@ -333,7 +366,7 @@ public class RunService {
         // Rounds come from the part's template, never from the request: a part is defined by the
         // template the builder published it with (ruling 5 Nov 2026).
         RunView view = startPrepared(tenantId, facilitatorId, name, part.templateKey(),
-                pkg.companyProfileIds(), effective, null, null, pkg.locale());
+                pkg.companyProfileIds(), effective, null, null, pkg.locale(), pkg.seatLimit());
         // The class language of the package decides the catalogue and the environment for every seat
         // in this part. It was already passed to startPrepared; this only records the package.
         jdbc.update("""

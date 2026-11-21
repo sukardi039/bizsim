@@ -37,7 +37,9 @@ public class PackageRepository {
     public record PackageRow(long id, String name, String templateKey, String sourceTemplateKey,
                              int templateVersion, List<Long> companyProfileIds, List<Seat> seats,
                              String locale, String status, String publishedAt,
-                             List<PartRow> parts, List<Integer> startedParts) {
+                             List<PartRow> parts, List<Integer> startedParts,
+                             /** D118: how many companies this package may run. */
+                             int seatLimit) {
     }
 
     private final JdbcTemplate jdbc;
@@ -56,14 +58,14 @@ public class PackageRepository {
     @Transactional
     public long insert(long tenantId, String name, String templateKey, String sourceTemplateKey,
                        int templateVersion, List<Long> companyProfileIds, List<Long> seats,
-                       String locale, long publishedBy) {
+                       String locale, long publishedBy, int seatLimit) {
         long id = jdbc.queryForObject("""
                 insert into simulation_package
                     (tenant_id, name, template_key, source_template_key, template_version,
-                     company_profile_ids, locale, published_by)
-                values (?, ?, ?, ?, ?, ?::jsonb, ?, ?) returning id
+                     company_profile_ids, locale, published_by, seat_limit)
+                values (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?) returning id
                 """, Long.class, tenantId, name, templateKey, sourceTemplateKey, templateVersion,
-                writeIds(companyProfileIds), locale, publishedBy);
+                writeIds(companyProfileIds), locale, publishedBy, seatLimit);
         if (seats != null) {
             for (int position = 0; position < seats.size(); position++) {
                 Long userId = seats.get(position);
@@ -81,7 +83,7 @@ public class PackageRepository {
     public List<PackageRow> list(long tenantId) {
         return jdbc.query("""
                 select id, name, template_key, source_template_key, template_version,
-                       company_profile_ids::text, locale, status,
+                       company_profile_ids::text, locale, status, seat_limit,
                        to_char(published_at, 'YYYY-MM-DD HH24:MI') as published_at
                 from simulation_package where tenant_id = ? order by published_at desc, id desc
                 """, (rs, i) -> new PackageRow(rs.getLong("id"), rs.getString("name"),
@@ -89,7 +91,7 @@ public class PackageRepository {
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
                 seatsOf(rs.getLong("id")), rs.getString("locale"), rs.getString("status"),
                 rs.getString("published_at"), partsOf(rs.getLong("id")),
-                startedPartsOf(tenantId, rs.getLong("id"))),
+                startedPartsOf(tenantId, rs.getLong("id")), rs.getInt("seat_limit")),
                 tenantId);
     }
 

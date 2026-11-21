@@ -156,8 +156,14 @@ public class MapShareService {
             PositionMapPage.RoundInput round = history.get(index);
             boolean brand = "brand".equals(renderer.axisFor(history.subList(0, index + 1)));
             List<PositionMapPage.Company> companies = renderer.positionsOf(round);
+            // D118: never a partial chart. A class larger than the picture used to be silently truncated,
+            // which is a shared page that names all thirty companies in its table and draws six of them —
+            // a reader cannot tell that from a class where the rest scored nothing. Refuse, and name the
+            // command that fixes it; the template is built for the ceiling (thirty) by `npm run map-template`.
             if (companies.size() > renderer.slots()) {
-                companies = companies.subList(0, renderer.slots());
+                throw new IllegalStateException("the shared map draws up to " + renderer.slots()
+                        + " companies but this class has " + companies.size()
+                        + "; rebuild the map template for the ceiling (npm run map-template in web/)");
             }
             String caption = renderer.roundCaption(lang, round);
             // D112: the pies come first — a facilitator opening the link to ask "who holds this market"

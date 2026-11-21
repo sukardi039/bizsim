@@ -32,8 +32,14 @@ public class PackageService {
     }
 
     public record PublishRequest(String name, String templateKey, List<Long> companyProfileIds,
-                                 List<Long> traineeIds, String locale, List<PartRequest> parts) {
+                                 List<Long> traineeIds, String locale, List<PartRequest> parts,
+                                 /** D118: how many companies this class may have; null keeps the old ten. */
+                                 Integer seatLimit) {
     }
+
+    /** The ceiling the console can draw: thirty distinct hues, and a map that stays readable. */
+    public static final int MAX_SEAT_LIMIT = 30;
+    public static final int MIN_SEAT_LIMIT = 2;
 
     private final PackageRepository packages;
     private final ScenarioRepository templates;
@@ -77,6 +83,21 @@ public class PackageService {
             profiles.findForTenant(tenantId, profileId).orElseThrow(
                     () -> ProblemException.notFound("company_profile.not_found",
                             "no such company profile in this tenant"));
+        }
+
+        // D118: the class size is the builder's call, bounded by what the console can draw. Refused at
+        // publish rather than at session start, so the builder meets the number while the room is still
+        // being prepared — a facilitator pressing "start" is the worst moment to learn a package is oversized.
+        int seatLimit = request.seatLimit() == null ? 10 : request.seatLimit();
+        if (seatLimit < MIN_SEAT_LIMIT || seatLimit > MAX_SEAT_LIMIT) {
+            throw ProblemException.badRequest("package.seat_limit_invalid",
+                    "a class may have between " + MIN_SEAT_LIMIT + " and " + MAX_SEAT_LIMIT + " companies",
+                    "field", "seatLimit", "max", MAX_SEAT_LIMIT);
+        }
+        if (profileIds.size() > seatLimit) {
+            throw ProblemException.badRequest("package.too_many_companies",
+                    "this package allows " + seatLimit + " companies but carries " + profileIds.size(),
+                    "max", seatLimit, "companies", profileIds.size());
         }
 
         List<Long> seats = request.traineeIds() == null ? List.of() : request.traineeIds();
@@ -164,7 +185,7 @@ public class PackageService {
         // session start, the reports, the list — keeps working on a single-part package unchanged.
         long id = packages.insert(tenantId, request.name().trim(), frozenKeys.get(0),
                 partTemplates.get(0).key(), partTemplates.get(0).version(), profileIds, seats, locale,
-                actorId);
+                actorId, seatLimit);
         for (int i = 0; i < frozenKeys.size(); i++) {
             ScenarioRepository.TemplateRow partTemplate = partTemplates.get(i);
             String partName = requestedParts.get(i).name() == null

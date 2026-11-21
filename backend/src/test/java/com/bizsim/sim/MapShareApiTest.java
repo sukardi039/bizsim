@@ -180,7 +180,7 @@ class MapShareApiTest extends PostgresTestBase {
         assertThat(testTemplateShips())
                 .as("a template is reachable, or the app must answer 503 rather than draw nothing")
                 .isTrue();
-        PositionMapPage page = new PositionMapPage();
+        PositionMapPage page = new PositionMapPage("");
         assertThat(page.slots()).as("six slots, the largest class").isEqualTo(6);
         assertThat(page.text(page.template(), "zh", "debrief.quadrantStuck")).isEqualTo("卡在中间");
         assertThat(page.text(page.template(), "en", "debrief.positionBrand")).isEqualTo("Brand index");
