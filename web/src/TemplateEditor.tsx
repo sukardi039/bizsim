@@ -213,6 +213,8 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
   const [segments, setSegments] = useState<TemplateSegment[]>([]);
   const [salaries, setSalaries] = useState<Record<string, string>>({});
   const [staff, setStaff] = useState<Record<string, string>>({});
+  /** D119: the round ceiling comes from the server's limits, not a literal in this file. */
+  const [maxRounds, setMaxRounds] = useState(0);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -250,6 +252,15 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
       })
       .catch((error) => {
         if (!cancelled) setProblem(describeError(error, t));
+      });
+    // D119: the limits come from the server so the editor and the API agree about the round ceiling.
+    api
+      .limits()
+      .then((next) => {
+        if (!cancelled) setMaxRounds(next.maxRounds);
+      })
+      .catch(() => {
+        // No limit means the add button stays disabled rather than guessing a number.
       });
     return () => {
       cancelled = true;
@@ -608,7 +619,11 @@ export default function TemplateEditor({ templateKey, onLeave }: { templateKey: 
               {t("editor.rounds", { count: rounds.length, formatted: fmt(rounds.length, 0) })}
             </p>
             <div className="buttons">
-              <button type="button" onClick={addRound} disabled={locked || rounds.length >= 48}>
+              <button
+                type="button"
+                onClick={addRound}
+                disabled={locked || maxRounds === 0 || rounds.length >= maxRounds}
+              >
                 {t("editor.addRound")}
               </button>
               <button type="button" onClick={removeRound} disabled={locked || rounds.length <= 1}>

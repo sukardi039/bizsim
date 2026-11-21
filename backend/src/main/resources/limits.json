@@ -1,0 +1,10 @@
+{
+  "_comment": "D119: the one authority for the console's limits. The server validates this file at startup, exposes it at GET /api/limits, the web build reads it to size the map template and check the palette, and a test asserts the database constraints match it. Add a rule here or not at all — a copy in another layer is a second source of truth, and copies drift.",
+  "classSize": {
+    "min": 2,
+    "max": 30,
+    "default": 10
+  },
+  "maxRounds": 48,
+  "maxProducts": 10
+}

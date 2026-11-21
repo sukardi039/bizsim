@@ -69,12 +69,13 @@ public class TemplateController {
     private static final List<String> BENEFIT_CURVES = List.of("LINEAR", "POWER", "CHANCE");
     private static final List<String> OVERFUNDING = List.of("REFUND", "LOST");
 
-    private static final int MAX_ROUNDS = 48;
-
     private final ScenarioRepository scenarios;
+    /** D119: rounds and products bounds come from limits.json; this class states no number of its own. */
+    private final com.bizsim.config.Limits limits;
 
-    public TemplateController(ScenarioRepository scenarios) {
+    public TemplateController(ScenarioRepository scenarios, com.bizsim.config.Limits limits) {
         this.scenarios = scenarios;
+        this.limits = limits;
     }
 
     @GetMapping
@@ -219,15 +220,15 @@ public class TemplateController {
         return row;
     }
 
-    private static void validateSettings(Map<String, Object> settings) {
+    private void validateSettings(Map<String, Object> settings) {
         if (settings == null) {
             throw ProblemException.badRequest("template.settings_invalid", "settings are required",
                     "field", "settings");
         }
-        requireRange(settings, "rounds", 1, MAX_ROUNDS);
+        requireRange(settings, "rounds", 1, limits.maxRounds());
         requireRange(settings, "roundMinutes", 1, 480);
         requireRange(settings, "cycles", 1, 12);
-        requireRange(settings, "cycleLength", 1, MAX_ROUNDS);
+        requireRange(settings, "cycleLength", 1, limits.maxRounds());
         requireMinimum(settings, "startingCash", BigDecimal.ZERO);
         requireMinimum(settings, "startingBrand", BigDecimal.ZERO);
         requireMinimum(settings, "fixedCostPerMonth", BigDecimal.ZERO);
@@ -288,12 +289,13 @@ public class TemplateController {
         }
     }
 
-    private static void validateProducts(List<ScenarioRepository.ProductRow> products) {
+    private void validateProducts(List<ScenarioRepository.ProductRow> products) {
         if (products == null || products.isEmpty()) {
             throw catalogInvalid("a template needs at least one product", "field", "products");
         }
-        if (products.size() > 10) {
-            throw catalogInvalid("a template cannot exceed 10 products", "field", "products", "max", 10);
+        if (products.size() > limits.maxProducts()) {
+            throw catalogInvalid("a template cannot exceed " + limits.maxProducts() + " products",
+                    "field", "products", "max", limits.maxProducts());
         }
         java.util.Set<String> codes = new java.util.HashSet<>();
         for (ScenarioRepository.ProductRow product : products) {
@@ -624,7 +626,7 @@ public class TemplateController {
         }
     }
 
-    private static void validateEnvironment(List<ScenarioRepository.RoundRow> rounds) {
+    private void validateEnvironment(List<ScenarioRepository.RoundRow> rounds) {
         if (rounds == null || rounds.isEmpty()) {
             throw ProblemException.badRequest("template.environment_invalid",
                     "the environment needs at least one round", "field", "rounds");
@@ -673,10 +675,10 @@ public class TemplateController {
                             "field", "round", "lang", entry.getKey());
                 }
             }
-            if (size > MAX_ROUNDS) {
+            if (size > limits.maxRounds()) {
                 throw ProblemException.badRequest("template.environment_invalid",
-                        "the environment cannot exceed " + MAX_ROUNDS + " rounds",
-                        "field", "rounds", "max", MAX_ROUNDS);
+                        "the environment cannot exceed " + limits.maxRounds() + " rounds",
+                        "field", "rounds", "max", limits.maxRounds());
             }
         }
         requireSameLength(counts);

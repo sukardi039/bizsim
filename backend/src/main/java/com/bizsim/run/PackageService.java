@@ -37,9 +37,8 @@ public class PackageService {
                                  Integer seatLimit) {
     }
 
-    /** The ceiling the console can draw: thirty distinct hues, and a map that stays readable. */
-    public static final int MAX_SEAT_LIMIT = 30;
-    public static final int MIN_SEAT_LIMIT = 2;
+    /** D119: the class-size bounds come from limits.json — this class states none of them. */
+    private final com.bizsim.config.Limits limits;
 
     private final PackageRepository packages;
     private final ScenarioRepository templates;
@@ -47,11 +46,13 @@ public class PackageService {
     private final UserRepository users;
 
     public PackageService(PackageRepository packages, ScenarioRepository templates,
-                          CompanyProfileRepository profiles, UserRepository users) {
+                          CompanyProfileRepository profiles, UserRepository users,
+                          com.bizsim.config.Limits limits) {
         this.packages = packages;
         this.templates = templates;
         this.profiles = profiles;
         this.users = users;
+        this.limits = limits;
     }
 
     /**
@@ -88,11 +89,12 @@ public class PackageService {
         // D118: the class size is the builder's call, bounded by what the console can draw. Refused at
         // publish rather than at session start, so the builder meets the number while the room is still
         // being prepared — a facilitator pressing "start" is the worst moment to learn a package is oversized.
-        int seatLimit = request.seatLimit() == null ? 10 : request.seatLimit();
-        if (seatLimit < MIN_SEAT_LIMIT || seatLimit > MAX_SEAT_LIMIT) {
+        int seatLimit = request.seatLimit() == null ? limits.classSizeDefault() : request.seatLimit();
+        if (seatLimit < limits.classSizeMin() || seatLimit > limits.classSizeMax()) {
             throw ProblemException.badRequest("package.seat_limit_invalid",
-                    "a class may have between " + MIN_SEAT_LIMIT + " and " + MAX_SEAT_LIMIT + " companies",
-                    "field", "seatLimit", "max", MAX_SEAT_LIMIT);
+                    "a class may have between " + limits.classSizeMin() + " and "
+                            + limits.classSizeMax() + " companies",
+                    "field", "seatLimit", "min", limits.classSizeMin(), "max", limits.classSizeMax());
         }
         if (profileIds.size() > seatLimit) {
             throw ProblemException.badRequest("package.too_many_companies",

@@ -99,12 +99,14 @@ public class InitDataService {
     private final RunService runs;
     private final RoundService rounds;
     private final BotRoundService bots;
+    /** D119: the class-size bounds are limits.json's, not this seeder's. */
+    private final com.bizsim.config.Limits limits;
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public InitDataService(JdbcTemplate jdbc, UserRepository users, ScenarioRepository scenarios,
                            CompanyProfileRepository profiles, PackageService packageService,
                            PackageRepository packages, RunService runs, RoundService rounds,
-                           BotRoundService bots) {
+                           BotRoundService bots, com.bizsim.config.Limits limits) {
         this.jdbc = jdbc;
         this.users = users;
         this.scenarios = scenarios;
@@ -114,6 +116,7 @@ public class InitDataService {
         this.runs = runs;
         this.rounds = rounds;
         this.bots = bots;
+        this.limits = limits;
     }
 
     /**
@@ -128,7 +131,7 @@ public class InitDataService {
     public Summary init(String tenantCode, Params params) {
         String code = normaliseCode(tenantCode);
         Params p = params == null ? Params.defaults() : params;
-        int companies = clamp(p.companies(), 1, 6);
+        int companies = clamp(p.companies(), limits.classSizeMin(), limits.classSizeMax());
         int trainees = clamp(p.trainees(), 1, companies);
         int requestedRounds = clamp(p.rounds(), 0, 12);
         String locale = p.locale() == null || p.locale().isBlank() ? "en" : p.locale().trim().toLowerCase(Locale.ROOT);
@@ -175,7 +178,7 @@ public class InitDataService {
                 // D118: the seeded package states its own class size, so a demo class larger than ten
                 // can be prepared at all — the publish would otherwise refuse its own company list.
                 new PackageService.PublishRequest(packageName, templateKey, profileIds, playerIds,
-                        locale, null, Math.max(2, Math.min(30, profileIds.size()))));
+                        locale, null, profileIds.size()));
 
         // ---------------------------------------------------------------- session
         String runName = blankTo(p.runName(), "Demo class " + code);

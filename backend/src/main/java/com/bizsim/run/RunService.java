@@ -68,7 +68,8 @@ public class RunService {
     public RunService(RunRepository runs, RoundService rounds, ScenarioRepository scenarios,
                       EnvironmentService environment, JdbcTemplate jdbc,
                       CompanyProfileRepository profiles, UserRepository users,
-                      PackageRepository packages, com.bizsim.sim.BotRoundService bots) {
+                      PackageRepository packages, com.bizsim.sim.BotRoundService bots,
+                      com.bizsim.config.Limits limits) {
         this.runs = runs;
         this.rounds = rounds;
         this.bots = bots;
@@ -78,19 +79,17 @@ public class RunService {
         this.profiles = profiles;
         this.users = users;
         this.packages = packages;
+        this.limits = limits;
     }
 
-    /**
-     * The console's ceiling (D118). A package states its own class size up to this number; a run created
-     * without a package — a builder's tool — is bounded by it directly.
-     */
-    public static final int MAX_TEAMS = 30;
+    /** D119: the ceiling comes from limits.json; nothing here restates a number. */
+    private final com.bizsim.config.Limits limits;
 
     @Transactional
     public RunView createRun(long tenantId, long facilitatorId, String name, String scenarioKey,
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles) {
         return createRun(tenantId, facilitatorId, name, scenarioKey, teams, requestedRounds,
-                requestedCycles, null, MAX_TEAMS);
+                requestedCycles, null, limits.classSizeMax());
     }
 
     /**
@@ -102,7 +101,7 @@ public class RunService {
                              List<TeamSpec> teams, Integer requestedRounds, Integer requestedCycles,
                              String lang) {
         return createRun(tenantId, facilitatorId, name, scenarioKey, teams, requestedRounds,
-                requestedCycles, lang, MAX_TEAMS);
+                requestedCycles, lang, limits.classSizeMax());
     }
 
     /** D118: {@code maxTeams} is the package's seat limit when a session starts from a package. */
@@ -191,7 +190,7 @@ public class RunService {
                                  List<Long> profileIds, List<Long> traineeIds,
                                  Integer requestedRounds, Integer requestedCycles, String lang) {
         return startPrepared(tenantId, facilitatorId, name, templateKey, profileIds, traineeIds,
-                requestedRounds, requestedCycles, lang, MAX_TEAMS);
+                requestedRounds, requestedCycles, lang, limits.classSizeMax());
     }
 
     /** D118: a session started from a package carries that package's seat limit into the run cap. */

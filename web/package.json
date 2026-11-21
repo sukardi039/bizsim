@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/check-i18n.mjs && node scripts/build-map-template.mjs && tsc -b && vite build && node scripts/stamp.mjs",
+    "build": "node scripts/check-i18n.mjs && node scripts/build-map-template.mjs && node scripts/check-limits.mjs && tsc -b && vite build && node scripts/stamp.mjs",
     "map-template": "node scripts/build-map-template.mjs",
     "map-template:check": "node scripts/build-map-template.mjs --check",
     "preview": "vite preview"

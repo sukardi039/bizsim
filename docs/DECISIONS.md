@@ -1186,3 +1186,48 @@ twelve limit refused, thirty-one refused at the ceiling, a twelve-company sessio
 run of thirty created and of thirty-one refused with `max=30`). The map template reports **30 bubbles, 30
 figures, 30 name slots**, and the full suite is green. The builder's Packages screen carries the field
 (default 10) and the picker stops at it.
+
+
+**D119 — One authority for the limits, projected to every layer (ruled and built 21 Nov 2026).** The
+owner's demand, after D118: *"I want this to be controlled universally."* He is right that D118 fixed the
+number without fixing the pattern — the ceiling `30` immediately existed in five places again
+(`RunService.MAX_TEAMS`, `PackageService.MAX_SEAT_LIMIT`, `PackagesPanel` twice, the palette length, the map
+template's derived slot count).
+
+**Why it kept happening.** Each layer enforces the rule and cannot share a symbol with the others: a SQL
+check constraint must enumerate values, Java re-checks because it does not trust the client, TypeScript
+cannot call Java, and the map template is generated before any class exists. So the value is copied at every
+boundary. Nothing failed when a copy drifted — each copy passed its own tests — and the two failures that
+followed were both found the hard way: a 7–10 company class that could play but not share its map (10 vs
+**6** slots), and `SHOW_OPEN` answering **409** on a facilitator's button because the audit constraint kept
+its own list of valid actions in a third migration.
+
+**The ruling.** A limit is a *datum with one owner*, not a constant repeated where it is needed:
+
+- **`backend/src/main/resources/limits.json`** is the authority — `classSize {min, max, default}`,
+  `maxRounds`, `maxProducts`. `Limits` (Java) loads it, **refuses to start** if it contradicts itself
+  (a minimum above a maximum would make every class impossible, and that must fail at boot, not on a
+  button), and every server use reads it: `RunService` (run ceiling and the package's cap), `PackageService`
+  (publish bounds and default), `TemplateController` (rounds, cycle length, products), `InitDataService`
+  (the seeder's clamp, which used to be a local `1..6`).
+- **`GET /api/limits` answers the file itself** — the console reads its bounds instead of stating them.
+  `PackagesPanel` no longer carries `max={30}`, `min={2}` or `default 10`; `TemplateEditor` no longer caps
+  rounds at a literal `48`. With the limits unavailable the publish button is blocked with a reason rather
+  than guessing.
+- **The build reads the same file.** `map-template.mjs` takes the slot count from `classSize.max` (the
+  `6 × 5 = 30` derivation was the last second statement of the ceiling), and a new gate,
+  **`web/scripts/check-limits.mjs`, fails `npm run build`** when the copies disagree: template slots ≠
+  ceiling, palette shorter than the ceiling, or the console not reading `/api/limits`. Proved to bite —
+  setting `max: 29` in the file while the template still had 30 slots exits **1** and names both numbers;
+  restoring it exits **0**.
+- **The database is checked, not trusted.** `LimitsTest` reads `pg_get_constraintdef` for
+  `simulation_package.seat_limit` and asserts the constraint's bounds equal the file's — a backstop that
+  disagrees with the server is worse than no backstop, because the API then accepts a size the insert
+  refuses.
+
+This is the same shape as D116's i18n gate: a rule with one statement, a projection to every layer that
+needs it, and a build step that fails when a second statement appears.
+
+**Verified.** `LimitsTest` (file valid, DB constraint agrees, `/api/limits` answers the file, a
+self-contradicting file refuses to load) and `SeatLimitTest` — 6 tests green; full suite **249**; `tsc` and
+both gates clean; live `/api/limits` after deploy.

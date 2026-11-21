@@ -37,8 +37,10 @@ export default function PackagesPanel() {
     /** D62: extra parts beyond the first. Empty = a single-simulation package. */
     parts: [] as { name: string; templateKey: string }[],
     /** D118: how many companies this class may have. Ten is the old fixed size; the ceiling is 30. */
-    seatLimit: 10,
+    seatLimit: 0, // filled from the server's limits on load (D119) — never a literal here
   });
+  /** D119: the server's class-size bounds; the picker and the field both read these. */
+  const [limits, setLimits] = useState<{ min: number; max: number; default: number } | null>(null);
   const [busy, setBusy] = useState<number | "new" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -49,6 +51,17 @@ export default function PackagesPanel() {
     // emptied the whole form — a builder without the people list lost the template dropdown, and
     // the only clue was "This action is for facilitators" under the wrong heading.
     const failures: string[] = [];
+    try {
+      const loaded = await api.limits();
+      setLimits(loaded.classSize);
+      // The draft's own number is the authority once the builder has chosen one; a fresh draft takes
+      // the server default rather than a literal.
+      setDraft((current) => (current.seatLimit > 0
+        ? current
+        : { ...current, seatLimit: loaded.classSize.default }));
+    } catch (error) {
+      failures.push(`limits: ${describeError(error, t)}`);
+    }
     let templateList: TemplateRow[] = [];
     const settle = async <T,>(label: string, call: Promise<T>, apply: (value: T) => void) => {
       try {
@@ -108,7 +121,7 @@ export default function PackagesPanel() {
         templateKey: draft.templateKey,
         companyIds: [],
         locale: String(locale),
-        seatLimit: 10,
+        seatLimit: limits?.default ?? 0,
         parts: [],
       });
       setSeats({});
@@ -176,6 +189,8 @@ export default function PackagesPanel() {
     draft.companyIds.length === 0 ? t("packages.blockedCompanies") : null,
     !draft.templateKey ? t("packages.blockedTemplate") : null,
     !draft.locale ? t("packages.blockedLanguage") : null,
+    // D119: without the server's limits there is no honest class size to publish against.
+    !limits ? t("packages.blockedLimits") : null,
   ].filter((entry): entry is string => entry !== null);
 
   const companyName = (id: number) =>
@@ -389,13 +404,14 @@ export default function PackagesPanel() {
             {t("packages.seatLimit")}
             <input
               type="number"
-              min={2}
-              max={30}
+              min={limits?.min ?? 1}
+              max={limits?.max ?? 1}
               value={draft.seatLimit}
               onChange={(e) =>
                 setDraft((current) => ({
                   ...current,
-                  seatLimit: Math.max(2, Math.min(30, Number(e.target.value) || 10)),
+                  seatLimit: Math.max(limits?.min ?? 1,
+                    Math.min(limits?.max ?? 1, Number(e.target.value) || limits?.default || 1)),
                 }))
               }
             />

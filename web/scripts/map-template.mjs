@@ -41,7 +41,14 @@ const CHECK = process.argv.includes("--check");
  */
 const PRICE_TIERS = [0.7031, 0.8279, 0.9187, 1.0713, 1.1851, 1.2917];
 const VERTICAL_STEPS = [0.7413, 0.8621, 0.9319, 1.0217, 1.1333];
-const SLOT_COUNT = PRICE_TIERS.length * VERTICAL_STEPS.length;
+/**
+ * D119: the number of slots is the class-size ceiling from limits.json — the same file the server
+ * validates and the console reads. Deriving it here from the grid (6 x 5 = 30) was the last place the
+ * ceiling was stated a second time.
+ */
+const LIMITS = JSON.parse(readFileSync(
+  resolve(process.cwd(), "..", "backend", "src", "main", "resources", "limits.json"), "utf8"));
+const SLOT_COUNT = LIMITS.classSize.max;
 
 const SLOTS = Array.from({ length: SLOT_COUNT }, (_, index) => {
   const tier = index % PRICE_TIERS.length;

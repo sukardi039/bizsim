@@ -448,6 +448,16 @@ export interface ClassShareCompany {
   share: number;
 }
 
+/**
+ * D119: the console's limits, read from the server. The server owns limits.json; this type is only the
+ * shape it answers with, so no screen has to state a number of its own.
+ */
+export interface Limits {
+  classSize: { min: number; max: number; default: number };
+  maxRounds: number;
+  maxProducts: number;
+}
+
 /** D117: the chart the facilitator is showing on the class's screens right now. */
 export interface ClassShow {
   open: boolean;
@@ -817,6 +827,9 @@ export const api = {
 
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
+  /** D119: the server's limits — class size, rounds, products. Never a literal in a screen. */
+  limits: () => request<Limits>("/limits"),
+
   /** D117: what the facilitator is showing on the class's screens; any reader of the run may ask. */
   show: (runId: number) => request<ClassShow>(`/runs/${runId}/show`),
   /** D117: facilitator — put the round's pies on every seated screen. */
