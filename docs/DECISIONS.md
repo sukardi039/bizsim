@@ -1231,3 +1231,37 @@ needs it, and a build step that fails when a second statement appears.
 **Verified.** `LimitsTest` (file valid, DB constraint agrees, `/api/limits` answers the file, a
 self-contradicting file refuses to load) and `SeatLimitTest` — 6 tests green; full suite **249**; `tsc` and
 both gates clean; live `/api/limits` after deploy.
+
+
+**D120 — Nothing on a screen is English-only, including the answers to a mistake (ruled and built 21 Nov
+2026).** A round played by hand in the browser (the walk-through the owner asked for) exposed three places
+where an identifier or an English sentence reached a Chinese class:
+
+1. **The trainee header printed the outlook code beside its own label** — `第 1 轮，共 8 轮 · STEADY · 平稳`.
+   `PlayerConsole` rendered `context.market.outlook` and then `context.market.trendLabel`. The label is the
+   word; the code is an identifier and belongs nowhere on screen (the same rule as D116).
+2. **A validation failure arrived in English.** A blank password answered `request.field` with Spring's
+   `getDefaultMessage()` (`"password NotBlank"`), for which the console has no key, so the card read
+   **"password is not valid."** while every label around it was Chinese.
+3. **A bad sign-in answered with a sentence.** `AuthController` threw `401 "invalid credentials"`, which is
+   prose, not a code — untranslatable by construction.
+
+**Ruling.** An error is a code plus parameters, never a sentence; the console owns the wording, and a field
+name is itself a word that has to be translated.
+
+- `request.field` now carries `field` and `violation` (the constraint's kind: `NotBlank`, and so on) and no
+  prose. The console renders `请填写密码。` for an empty box and `密码 不合法。` otherwise, translating the
+  field name through its own catalogue (`field.password → 密码`).
+- Sign-in failures carry **`auth.invalid_credentials`**. The answer stays identical for every cause —
+  unknown tenant, unknown email, wrong password, deactivated account, an auto worker — so the form still
+  cannot enumerate tenants or accounts (D47). Only the wording moved.
+- `ApiExceptionHandler` treats a `ResponseStatusException` reason as a code **only when it looks like one**
+  (dotted, lowercase). A raw sentence keeps the HTTP-shaped `error.http.NNN` answer, so prose can never
+  masquerade as a translatable code.
+- The project's own rule, restated: a message visible to a user in a class language must be data. If a
+  screen can show it, the catalogue must be able to say it.
+
+**Verified in the browser, in Chinese** — blank sign-in: `请填写机构代码。 · 请填写邮箱。 · 请填写密码。`;
+wrong password: `邮箱或密码不正确。请检查后重试。`; an open round's header: `第 1 轮，共 8 轮 · 平稳`, no
+code. `FieldProblemApiTest` pins both API shapes (a field problem carries no `message`; a bad sign-in carries
+`auth.invalid_credentials`); suite **250** green.
