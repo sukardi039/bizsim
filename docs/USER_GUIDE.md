@@ -514,7 +514,9 @@ Under the scoreboard, for any computed round:
    pieces underneath. It is *not* units sold: a company that stocked out still won its share of the class and
    sold less, and that shortfall appears on its product line as lost sales. The tables exist only on a
    template that weights channel reach by class; on a class-blind template the market is one pool and there is
-   nothing to break down.
+   nothing to break down. A round computed **before release 0.27.0** has no class split — the allocation was
+   not stored then and cannot be rebuilt — so the panel says so in one line rather than showing an empty
+   table. Every round computed after the upgrade carries it.
 
 4. The **Class** footer sums revenue and profit for the whole class.
 

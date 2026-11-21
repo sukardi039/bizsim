@@ -4,7 +4,7 @@ import {
   downloadDebrief,
   downloadEvaluation,
   type DecisionInput,
-  type ClassShareRow,
+  type ClassSharePage,
   type MarketPie,
   type RunPlayer,
   type ScoreRow,
@@ -45,8 +45,8 @@ export default function DebriefPanel({
   const [statements, setStatements] = useState<Record<number, StatementRow[]>>({});
   /** D112: the per-product market-share pies for the selected round (facilitator's own view). */
   const [pies, setPies] = useState<MarketPie[]>([]);
-  /** D115: the award per (product, class) for the selected round; empty if the template is not weighted. */
-  const [classShares, setClassShares] = useState<ClassShareRow[]>([]);
+  /** D115: the award per (product, class) for the selected round, and whether classes exist at all. */
+  const [classShares, setClassShares] = useState<ClassSharePage>({ weighted: false, rows: [] });
   /** What each company sent for the selected round, so the detail can show cause before result (D42). */
   const [decisions, setDecisions] = useState<Record<number, DecisionInput | null>>({});
   const [problem, setProblem] = useState<string | null>(null);
@@ -128,7 +128,7 @@ export default function DebriefPanel({
       try {
         setClassShares(await api.classShares(runId, round));
       } catch {
-        setClassShares([]);
+        setClassShares({ weighted: false, rows: [] });
       }
       // A separate call on purpose: the statements are the result and must still render if the
       // decisions cannot be read.
@@ -400,7 +400,7 @@ export default function DebriefPanel({
       {/* D115: who holds each customer class, product by product — the question segment-weighted
           marketing makes askable ("strong in mass, weak in premium"). Each cell is demand won against
           the class's served market, not units sold; the caption says so. */}
-      <ClassShares rows={classShares} />
+      <ClassShares weighted={classShares.weighted} rows={classShares.rows} />
 
       {/* D98/D101: the round's competitive picture — price against quality (or brand), bubble by share.
           Each earlier round is placed the same way, so the map draws the path a company took instead

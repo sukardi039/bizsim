@@ -574,6 +574,8 @@ export const en: Dict = {
   "debrief.classHint":
     "Each cell is the demand a company was awarded in that class, as a share of the class's served market — the pieces the class actually contested. It is not units sold: a company that stocked out still won its share and sold less, and that shortfall is on its product line as lost sales. The small number is the awarded pieces.",
   "debrief.classMarket": "market",
+  "debrief.classOldRound":
+    "This round was computed before the class breakdown was recorded (release 0.27.0), so the split was never stored and cannot be reconstructed. Every round computed from now on carries it.",
   "debrief.hint":
     "One row per company for the chosen round, straight from that round's statements. Open a company to see what it was charged.",
   "debrief.noRounds": "no round computed yet",
@@ -1281,6 +1283,8 @@ export const zh: Dict = {
   "debrief.classHint":
     "每个格子是公司在该客户群赢得的商机占该客户群可服务市场（本班实际争夺的那部分）的比例。这不是销量：缺货的公司同样赢得了份额，只是卖得更少，缺口已作为流失销售记在它的产品行上。下方小数字为赢得的台数。",
   "debrief.classMarket": "可服务市场",
+  "debrief.classOldRound":
+    "本轮结算早于各客户群份额功能（0.27.0 版），拆分当时未记录，无法补算。此后结算的轮次都会包含。",
   "debrief.hint": "所选轮次每家公司的数据，直接来自该轮结算单。展开公司可查看各项费用。",
   "debrief.noRounds": "尚无已计算的轮次",
   "debrief.round": "轮次",

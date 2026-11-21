@@ -15,10 +15,22 @@
 import { useI18n } from "./i18n";
 import type { ClassShareRow } from "./api";
 
-export default function ClassShares({ rows }: { rows: ClassShareRow[] }) {
+export default function ClassShares({ weighted, rows }: { weighted: boolean; rows: ClassShareRow[] }) {
   const { t, number } = useI18n();
-  if (rows.length === 0) {
+  if (!weighted) {
+    // A class-blind template has one pool: there is no breakdown to show and nothing to explain.
     return null;
+  }
+  if (rows.length === 0) {
+    // Weighted, but this round carries no class rows: it was computed before the breakdown was recorded,
+    // and the allocation was never stored. Saying so is the honest alternative to an empty panel a
+    // facilitator would read as "the feature is broken" — or to reconstructing numbers nobody measured.
+    return (
+      <section className="class-shares">
+        <h3>{t("debrief.classTitle")}</h3>
+        <p className="muted">{t("debrief.classOldRound")}</p>
+      </section>
+    );
   }
 
   // One table per product, in the order the server sent them (template order), so a facilitator reads

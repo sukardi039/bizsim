@@ -451,14 +451,21 @@ public class RoundService {
      *
      * <p>Names are resolved in the run's own language (D87/D114), which is why the table is assembled
      * here rather than in the browser. A template that does not weight reach by class has no breakdown at
-     * all and returns an empty list: there the market was one pool, so a per-class split would be invented.
+     * all: there the market was one pool, so a per-class split would be invented. The response therefore
+     * says which case the caller is looking at — {@code weighted: false} with no rows (nothing to explain)
+     * or {@code weighted: true} with no rows (a round computed before the breakdown was recorded, which
+     * cannot be reconstructed and is said out loud rather than shown as an empty panel).
      */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> classShares(long tenantId, long runId, Integer round) {
+    public Map<String, Object> classShares(long tenantId, long runId, Integer round) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
                 () -> ProblemException.notFound("run.not_found", "no such run"));
         Scenario scenario = scenarios.load(run.scenarioKey());
         String lang = runs.langOf(runId);
+        // Whether the template weights reach by class at all. The caller needs the difference: an empty
+        // table on a class-weighted template is a round computed before the breakdown existed, while on a
+        // class-blind template there is nothing to break down and nothing to explain.
+        boolean weighted = scenario.channels().stream().anyMatch(Scenario.ChannelSpec::segmentSpecific);
 
         Integer at = round;
         if (at == null) {
@@ -466,7 +473,7 @@ public class RoundService {
                     rs -> rs.next() ? rs.getObject(1, Integer.class) : null, runId);
         }
         if (at == null) {
-            return List.of();
+            return page(weighted, List.of());
         }
         final int target = at;
 
@@ -530,7 +537,15 @@ public class RoundService {
                 }
             }
         }
-        return out;
+        return page(weighted, out);
+    }
+
+    /** The class table and the one fact the caller cannot infer from it: was there anything to split. */
+    private static Map<String, Object> page(boolean weighted, List<Map<String, Object>> rows) {
+        Map<String, Object> page = new LinkedHashMap<>();
+        page.put("weighted", weighted);
+        page.put("rows", rows);
+        return page;
     }
 
     /** A number from a stored statement detail: kept exact rather than a double's approximation. */

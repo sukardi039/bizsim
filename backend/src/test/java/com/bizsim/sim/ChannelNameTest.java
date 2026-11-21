@@ -78,6 +78,51 @@ class ChannelNameTest extends PostgresTestBase {
                 .isEqualTo("经销商渠道");
     }
 
+    /**
+     * V43's seed, executed against the shape a package published before V42 really has: the same channels,
+     * no `channel_text` rows. This is the defect that survived the first release — a Chinese class played
+     * from an existing package still read the channels in English — so the migration is run here rather
+     * than assumed to have worked.
+     *
+     * <p>A channel the trainer renamed is left alone: it is their word, not the shipped one, and a
+     * translation nobody chose is worse than an untranslated name.
+     */
+    @Test
+    void the_v43_seed_translates_a_package_frozen_before_it() throws Exception {
+        Long tenantId = jdbc.queryForObject(
+                "insert into tenant (code, name) values (?, ?) returning id", Long.class,
+                "old" + java.util.UUID.randomUUID().toString().substring(0, 6), "old");
+        String frozen = "pkg-old-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+        scenarios.cloneInto("standard-v1", frozen, "published", tenantId, "PUBLISHED");
+        // What a package frozen before V42 looks like: the channels exist, the words do not.
+        jdbc.update("delete from channel_text where scenario_key = ?", frozen);
+        // And a channel this trainer renamed: their word, which no seed may overwrite.
+        jdbc.update("update channel set name = 'Our dealer network' where scenario_key = ? and code = 'TRADE'",
+                frozen);
+
+        StringBuilder bare = new StringBuilder();
+        String sql = new org.springframework.core.io.ClassPathResource(
+                "db/migration/V43__channel_text_copies.sql")
+                .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        for (String line : sql.split("\\R")) {
+            if (!line.trim().startsWith("--")) {
+                bare.append(line).append('\n');
+            }
+        }
+        for (String statement : bare.toString().split(";")) {
+            if (!statement.isBlank()) {
+                jdbc.execute(statement);
+            }
+        }
+
+        Scenario copy = scenarios.load(frozen);
+        assertThat(copy.channel("DIGITAL").orElseThrow().nameIn("zh"))
+                .as("an untouched shipped channel is translated").isEqualTo("数字营销");
+        assertThat(copy.channel("FIELD").orElseThrow().nameIn("zh")).isEqualTo("直销团队");
+        assertThat(copy.channel("TRADE").orElseThrow().nameIn("zh"))
+                .as("a renamed channel keeps the trainer's words").isEqualTo("Our dealer network");
+    }
+
     @Test
     void the_players_context_names_channels_in_the_class_language() throws Exception {
         long tenantId = jdbc.queryForObject(

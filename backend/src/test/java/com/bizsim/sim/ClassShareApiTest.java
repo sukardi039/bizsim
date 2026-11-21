@@ -85,7 +85,11 @@ class ClassShareApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + trainer))
                 .andExpect(status().isOk())
                 .andReturn();
-        JsonNode rows = json.readTree(table.getResponse().getContentAsString());
+        JsonNode page = json.readTree(
+                table.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(page.get("weighted").asBoolean())
+                .as("the shipped template weights reach by class (D111)").isTrue();
+        JsonNode rows = page.get("rows");
         assertThat(rows.isArray()).isTrue();
         assertThat(rows.size()).as("three products x three classes").isEqualTo(9);
 
@@ -157,7 +161,59 @@ class ClassShareApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + trainer))
                 .andExpect(status().isOk())
                 .andReturn();
-        assertThat(json.readTree(table.getResponse().getContentAsString()).size()).isZero();
+        JsonNode page = json.readTree(
+                table.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(page.get("weighted").asBoolean())
+                .as("a class-blind template says so, rather than looking broken").isFalse();
+        assertThat(page.get("rows").size()).isZero();
+    }
+
+    /**
+     * A round computed before the breakdown existed has no class rows and never will: the allocation was
+     * recorded per product only. The endpoint must still say the template *is* class-weighted, so the
+     * debrief can explain the empty table instead of leaving a facilitator to guess (reported by
+     * construction: every class played before 0.27.0 looks like this).
+     */
+    @Test
+    void a_round_computed_before_the_breakdown_says_so_rather_than_looking_class_blind() throws Exception {
+        long tenantId = jdbc.queryForObject(
+                "insert into tenant (code, name) values ('acme-old', 'Old') returning id", Long.class);
+        user(tenantId, "admin@old.test", "ADMIN");
+        user(tenantId, "trainer@old.test", "FACILITATOR");
+        String admin = login("acme-old", "admin@old.test");
+        String trainer = login("acme-old", "trainer@old.test");
+        long facilitatorId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@old.test'", Long.class);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("name", "Old cohort");
+        body.put("scenarioKey", "standard-v1");
+        body.put("teams", List.of(Map.of("name", "Alpha", "companyName", "Alpha Inc")));
+        MvcResult created = mvc.perform(post("/api/runs")
+                        .param("facilitatorId", String.valueOf(facilitatorId))
+                        .header("Authorization", "Bearer " + admin)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(body)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long runId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+        mvc.perform(post("/api/runs/" + runId + "/rounds/next")
+                .header("Authorization", "Bearer " + trainer)).andExpect(status().isOk());
+        mvc.perform(post("/api/runs/" + runId + "/rounds/close")
+                .header("Authorization", "Bearer " + trainer)).andExpect(status().isOk());
+
+        // Strip the breakdown from the stored detail: exactly the shape a pre-0.27.0 statement has.
+        jdbc.update("update round_statement set detail = (detail - 'classes')::jsonb"
+                + " where round_id in (select id from round where run_id = ?)", runId);
+
+        MvcResult table = mvc.perform(get("/api/runs/" + runId + "/class-shares")
+                        .header("Authorization", "Bearer " + trainer))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode page = json.readTree(
+                table.getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8));
+        assertThat(page.get("weighted").asBoolean())
+                .as("the template is class-weighted; the round simply predates the record").isTrue();
+        assertThat(page.get("rows").size()).isZero();
     }
 
     // ------------------------------------------------------------------ helpers

@@ -95,8 +95,8 @@ public class SimulationController {
      * data, and a trainee reaching this endpoint must not learn it.
      */
     @GetMapping("/class-shares")
-    public List<Map<String, Object>> classShares(@PathVariable long runId,
-                                                 @RequestParam(required = false) Integer round) {
+    public Map<String, Object> classShares(@PathVariable long runId,
+                                           @RequestParam(required = false) Integer round) {
         TenantContext.Principal me = requireStaff();
         return rounds.classShares(me.tenantId(), runId, round);
     }

@@ -962,6 +962,21 @@ The names follow what each channel *is*, as V41 and the guide's §3.1c table alr
 `DIGITAL` 数字营销 (paid digital media), `TRADE` 经销商渠道 (the wholesale/dealer counter), `FIELD` 直销团队
 (people selling face to face).
 
+**Amendment, same day (V43) — the defect the first release left on live.** The scope above excluded package
+copies, and that is exactly where it mattered: checked on the live site after v0.27.0 deployed, the demo
+tenant's finished Chinese class read the classes and products in Chinese and the three channels in English —
+because its session plays a package frozen **before** V42, whose copy has no `channel_text` rows. The review of
+a running class is the one place the defect is visible, so leaving it there was not a scope choice but a bug.
+
+- **The seed now walks the lineage**: any template descended from a shipped one (package from `standard-v1`,
+  package from a tenant draft that was itself copied from it, recursively) gets the words.
+- **A renamed channel is still left alone.** The row is inserted only when the channel's authored name is
+  still the shipped one (`'Digital'`, `'Trade'`, `'Field sales'`); a trainer who named it "Our dealer network"
+  keeps their words in every language, and the fallback in `ChannelSpec.nameIn` does the rest.
+- `ChannelNameTest.the_v43_seed_translates_a_package_frozen_before_it` executes V43's own SQL against a
+  package stripped of its `channel_text` rows and renamed on one channel, and asserts both halves: the two
+  untouched channels translate, the renamed one does not.
+
 Evidence:
 
 | Check | Result |
@@ -1012,3 +1027,12 @@ Evidence, on an eight-round six-company session played by the audit strategies t
 The sums are the point: a company's class awards equal the demand on its product line, and the companies in
 one class equal that class's served market. Both are re-derived by the auditor from the decisions, so a
 breakdown that merely looks plausible fails the audit.
+
+**Amendment, same day — a round that predates the record says so.** Every round computed before 0.27.0 has no
+`classes` in its detail, and no way to get one (the allocation was stored per product only). On the live demo
+tenant that is every round: the first look at the deployed feature showed an empty table, which a facilitator
+would read as a broken feature. The endpoint therefore answers `{weighted, rows}` rather than a bare list —
+`weighted: false` means a class-blind template (nothing to explain, the panel stays away), `weighted: true`
+with no rows means the round predates the record, and the debrief says exactly that instead of drawing
+nothing. `ClassShareApiTest.a_round_computed_before_the_breakdown_says_so_rather_than_looking_class_blind`
+strips `classes` from a stored statement and asserts the distinction.

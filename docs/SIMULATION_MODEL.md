@@ -185,6 +185,9 @@ record (D109), so the weights change who wins each class, never the size of the 
 - The breakdown adds up by construction: a company's class awards equal the demand on its product line, and
   the companies in one class equal that class's served market. `scripts/audit_financials.py` re-derives both
   independently.
+- **A round computed before release 0.27.0 carries none**, and one cannot be reconstructed from what was
+  stored. `GET /api/runs/{id}/class-shares` therefore returns `{weighted, rows}`: the flag separates "this
+  template has no classes" from "this round predates the record", so the debrief can say which one it is.
 
 ### 5.3 Brand
 

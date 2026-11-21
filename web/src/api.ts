@@ -448,6 +448,13 @@ export interface ClassShareCompany {
   share: number;
 }
 
+/** D115: the class table for a round, plus whether the template had classes to split at all. */
+export interface ClassSharePage {
+  /** False on a class-blind template: there is nothing to break down, and nothing to explain. */
+  weighted: boolean;
+  rows: ClassShareRow[];
+}
+
 /** D115: one (product, class) cell of the debrief's class table. */
 export interface ClassShareRow {
   product: string;
@@ -800,9 +807,9 @@ export const api = {
 
   scoreboard: (runId: number, round?: number) =>
     request<ScoreRow[]>(`/runs/${runId}/scoreboard${round ? `?round=${round}` : ""}`),
-  /** D115: the award per (product, class) — empty on a template that is not class-weighted. */
+  /** D115: the award per (product, class), with the flag that says whether classes exist at all. */
   classShares: (runId: number, round?: number) =>
-    request<ClassShareRow[]>(
+    request<ClassSharePage>(
       `/runs/${runId}/class-shares` + (round === undefined ? "" : `?round=${round}`),
     ),
   context: (runId: number, teamId: number) =>
