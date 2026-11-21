@@ -4,16 +4,12 @@
 
 # ---------------------------------------------------------------- 1. build
 FROM node:22-alpine AS build
-# D119: the build context is the repository root, not web/, because the console's build reads
-# backend/src/main/resources/limits.json — the same file the server validates and serves. Copying the
-# limits into web/ instead would be the second copy this ruling exists to prevent.
-WORKDIR /src/web
+WORKDIR /app
 
-COPY web/package.json web/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY web/ ./
-COPY backend/src/main/resources/limits.json ../backend/src/main/resources/limits.json
+COPY . .
 
 # Optional: only set this if the browser must call the API on a different origin (e.g. a separately
 # hosted API). Left empty, the console calls "/api" on its own origin and nginx forwards it.
@@ -21,12 +17,17 @@ COPY backend/src/main/resources/limits.json ../backend/src/main/resources/limits
 ARG VITE_API_BASE_URL=""
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-RUN npm run build
+# D119: this image builds only the static bundle it serves. The gates that read the repository
+# (check-limits: map slots and palette against backend/src/main/resources/limits.json) run in the API
+# image and in every local/CI build, where the file exists; the map template itself is built there too,
+# because the API is what renders the shared page. The i18n gate (D116) needs only this directory, so it
+# stays here. Keep this list and `build` in package.json in step.
+RUN npm run build:image
 
 # ---------------------------------------------------------------- 2. serve
 FROM nginx:1.27-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /src/web/dist /usr/share/nginx/html
+COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
