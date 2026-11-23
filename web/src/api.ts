@@ -646,6 +646,8 @@ export interface DecisionFormContext {
     description?: string | null;
   };
   marketReportCost: number;
+  /** D124: a review already bought for this round — the box shows ticked and cannot be unticked. */
+  reportPurchased?: boolean;
   /** D15: whether this template sells quality upgrades, and at what price per point. */
   qualityUpgrade: boolean;
   qualityCostPerPoint: number;

@@ -114,7 +114,16 @@ public class RoundService {
             throw new CashShortfallException(input.cash(), commitment.discretionary(), lines);
         }
 
-        rounds.upsertDecision(round.id(), teamId, payload, userId);
+        // D124: the purchase is charged with the plan that carried it, and a round already bought stays
+        // bought. Without this a trainee could read the forecast, edit the plan and re-submit with the box
+        // cleared — keeping the report and withdrawing its cost.
+        DecisionPayload stored = rounds.reportPurchased(round.id(), teamId) && !payload.marketReportRequested()
+                ? payload.withMarketReport()
+                : payload;
+        if (payload.marketReportRequested()) {
+            rounds.recordReportPurchase(round.id(), teamId);
+        }
+        rounds.upsertDecision(round.id(), teamId, stored, userId);
         events.publishAfterCommit(runId, "decision.submitted",
                 Map.of("round", round.number(), "teamId", teamId));
     }
@@ -704,6 +713,10 @@ public class RoundService {
         Optional<DecisionPayload> submitted = open.flatMap(r -> rounds.decision(r.id(), teamId));
         body.put("submitted", submitted.isPresent());
         submitted.ifPresent(d -> body.put("decision", d));
+        // D124: a bought review cannot be un-bought by re-submitting. The form needs to know, so the box
+        // shows ticked-and-locked instead of letting a trainee untick it and believe they saved the money.
+        body.put("reportPurchased", open
+                .map(r -> rounds.reportPurchased(r.id(), teamId)).orElse(false));
 
         body.put("cash", team.cash());
         body.put("brand", team.brand());

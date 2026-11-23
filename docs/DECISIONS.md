@@ -1328,3 +1328,33 @@ who read the report and submitted again paid for it twice.
 **Verified in the browser, Chinese, on a local class of four companies:** submit round 2 with the box ticked →
 box stays ticked and the report button enables → press 查看已购买的报告 → five forecast rows appear and the box
 goes unticked. Pie base measured in the DOM: `circle r=88 fill=#2f3947`, preceding the first slice path.
+
+
+**D124 — A bought market review is sticky for its round (owner's ruling, 23 Nov 2026).** After D123 cleared the
+box on reading, the owner asked how the report is priced and then: *"i want that closed"* — the hole being that
+a trainee could read the forecast, edit the plan and re-submit with the box cleared, keeping the report and
+withdrawing its cost.
+
+**The pricing, stated once, because it was never written down:** the review is **paid per round**. One payment
+buys that round's forecast — a forward horizon with a noise band — and it can be re-read as often as the
+trainee likes until the round closes. It is not pay-per-view, and it is not a one-time unlock for the whole
+simulation. The charge lands at settlement for each round whose plan carried the purchase
+(`ScoringEngine`: `reportCost`).
+
+**The ruling.** The purchase is a record of its own (`report_purchase`, unique per round and company), not a
+flag inside the plan — the plan is replaced on every re-submission (`on conflict … do update set payload`),
+which is precisely how the purchase got lost.
+
+- Submitting with the box ticked **records** the purchase.
+- A round already recorded **keeps it** on every later submission: the stored plan is rewritten with
+  `marketReport: true` even if the trainee cleared the box (`DecisionPayload.withMarketReport`).
+- The console is told (`context.reportPurchased`), so the box shows **ticked and disabled**, with the line
+  *本轮已购买——费用已计入，重新提交仍保留；本轮关闭前可随时再次查看。* Nothing is left to infer from a control that
+  silently refuses clicks.
+- Unchanged: reading stays free after the purchase, and the round's own decision continues to record
+  `marketReport: true` — it is the ledger line, not a preference.
+
+**Verified.** `ReportPurchaseTest` walks the exact hole: submit without the review, submit with it, read it,
+then re-submit without it — the purchase survives and the stored plan still bills it. The test was run against
+the previous `RoundService` and **fails there**, so it pins the fix rather than describing it. In the browser,
+Chinese, the bought section renders a ticked disabled box with the explanatory line. Suite **254** green.

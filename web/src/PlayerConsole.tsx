@@ -105,7 +105,8 @@ function draftFrom(context: DecisionFormContext): Draft {
     capacity: saved?.capacityPurchase
       ? Number(saved.capacityPurchase) / Math.max(1, context.machineCostPerWorker)
       : 0,
-    marketReport: saved?.marketReport ?? false,
+    // D124: a round already paid for opens ticked, so the next submission keeps the charge.
+    marketReport: saved?.marketReport ?? context.reportPurchased ?? false,
   };
 }
 
@@ -968,14 +969,20 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
       <section className="card">
         <h2>{t("player.review")}</h2>
         <label className="inline">
+          {/* D124: a review bought for this round stays bought — ticking it again is what carries the
+              charge, so the box cannot be cleared until the round closes. */}
           <input
             type="checkbox"
-            checked={draft.marketReport}
+            checked={draft.marketReport || Boolean(context.reportPurchased)}
+            disabled={Boolean(context.reportPurchased)}
             onChange={(e) => set("marketReport", e.target.checked)}
             style={{ width: "auto" }}
           />
           {t("player.buyReview", { cost: money(context.marketReportCost) })}
         </label>
+        {context.reportPurchased && (
+          <p className="muted">{t("player.reviewBought")}</p>
+        )}
         <p className="muted">
           {t("player.marketIndices", {
             demand: plain(context.market.demandIndex),

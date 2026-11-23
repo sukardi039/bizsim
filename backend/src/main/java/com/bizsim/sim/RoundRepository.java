@@ -491,6 +491,25 @@ public class RoundRepository {
                 }, roundId, teamId).stream().findFirst();
     }
 
+    /**
+     * D124: remember that this company bought the market review for this round. Sticky — the plan is
+     * replaced on every re-submit, so the purchase needs a record of its own.
+     */
+    public void recordReportPurchase(long roundId, long teamId) {
+        jdbc.update("""
+                insert into report_purchase (round_id, team_id) values (?, ?)
+                on conflict (round_id, team_id) do nothing
+                """, roundId, teamId);
+    }
+
+    /** Has this company bought the review for this round, on any submission? */
+    public boolean reportPurchased(long roundId, long teamId) {
+        Integer hit = jdbc.queryForObject("""
+                select count(*) from report_purchase where round_id = ? and team_id = ?
+                """, Integer.class, roundId, teamId);
+        return hit != null && hit > 0;
+    }
+
     public void upsertDecision(long roundId, long teamId, DecisionPayload payload, long submittedBy) {
         jdbc.update("""
                 insert into decision (round_id, team_id, role_key, payload, submitted_by)
