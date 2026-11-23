@@ -646,8 +646,11 @@ export interface DecisionFormContext {
     description?: string | null;
   };
   marketReportCost: number;
-  /** D124: a review already bought for this round — the box shows ticked and cannot be unticked. */
-  reportPurchased?: boolean;
+  /**
+   * D125: the review has been READ for this round. Reading locks the box; until then a ticked box can be
+   * unticked and the plan re-submitted, and the charge follows the final submission.
+   */
+  reportRead?: boolean;
   /** D15: whether this template sells quality upgrades, and at what price per point. */
   qualityUpgrade: boolean;
   qualityCostPerPoint: number;

@@ -492,18 +492,18 @@ public class RoundRepository {
     }
 
     /**
-     * D124: remember that this company bought the market review for this round. Sticky — the plan is
-     * replaced on every re-submit, so the purchase needs a record of its own.
+     * D125: remember that this company **read** the market review for this round. Reading is what locks the
+     * box — until then the trainee may tick, submit, un-tick and submit again without being charged.
      */
-    public void recordReportPurchase(long roundId, long teamId) {
+    public void recordReportRead(long roundId, long teamId) {
         jdbc.update("""
                 insert into report_purchase (round_id, team_id) values (?, ?)
                 on conflict (round_id, team_id) do nothing
                 """, roundId, teamId);
     }
 
-    /** Has this company bought the review for this round, on any submission? */
-    public boolean reportPurchased(long roundId, long teamId) {
+    /** Has this company read the review for this round? */
+    public boolean reportRead(long roundId, long teamId) {
         Integer hit = jdbc.queryForObject("""
                 select count(*) from report_purchase where round_id = ? and team_id = ?
                 """, Integer.class, roundId, teamId);

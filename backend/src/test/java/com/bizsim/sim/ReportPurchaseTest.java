@@ -25,12 +25,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * D124: a bought market review is paid for the round, and reading it makes the purchase stick.
+ * D125: the market review is <em>charged per round, and locked by reading it</em>, not by submitting it.
  *
- * <p>The hole this closes: the purchase travelled inside the submitted plan, and the plan is replaced on
- * every re-submission. So a trainee could buy the review, read the forecast, edit a price and submit again
- * with the box cleared — keeping the report and withdrawing its cost. Reading the report is what the money
- * pays for, so the purchase is recorded separately and re-submission cannot undo it.
+ * <p>The owner's rule: a ticked box may be unticked and the plan re-submitted — until the review has been
+ * read. Reading is what makes it final, and the charge follows the purchase status of the <strong>final</strong>
+ * submission of the round (the last plan submitted, or the auto-computed plan on timeout).
+ *
+ * <p>Two behaviours are pinned here, and they are different questions:
+ *
+ * <ol>
+ *   <li><strong>Nothing is locked before a read.</strong> Submit with the tick, submit without it: the round
+ *       ends up unbilled. D124 locked this at submission and charged for a report the trainee never opened.</li>
+ *   <li><strong>A read is irreversible within the round.</strong> Read it, then submit without the tick: the
+ *       stored plan is rewritten to keep the charge, so the report cannot be kept and its cost withdrawn.</li>
+ * </ol>
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -71,16 +79,16 @@ class ReportPurchaseTest extends PostgresTestBase {
 
         tenant = jdbc.queryForObject(
                 "insert into tenant (code, name) values ('acme', 'Acme') returning id", Long.class);
+        user("builder@acme.test", "BUILDER");
         user("trainer@acme.test", "FACILITATOR");
         user("ada@acme.test", "PLAYER");
         trainer = login("trainer@acme.test");
         trainee = login("ada@acme.test");
 
         MvcResult created = mvc.perform(post("/api/runs")
-                        .param("facilitatorId", String.valueOf(
-                                jdbc.queryForObject("select id from app_user where email = 'trainer@acme.test'",
-                                        Long.class)))
-                        .header("Authorization", "Bearer " + builderToken())
+                        .param("facilitatorId", String.valueOf(jdbc.queryForObject(
+                                "select id from app_user where email = 'trainer@acme.test'", Long.class)))
+                        .header("Authorization", "Bearer " + login("builder@acme.test"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Report class", "scenarioKey", "standard-v1",
@@ -93,50 +101,69 @@ class ReportPurchaseTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + trainer))
                 .andExpect(status().isOk());
         teamId = jdbc.queryForObject("select id from team where run_id = ?", Long.class, runId);
-        jdbc.update("""
-                insert into player (team_id, user_id, role_key, run_id) values (?, ?, 'OWNER', ?)
-                """, teamId, jdbc.queryForObject(
-                "select id from app_user where email = 'ada@acme.test'", Long.class), runId);
+        jdbc.update("insert into player (team_id, user_id, role_key, run_id) values (?, ?, 'OWNER', ?)",
+                teamId, jdbc.queryForObject("select id from app_user where email = 'ada@acme.test'",
+                        Long.class), runId);
     }
 
+    /** The question the owner asked: bought, not read, before submission — can it be taken back? Yes. */
+    @Test
+    void a_ticked_box_can_be_unticked_before_the_review_is_read() throws Exception {
+        submit(true);
+        context().andExpect(jsonPath("$.reportRead").value(false))
+                .andExpect(jsonPath("$.decision.marketReport").value(true));
+
+        // Change of mind, and no report was ever opened.
+        submit(false);
+
+        context().andExpect(jsonPath("$.reportRead").value(false))
+                .andExpect(jsonPath("$.decision.marketReport").value(false));
+        assertThat(billed()).as("a report nobody read is not charged").isFalse();
+    }
+
+    /** Once read, the report cannot be kept while its cost is withdrawn. */
     @Test
     void reading_the_review_locks_the_purchase_for_the_round() throws Exception {
-        // 1. The plan is submitted with no review: nothing bought.
-        submit(false);
-        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/context")
-                        .header("Authorization", "Bearer " + trainee))
-                .andExpect(jsonPath("$.submitted").value(true))
-                .andExpect(jsonPath("$.reportPurchased").value(false));
-
-        // 2. A second submission buys it.
         submit(true);
-        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/context")
+        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/market-report")
                         .header("Authorization", "Bearer " + trainee))
-                .andExpect(jsonPath("$.reportPurchased").value(true));
-        assertThat(reportCostCharged()).as("the review is billed after buying it").isPositive();
+                .andExpect(status().isOk());
 
-        // 3. The trainee edits the plan and submits with the review cleared — the hole this closes.
+        context().andExpect(jsonPath("$.reportRead").value(true));
+
+        // The trainee edits the plan and submits with the review cleared — the hole this closes.
         submit(false);
 
-        mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/context")
-                        .header("Authorization", "Bearer " + trainee))
-                .andExpect(jsonPath("$.reportPurchased").value(true))
+        context().andExpect(jsonPath("$.reportRead").value(true))
                 .andExpect(jsonPath("$.decision.marketReport").value(true));
-        assertThat(reportCostCharged()).as("re-submitting cannot withdraw the charge").isPositive();
+        assertThat(billed()).as("re-submitting cannot withdraw the cost of a report already read").isTrue();
+    }
 
-        // 4. The trainee can still read it — the round is paid for.
+    /** Reading is only possible once the review has been bought by a submitted plan. */
+    @Test
+    void the_review_cannot_be_read_before_it_is_bought() throws Exception {
+        submit(false);
         mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/market-report")
+                        .header("Authorization", "Bearer " + trainee))
+                .andExpect(status().isPaymentRequired())
+                .andExpect(jsonPath("$.code").value("report.not_purchased"));
+        context().andExpect(jsonPath("$.reportRead").value(false));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions context() throws Exception {
+        return mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/context")
                         .header("Authorization", "Bearer " + trainee))
                 .andExpect(status().isOk());
     }
 
-    /** The report line on the open round's stored plan — what the engine will charge at close. */
-    private java.math.BigDecimal reportCostCharged() {
-        return jdbc.queryForObject("""
-                select coalesce((payload->>'marketReport')::boolean, false)
+    /** Will the open round's settlement bill the review, as things stand? */
+    private boolean billed() {
+        Boolean ticked = jdbc.queryForObject("""
+                select coalesce((d.payload->>'marketReport')::boolean, false)
                 from decision d join round r on r.id = d.round_id
                 where r.run_id = ? and d.team_id = ?
-                """, Boolean.class, runId, teamId) ? java.math.BigDecimal.ONE : java.math.BigDecimal.ZERO;
+                """, Boolean.class, runId, teamId);
+        return Boolean.TRUE.equals(ticked);
     }
 
     private void submit(boolean withReview) throws Exception {
@@ -160,11 +187,6 @@ class ReportPurchaseTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isOk());
-    }
-
-    private String builderToken() throws Exception {
-        user("builder@acme.test", "BUILDER");
-        return login("builder@acme.test");
     }
 
     private void user(String email, String role) {

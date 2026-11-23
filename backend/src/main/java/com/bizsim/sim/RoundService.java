@@ -114,15 +114,12 @@ public class RoundService {
             throw new CashShortfallException(input.cash(), commitment.discretionary(), lines);
         }
 
-        // D124: the purchase is charged with the plan that carried it, and a round already bought stays
-        // bought. Without this a trainee could read the forecast, edit the plan and re-submit with the box
-        // cleared — keeping the report and withdrawing its cost.
-        DecisionPayload stored = rounds.reportPurchased(round.id(), teamId) && !payload.marketReportRequested()
+        // D125: charging follows the **final** submission's purchase status, so a ticked box may be unticked
+        // and re-submitted — until the review has been read. Reading locks it: a trainee who has seen the
+        // forecast cannot withdraw its cost, and every later submission of the round carries the charge.
+        DecisionPayload stored = rounds.reportRead(round.id(), teamId) && !payload.marketReportRequested()
                 ? payload.withMarketReport()
                 : payload;
-        if (payload.marketReportRequested()) {
-            rounds.recordReportPurchase(round.id(), teamId);
-        }
         rounds.upsertDecision(round.id(), teamId, stored, userId);
         events.publishAfterCommit(runId, "decision.submitted",
                 Map.of("round", round.number(), "teamId", teamId));
@@ -713,10 +710,9 @@ public class RoundService {
         Optional<DecisionPayload> submitted = open.flatMap(r -> rounds.decision(r.id(), teamId));
         body.put("submitted", submitted.isPresent());
         submitted.ifPresent(d -> body.put("decision", d));
-        // D124: a bought review cannot be un-bought by re-submitting. The form needs to know, so the box
-        // shows ticked-and-locked instead of letting a trainee untick it and believe they saved the money.
-        body.put("reportPurchased", open
-                .map(r -> rounds.reportPurchased(r.id(), teamId)).orElse(false));
+        // D125: the box locks when the review has been READ, not when a plan was submitted. Until then the
+        // trainee may tick, un-tick and re-submit freely; the charge follows whatever the final plan says.
+        body.put("reportRead", open.map(r -> rounds.reportRead(r.id(), teamId)).orElse(false));
 
         body.put("cash", team.cash());
         body.put("brand", team.brand());
@@ -810,7 +806,9 @@ public class RoundService {
      * The paid market review (D18). It is bought with the round's decision, so it cannot be read
      * before paying, and it reports the ordinary economics only — never the event deck.
      */
-    @Transactional(readOnly = true)
+    // D125: not read-only any more — reading the review is the act that locks the purchase, so this call
+    // writes a row. It stays a single transaction: the report is returned only if the read was recorded.
+    @Transactional
     public Map<String, Object> marketReport(long tenantId, long userId, String role,
                                             long runId, long teamId) {
         RunRepository.RunRow run = runs.find(runId, tenantId).orElseThrow(
@@ -824,6 +822,8 @@ public class RoundService {
                     ApiProblem.of("report.not_purchased",
                             "the market review has not been purchased for this round"));
         }
+        // D125: the report has just been read, and reading is what locks the purchase for this round.
+        rounds.recordReportRead(round.id(), teamId);
 
         Scenario scenario = scenarios.load(run.scenarioKey());
         Map<String, Object> body = new LinkedHashMap<>();

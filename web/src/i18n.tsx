@@ -298,7 +298,7 @@ export const en: Dict = {
   "player.rndThisMonth": "This month",
   "player.review": "Market review",
   "player.reviewBought":
-    "Bought for this round — it stays charged, and re-submitting keeps it. You can re-read it as often as you like until the round closes.",
+    "You have read this round's review, so it stays charged — you can untick it again next round. Re-read it as often as you like until this one closes.",
   "player.reviewNeedsPlan": "Submit this month's plan first — the review is bought with it.",
   "player.showReview": "Show the review",
   "player.waitingRound1": "Waiting for your facilitator to open round 1.",
@@ -1084,7 +1084,7 @@ export const zh: Dict = {
   "player.rndThisMonth": "本月投入",
   "player.review": "市场报告",
   "player.reviewBought":
-    "本轮已购买——费用已计入，重新提交仍保留；本轮关闭前可随时再次查看。",
+    "本轮报告已查看——费用已计入，下一轮可重新选择；本轮关闭前可随时再次查看。",
   "player.reviewNeedsPlan": "请先提交本月计划——报告是随计划一起购买的。",
   "player.showReview": "查看已购买的报告",
   "player.waitingRound1": "等待教师开启第 1 轮。",

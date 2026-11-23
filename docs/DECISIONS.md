@@ -1358,3 +1358,43 @@ which is precisely how the purchase got lost.
 then re-submit without it — the purchase survives and the stored plan still bills it. The test was run against
 the previous `RoundService` and **fails there**, so it pins the fix rather than describing it. In the browser,
 Chinese, the bought section renders a ticked disabled box with the explanatory line. Suite **254** green.
+
+
+**D125 — The box locks when the report is READ; the charge follows the final submission (owner's ruling, 23 Nov
+2026).** The owner's wording, verbatim: *"it can be as it is but when a report is read, the purchase cannot be
+unchecked. charging will be based on the final submission / timeout computation purchased status."*
+
+That corrects D124, which made the purchase sticky at **submission**. D124 withdrew a choice before the trainee
+had seen anything: a plan submitted with the box ticked could not be un-ticked, and the round was billed for a
+report nobody had opened.
+
+**The rule now.**
+
+| Moment | Box | Billed at settlement? |
+|---|---|---|
+| Ticked, not submitted | changeable | no |
+| Submitted with the tick, **not read** | changeable — untick and re-submit freely | only if the final plan still carries it |
+| **Read** (查看已购买的报告) | **locked, ticked, disabled** | yes — every later submission of the round keeps it |
+| Round closes / times out | — | the purchase status of the **final** plan decides |
+
+- `report_purchase` is no longer "a plan was submitted with the tick"; it is **"the review was read for this
+  round"** (V47 adds `read_at`). Reading is the only thing that writes it.
+- Submit no longer records a purchase. It only *enforces* a read: a round that has been read is rewritten with
+  `marketReport: true` even if the plan arrived without it, so the report cannot be kept while its cost is
+  withdrawn.
+- The console is told (`context.reportRead`) and renders the box ticked and disabled with the line
+  *本轮报告已查看——费用已计入，下一轮可重新选择；本轮关闭前可随时再次查看。*
+- `marketReport` is no longer `@Transactional(readOnly = true)`: the read is the act that locks the purchase, so
+  it writes one row. Report and record are in one transaction — the report is not returned unless the lock was
+  taken.
+
+**Timeout is unchanged and needs nothing new:** a round that closes with auto-computed plans is settled from
+whatever the last stored plan said, which is exactly "the final submission's purchased status". A trainee who
+never read the report and let the round time out with a ticked box is charged, because their final plan carries
+the tick — the same rule as a manual final submission.
+
+**Verified.** `ReportPurchaseTest` (3 tests) pins all three behaviours: ticked-then-unticked before any read ends
+unbilled; read-then-unticked stays billed; the report cannot be read before it is bought (`402
+report.not_purchased`). Run against the previous `RoundService`, **all three fail** — the tests describe the rule
+rather than the code. In the browser, Chinese: after reading, the box renders ticked, disabled, with the new
+explanation. Suite **256** green.
