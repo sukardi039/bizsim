@@ -103,6 +103,31 @@ public final class AutoWorker {
         return profile(level, personality, strategyFor(personality));
     }
 
+    /**
+     * D129: the neutral profile — a baseline plan with no strategic commitment.
+     *
+     * <p>The guided suggestion for a human seat used to be `profile("MID", "BALANCED")`, which before D128 was
+     * the neutral cell and after D128 silently meant **FOCUS**: a suggestion that concentrated marketing on one
+     * class's channel and planned only that class's product, for a company the guide knows nothing about. A
+     * suggestion is not a strategy. This profile sets every strategy lever to its neutral value — price at the
+     * template's, share at the market's, marketing pro rata to channel reach, the whole line planned, no capacity
+     * race, quality and R&D untouched — and keeps MID's competence so the numbers are honest but unremarkable.
+     */
+    public static Profile neutral() {
+        return new Profile(
+                "neutral", "MID", "BALANCED", "NEUTRAL",
+                new BigDecimal("1.00"), BigDecimal.ONE,
+                new BigDecimal("0.70"), new BigDecimal("0.14"), new BigDecimal("0.020"),
+                false,                 // a suggestion does not spend the company's money on a review
+                false,                 // nor commit it to an R&D programme the trainee never chose
+                false,                 // nor buy quality
+                new BigDecimal("2"),
+                BigDecimal.ZERO,       // no capacity race
+                BigDecimal.ONE,        // marketing pro rata to reach
+                BigDecimal.ONE, BigDecimal.ONE,
+                0);                    // the whole line, not one class's product
+    }
+
     /** D128: the profile for a strategy at a level of competence. */
     public static Profile profile(String level, String personality, String strategy) {
         BigDecimal[] byLevel = switch (level) {

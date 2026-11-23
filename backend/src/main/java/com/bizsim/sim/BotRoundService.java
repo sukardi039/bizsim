@@ -149,8 +149,10 @@ public class BotRoundService {
         if (roundRepository.decisionPayload(runId, number, teamId).isPresent()) {
             return Optional.empty();
         }
-        return Optional.of(planFor(tenantId, runId, teamId, number,
-                AutoWorker.profile("MID", "BALANCED")));
+        // D129: neutral, not MID/BALANCED. Since D128 that pair means FOCUS — a suggestion that narrowed the
+        // line to one class's product and concentrated its marketing, for a company the guide knows nothing
+        // about. A suggestion is a baseline, not a strategy.
+        return Optional.of(planFor(tenantId, runId, teamId, number, AutoWorker.neutral()));
     }
 
     /**

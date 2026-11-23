@@ -1569,3 +1569,42 @@ builder keys all COST plus one trainer-named row — rewinds to the pre-V51 stat
 statement, and asserts the outcome: **COST 3, FOCUS 3, DIFFERENTIATION 3**, `my-own-bot` still COST at v1 while
 the nine moved to v2. The predicate was also checked against the real key strings first, including shapes it must
 ignore (`high_aggressive`, `my-custom-bot`).
+
+
+**D129 — The guided suggestion is neutral, not a strategy (owner's question, 23 Nov 2026).** The owner asked which
+auto-worker style the opening-round suggestion for a *human* seat uses. The answer exposed a defect introduced by
+D128: `BotRoundService.suggest()` called `profile("MID", "BALANCED")`, the two-argument overload, which resolves
+through `strategyFor("BALANCED")` → **FOCUS**.
+
+Before D128 that pair was the genuinely neutral cell. After D128 the same call means something specific: a company
+that concentrates its marketing on one class's channel (channel bias 1.8) and plans **only that class's product**
+(`lineLimit = 1`). So every trainee's guided suggestion narrowed the line and biased the budget — for a company the
+guide knows nothing about, and regardless of what the class had been briefed to be. The seeded *opponents* used the
+proper three-argument call, so bots and suggestions had diverged in kind.
+
+**The ruling (owner: *"neutral"*).** A suggestion is a baseline, not a strategy. `AutoWorker.neutral()` sets every
+strategy lever to its neutral value and is used by `suggest()`:
+
+| Lever | Neutral value | Why |
+|---|---|---|
+| price posture | 1.00 | the template's price, with the policy's stock rule still applying |
+| target share | 1.00 | the market's, not a push or a retreat |
+| marketing | channel bias 1.0 | pro rata to reach — no concentration |
+| line | `lineLimit = 0` | every product the company carries is planned |
+| capacity | bias 0 | no machine race |
+| quality / R&D / review | not bought | a suggestion does not commit money the trainee never chose |
+| competence | MID | honest but unremarkable numbers |
+
+`NEUTRAL` is a policy profile only and is never written to `bot_profile`, so V50's check constraint
+(`COST`/`DIFFERENTIATION`/`FOCUS`) is unchanged.
+
+**Verified.** `SuggestedPlanTest` asserts the whole line is planned, marketing holds each channel's reach share
+(±3 pp), quality and R&D are empty, capacity and review are zero, and the price sits inside the stock-rule band
+rather than at a cost-leader's −6% or a differentiator's +6%. A second test pins the defect itself: the old
+`profile("MID","BALANCED")` **is** FOCUS and **is** focused, so the reason this ruling exists stays visible if
+`strategyFor` ever changes.
+
+**A wrong assertion, corrected rather than papered over.** The price check first failed at 1,050,000 against a
+1,000,000 list — the policy's own rule, not a strategy: an empty shelf facing unmet demand prices up 5%. That is a
+mechanic worth keeping in a suggestion, so the assertion allows the stock band and separately proves strategy did
+not move the price.
