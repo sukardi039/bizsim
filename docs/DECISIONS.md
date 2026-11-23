@@ -1476,3 +1476,18 @@ row still carries the shipped name — the same guard V43 used, so a trainer's o
 **Verified.** Local, Chinese, four-company class: the marketing section shows three channel paragraphs; the
 review shows every month with its impact sentence, the scheduled events for rounds 2 and 3 with names and
 descriptions, and the "what this purchase is worth" line. `Successfully applied 48 migrations`. Suite green.
+
+
+**V49 — the descriptions reach packages frozen before them.** V48 wrote the three channel descriptions onto the
+shipped templates, but a package published earlier is a *frozen copy* of its template (D33), so its channel rows
+were copied before there was a description to copy. The live tenant demonstrated it exactly: `v0.30.0` deployed,
+migrations 48, and the trainee's channels came back with `description = null`.
+
+This is the same gap V43 closed for the channel *names* when V42 introduced those, so it uses the same walk — a
+recursive `based_on` lineage from every shipped template, because one level misses the path the product actually
+uses (draft → package → part). The guard is V43's as well: only rows still carrying the shipped name are
+backfilled, so a trainer who renamed a channel keeps the trainer's words.
+
+Verified on a **fresh stack with 49 migrations**: the seeded frozen package's three channels all carry their
+Chinese description. (Also verified the hard way that a test on port 8099 must be checked for *which* jar is
+answering — the first run reported success against the previous build, which was still holding the port.)
