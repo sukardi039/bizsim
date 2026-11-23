@@ -6,7 +6,8 @@ import { describeError } from "./errors";
 /**
  * The auto-worker library (D47): reusable opponents a builder creates once and seats in packages.
  *
- * <p>Level is how well it plays, personality is what it wants. The name carries the level as a
+ * <p>Strategy is what it is trying to be, level is how well it plays it (D130 retired personality). The name
+ * carries the level as a
  * suffix because that is what a scoreboard shows — but the suffix is generated from the stored level,
  * so editing the level renames the brain rather than the other way round.
  */

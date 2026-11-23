@@ -30,7 +30,7 @@ type Dict = Record<string, string>;
 export const en: Dict = {
   "nav.bots": "Auto workers",
   "bots.title": "Auto workers",
-  "bots.hint": "A reusable opponent: level is how well it plays, personality is what it wants. Seat one in a package like a person — it then plays every round by itself, under the same rules as a trainee.",
+  "bots.hint": "A reusable opponent: strategy is what it is trying to be, level is how well it plays it. Seat one in a package like a person — it then plays every round by itself, under the same rules as a trainee.",
   "bots.name": "Name",
   "strategy.COST": "Cost leadership",
   "strategy.DIFFERENTIATION": "Differentiation",
@@ -840,7 +840,7 @@ export const en: Dict = {
 export const zh: Dict = {
   "nav.bots": "自动玩家",
   "bots.title": "自动玩家",
-  "bots.hint": "可重复使用的对手：等级决定下得多好，性格决定它想要什么。像学员一样安排进模拟包，它就会按与学员相同的规则自动完成每一轮。",
+  "bots.hint": "可重复使用的对手：竞争战略决定它想成为什么样的公司，等级决定它把这套战略执行得多好。像学员一样安排进模拟包，它就会按与学员相同的规则自动完成每一轮。",
   "bots.name": "名称",
   "strategy.COST": "成本领先",
   "strategy.DIFFERENTIATION": "差异化",
