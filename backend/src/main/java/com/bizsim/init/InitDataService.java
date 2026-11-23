@@ -276,10 +276,13 @@ public class InitDataService {
     }
 
     /**
-     * D130: one profile per strategy × level for a fresh tenant, each with the identity that signs its
-     * decisions (D47). Idempotent — a second call finds the keys present and does nothing.
+     * D130: one profile per strategy × level for a tenant, each with the identity that signs its decisions (D47).
+     *
+     * <p>Idempotent, and <strong>not only for fresh tenants</strong>: an existing tenant never re-enters the init
+     * path, so a library introduced after it was created would never appear. V52 retired its old profiles and the
+     * live class was left with none. {@code BotLibraryRunner} calls this on every startup.
      */
-    private void ensureBotLibrary(long tenantId, String tenantCode) {
+    public void ensureBotLibrary(long tenantId, String tenantCode) {
         for (Map.Entry<String, String> strategy : LIBRARY.entrySet()) {
             for (String level : List.of("HIGH", "MID", "LOW")) {
                 String key = strategy.getKey() + "-" + level.toLowerCase(java.util.Locale.ROOT);

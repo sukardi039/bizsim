@@ -1649,3 +1649,18 @@ only level, which is what a level test means.
 
 **Verified.** Suite **261 green**. A fresh stack seeds **9 profiles** with the nine names. The builder shows a
 Strategy selector and a Level selector, no personality; the decision trace shows strategy instead of personality.
+
+
+**V52 follow-up — an existing tenant never re-enters the init path.** V52 retired the live tenant's
+personality-era profiles (all nine, correctly: no seat pointed at them), but the nine new ones were only created
+by `InitDataService`, which runs once, when a tenant is created. The deployed result was a tenant with **no active
+auto-player library at all** — nothing to seat, nothing in the builder.
+
+`BotLibraryRunner` closes it: on every startup, for each tenant whose active library is empty, an idempotent
+`ensureBotLibrary` creates the nine. It is not a migration on purpose — tenants are created by application code
+*after* migrations run, which is exactly why the SQL version silently inserted zero rows. It never touches a key
+that already exists, so a trainer's own profiles are safe, and a seeding failure logs a warning rather than
+failing the boot.
+
+The lesson, recorded because it cost two attempts: **seed data that depends on rows the application creates
+belongs in a runner, not a migration.**
