@@ -385,6 +385,10 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
     try {
       const bought = await api.marketReport(run.id, team.id);
       setReport({ forecast: bought.forecast });
+      // D123: the report has been *read*. The charge is already committed — the purchase travelled with
+      // the plan that was submitted — so the box must not stay ticked: a ticked box means "charge this
+      // month with the next submission", and leaving it on bills the same report twice.
+      setDraft((current) => (current ? { ...current, marketReport: false } : current));
       setProblem(null);
     } catch (error) {
       setProblem(errorText(error, t));
@@ -979,6 +983,11 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             wage: plain(context.market.wageIndex),
           })}
         </p>
+        {/* D123: saying why the button is dark. The old screen just left it disabled with no reason,
+            which reads as a broken control when the plan was submitted seconds ago. */}
+        {!context.submitted && <p className="muted">{t("player.reviewNeedsPlan")}</p>}
+        {/* D123: the report is bought with the submitted plan, so the button follows the plan's state —
+            the same `submitted` the context reports, read where it is used. */}
         <button type="button" onClick={buyReport} disabled={!context.submitted}>
           {t("player.showReview")}
         </button>

@@ -1298,3 +1298,33 @@ fails on the old renderer and passes on this one.
 **Verified in a browser, in Chinese, at all three surfaces**: the facilitator's debrief (3 pies × 6 wedges,
 coverage 90 % / 72 % / 81 %), the trainee's pop-up for round 1 (same three), and the shared link (3 × 6
 wedges, unserved 9.6 % / 28.0 % / 19.5 % visible as a gap). Suite **252** green.
+
+
+**D123 — The pie has a base colour, and reading a bought report clears its box (owner's two items, 23 Nov 2026).**
+Two separate reports in one message, both accepted as stated.
+
+**1. "the pie chart should have a base colour."** Slices sweep on the served market (D113/D121), so a class
+that under-serves leaves a wedge nobody drew. On the page that wedge was the *page background*: it read as a
+rendering hole, not as demand the class failed to supply. Each pie is now drawn on a **base disc** — a full
+circle under the slices, in the same colour as the legend's "unserved" swatch (`#2f3947`), so picture and key
+agree by construction rather than by coincidence. Both renderers carry it (`MarketSharePies.tsx` and
+`MarketShareDonut`), and `MarketSharePieTest` asserts the disc exists *and* is painted before the first wedge
+— an SVG paints in document order, so a base drawn last would cover the pie it is meant to sit under.
+
+**2. "when a report is purchased and plan submitted, the purchased market should be unchecked if the report
+was read. this is a bug."** Correct, and it was a real double-charge waiting to happen: the purchase travels
+*with the submitted plan*, so a box left ticked means "charge this month with the next submission". A trainee
+who read the report and submitted again paid for it twice.
+
+- Reading the report (`buyReport`) now **clears the box**. The reading itself is unaffected: the forecast
+  stays on screen for the round.
+- The disabled state of **查看已购买的报告** is unchanged in meaning (the report is bought with the plan), but the
+  screen now **says why** it is dark — *请先提交本月计划——报告是随计划一起购买的* — instead of leaving a control that
+  looks broken.
+- What is deliberately *not* changed: the stored decision still records `marketReport: true` for that round.
+  It is the record of what was charged; clearing it would erase the purchase from the ledger. Only the form's
+  box is cleared, because the box is a statement about the *next* submission.
+
+**Verified in the browser, Chinese, on a local class of four companies:** submit round 2 with the box ticked →
+box stays ticked and the report button enables → press 查看已购买的报告 → five forecast rows appear and the box
+goes unticked. Pie base measured in the DOM: `circle r=88 fill=#2f3947`, preceding the first slice path.

@@ -172,4 +172,26 @@ class MarketSharePieTest {
         assertThat(html).as("a 100 % slice must be a full circle; an arc from a point to itself draws nothing")
                 .contains("<circle");
     }
+
+    /**
+     * D123: the pie sits on a base disc. Slices sweep on the served market, so an under-served class
+     * leaves a wedge nobody drew; without the base that wedge is page background, which reads as a hole
+     * in the chart rather than as the demand the class failed to supply.
+     */
+    @Test
+    void the_pie_has_a_base_disc_under_its_slices() {
+        List<MarketSharePie.Company> companies = List.of(
+                new MarketSharePie.Company(1, "Company 1", false, List.of(line("P1", 100, 0, 100))));
+
+        MarketSharePie.Pie pie = MarketSharePie.build(List.of("P1"), Map.of(),
+                Map.of("P1", BigDecimal.valueOf(400)), companies).get(0);
+
+        String html = MarketShareDonut.render("en", pie, "Basic", "unserved", "—", "share of market");
+        assertThat(html).as("a filled disc under the wedges, in the gap colour")
+                .contains("<circle cx=\"110\" cy=\"110\" r=\"96.00\" fill=\"#2f3947\"/>");
+        // The base comes first: an SVG paints in document order, so a disc drawn after the slices would
+        // cover them.
+        assertThat(html.indexOf("<circle cx=\"110\"")).as("base is drawn before the first wedge")
+                .isLessThan(html.indexOf("d=\"M110 110 L"));
+    }
 }

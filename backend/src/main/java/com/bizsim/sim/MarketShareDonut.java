@@ -31,6 +31,12 @@ public final class MarketShareDonut {
             "#ec4899", "#84cc16", "#f97316", "#6366f1", "#14b8a6", "#a855f7"
     };
     private static final String MUTED = "#6b7280";
+    /**
+     * D123: the pie's **base** — a disc under the slices, so the wedge a class failed to serve reads as
+     * demand it did not supply rather than as a hole in the drawing. Same colour as the legend's unserved
+     * swatch, so picture and legend agree.
+     */
+    private static final String BASE = "#2f3947";
 
     private static final int SIZE = 220;
     private static final int CX = SIZE / 2;
@@ -56,6 +62,10 @@ public final class MarketShareDonut {
 
         out.append("<svg viewBox=\"0 0 ").append(SIZE).append(' ').append(SIZE).append("\" role=\"img\"")
                 .append(" aria-label=\"").append(esc(title)).append("\">");
+
+        // 0. The base disc, first so every slice sits on it (D123).
+        out.append("<circle cx=\"").append(CX).append("\" cy=\"").append(CY).append("\" r=\"")
+                .append(n(OUTER)).append("\" fill=\"").append(BASE).append("\"/>");
 
         // 1. No separate "coverage" arc. The ring below is drawn on the served market, so the part the
         //    class did not supply is simply not drawn: the gap *is* the coverage. A second grey arc at a

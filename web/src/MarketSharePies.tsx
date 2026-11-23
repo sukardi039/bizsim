@@ -34,6 +34,13 @@ const PALETTE = [
   "#c77dff", "#00b4d8", "#ff7b00", "#5f0f40", "#84a98c",
 ];
 const AUTO = "#6b7280";
+/**
+ * D123: the **base** of the pie — a full disc drawn under the slices. Slices sweep on the served market,
+ * so a class that under-serves leaves a wedge nobody drew: without a base that wedge is page background
+ * and reads as a rendering hole rather than as the demand the class failed to supply. The base is the
+ * colour of that gap (the same one the legend's "unserved" swatch uses), so the two agree.
+ */
+const BASE = "#2f3947";
 
 /**
  * One slice: a wedge from the centre to `outer`, `from` in degrees clockwise from twelve o'clock.
@@ -81,6 +88,8 @@ function SolidPie({ pie }: { pie: MarketPie }) {
     <figure className="market-pie">
       <figcaption>{pie.productName || pie.product}</figcaption>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={pie.productName || pie.product}>
+        {/* The base disc, first so every slice sits on it. */}
+        <circle cx={SIZE / 2} cy={SIZE / 2} r={OUTER} fill={BASE} />
         {arcs.map(({ slice, mine, path }, index) =>
           path ? (
             <path key={`${slice.label}-${index}`} d={path} fill={mine} data-sweep={arcs[index].sweep} />
