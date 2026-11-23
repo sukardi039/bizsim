@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -491,5 +492,72 @@ class TemplateApiTest extends PostgresTestBase {
                 .andReturn();
         JsonNode body = json.readTree(result.getResponse().getContentAsString());
         return body.get("token").asText();
+    }
+
+    /**
+     * D131: a tenant may remove a template it owns, and the removal is soft.
+     *
+     * <p>Four behaviours, each of which the old code could not do at all (there was no DELETE):
+     * a tenant's own copy disappears from the library; the row and its catalogue survive so a played run keeps
+     * naming it; a shipped template stays undeletable; and a template anything points at is refused with the
+     * reason rather than removed from under a package.
+     */
+    @Test
+    void a_tenant_may_remove_its_own_template_softly() throws Exception {
+        String key = copyStandard();
+        int products = count("product", key);
+
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(jsonPath("$[?(@.key=='" + key + "')]").isNotEmpty());
+
+        mvc.perform(delete("/api/templates/" + key)
+                        .header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(key));
+
+        // Gone from the library...
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(jsonPath("$[?(@.key=='" + key + "')]").isEmpty());
+
+        // ...but the row and its catalogue are still there, because history still names them.
+        assertThat(jdbc.queryForObject(
+                "select count(*) from scenario where key = ? and deleted_at is not null", Integer.class, key))
+                .isEqualTo(1);
+        assertThat(count("product", key)).as("the catalogue survives").isEqualTo(products);
+    }
+
+    @Test
+    void a_shipped_template_can_never_be_removed() throws Exception {
+        mvc.perform(delete("/api/templates/standard-v1")
+                        .header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.read_only"));
+        mvc.perform(delete("/api/templates/preset-cost-v1")
+                        .header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.read_only"));
+
+        // And they are still listed, unmoved.
+        mvc.perform(get("/api/templates").header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(jsonPath("$[?(@.key=='standard-v1')]").isNotEmpty());
+    }
+
+    @Test
+    void a_template_a_package_points_at_is_refused_with_the_reason() throws Exception {
+        String key = copyStandard();
+        // A package pins its template by key; the delete must say so rather than break the package.
+        jdbc.update("""
+                insert into simulation_package (tenant_id, name, template_key, template_version)
+                values (?, 'Pinned', ?, 1)
+                """, acme, key);
+
+        mvc.perform(delete("/api/templates/" + key)
+                        .header("Authorization", "Bearer " + acmeFacilitator))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("template.in_use"));
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from scenario where key = ? and deleted_at is null", Integer.class, key))
+                .as("the template is still live").isEqualTo(1);
     }
 }

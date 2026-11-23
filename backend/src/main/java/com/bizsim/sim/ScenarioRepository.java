@@ -353,6 +353,39 @@ public class ScenarioRepository {
 
     // ------------------------------------------------------------------ templates
 
+    /**
+     * D131: what still points at this template. A template may only be removed when nothing does — a package
+     * pinned it, a package part was built from it, or a run played it.
+     */
+    public record References(int packages, int parts, int runs) {
+        public boolean any() {
+            return packages > 0 || parts > 0 || runs > 0;
+        }
+    }
+
+    public References references(String key) {
+        return new References(
+                jdbc.queryForObject("select count(*) from simulation_package where template_key = ?",
+                        Integer.class, key),
+                jdbc.queryForObject(
+                        "select count(*) from simulation_package_part "
+                                + "where template_key = ? or source_template_key = ?",
+                        Integer.class, key, key),
+                jdbc.queryForObject("select count(*) from run where scenario_key = ?",
+                        Integer.class, key));
+    }
+
+    /**
+     * D131: remove a tenant's own template from the library, softly. The row and its catalogue stay so a played
+     * run keeps naming it; only the picker forgets. Returns false when it was already gone.
+     */
+    public boolean softDelete(long tenantId, String key) {
+        return jdbc.update(
+                "update scenario set deleted_at = now() "
+                        + "where key = ? and tenant_id = ? and deleted_at is null",
+                key, tenantId) > 0;
+    }
+
     /** A template the caller can see: the shipped global one, or one their own tenant copied. */
     public record TemplateRow(String key, String name, Long tenantId, String status, String basedOn,
                               int version, int products, int rounds) {
@@ -365,6 +398,9 @@ public class ScenarioRepository {
                        (select count(*) from scenario_round r where r.scenario_key = s.key) as rounds
                 from scenario s
                 where (s.tenant_id is null or s.tenant_id = ?)
+                  -- D131: a removed template is hidden from the library but still resolvable by key, so
+                  -- a run that played it keeps naming it.
+                  and s.deleted_at is null
                   and s.frozen_for_package is null
                   -- A frozen copy is named `pkg-<tenant>-<8 hex>` (PackageService.frozenKey). Normally
                   -- the back-reference above hides it, but a copy whose package was deleted before this

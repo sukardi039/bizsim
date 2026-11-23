@@ -53,6 +53,26 @@ export default function TemplatesPanel() {
     }
   };
 
+  /**
+   * D131: soft removal. Confirmed first, because the row leaves the library — and refused by the server when a
+   * package, a part or a played run still points at the template, which the message explains.
+   */
+  const remove = async (template: TemplateRow) => {
+    if (!window.confirm(t("templates.deleteConfirm", { name: template.name }))) return;
+    setBusy(template.key);
+    setProblem(null);
+    setNotice(null);
+    try {
+      await api.deleteTemplate(template.key);
+      setNotice(t("templates.deleted", { name: template.name }));
+      await load();
+    } catch (error) {
+      setProblem(errorText(error, t));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (editing) {
     return <TemplateEditor templateKey={editing} onLeave={() => { setEditing(null); void load(); }} />;
   }
@@ -97,6 +117,17 @@ export default function TemplatesPanel() {
                 <button onClick={() => duplicate(template)} disabled={busy === template.key}>
                   {busy === template.key ? t("templates.copying") : t("templates.duplicate")}
                 </button>
+                {/* D131: a shipped template is a shared reference and stays for ever; only a tenant's own
+                    copy can be removed, and only when nothing points at it. */}
+                {template.tenantId != null && (
+                  <button
+                    className="ghost"
+                    onClick={() => void remove(template)}
+                    disabled={busy === template.key}
+                  >
+                    {t("templates.delete")}
+                  </button>
+                )}
               </td>
             </tr>
           ))}

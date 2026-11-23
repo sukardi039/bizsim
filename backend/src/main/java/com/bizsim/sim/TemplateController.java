@@ -3,6 +3,7 @@ package com.bizsim.sim;
 import com.bizsim.tenant.TenantContext;
 import com.bizsim.web.ProblemException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -76,6 +77,29 @@ public class TemplateController {
     public TemplateController(ScenarioRepository scenarios, com.bizsim.config.Limits limits) {
         this.scenarios = scenarios;
         this.limits = limits;
+    }
+
+    /**
+     * D131: remove a template the tenant owns.
+     *
+     * <p>Two refusals, both deliberate: a **shipped** template (tenant_id is null) is a shared reference and stays
+     * for ever, and a template anything still points at — a package, a package part, a played run — cannot be
+     * removed because those refer to it by key. The removal is **soft**: the row and its catalogue stay, so a run
+     * that played it still names it; only the library forgets.
+     */
+    @DeleteMapping("/{key}")
+    public Map<String, Object> delete(@PathVariable String key) {
+        TenantContext.Principal me = requireBuilder();
+        ScenarioRepository.TemplateRow row = requireEditable(me, key);
+        ScenarioRepository.References refs = scenarios.references(row.key());
+        if (refs.any()) {
+            throw ProblemException.conflict("template.in_use",
+                    "this template is still used by " + refs.packages() + " package(s), "
+                            + refs.parts() + " part(s) and " + refs.runs() + " simulation(s)",
+                    "packages", refs.packages(), "parts", refs.parts(), "runs", refs.runs());
+        }
+        scenarios.softDelete(me.tenantId(), row.key());
+        return Map.of("deleted", row.key());
     }
 
     @GetMapping

@@ -903,6 +903,9 @@ export const api = {
   replayBot: (runId: number, teamId: number, round: number) =>
     request<BotReplay>(`/runs/${runId}/bots/${teamId}/replay?round=${round}`, { method: "POST" }),
   templates: () => request<TemplateRow[]>("/templates"),
+  /** D131: remove a tenant-owned template from the library. Soft — history keeps naming it. */
+  deleteTemplate: (key: string) =>
+    request<{ deleted: string }>(`/templates/${encodeURIComponent(key)}`, { method: "DELETE" }),
   copyTemplate: (key: string, name?: string) =>
     request<TemplateRow>(`/templates/${encodeURIComponent(key)}/copy`, {
       method: "POST",

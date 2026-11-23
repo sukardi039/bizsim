@@ -287,6 +287,10 @@ export const en: Dict = {
   "templates.basedOn": "Based on",
   "templates.global": "global",
   "templates.yours": "yours",
+  "templates.delete": "Remove",
+  "templates.deleteConfirm":
+    "Remove \"{name}\" from the template library? Simulations that already played it keep their own record.",
+  "templates.deleted": "\"{name}\" was removed from the library.",
   "templates.duplicate": "Duplicate",
   "templates.copying": "Copying…",
 
@@ -1093,6 +1097,9 @@ export const zh: Dict = {
   "templates.basedOn": "复制自",
   "templates.global": "全局",
   "templates.yours": "本机构",
+  "templates.delete": "删除",
+  "templates.deleteConfirm": "从模板库中删除「{name}」吗？已经使用过它的模拟仍保留自己的记录。",
+  "templates.deleted": "「{name}」已从模板库中删除。",
   "templates.duplicate": "复制",
   "templates.copying": "正在复制…",
 

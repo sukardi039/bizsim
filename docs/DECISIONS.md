@@ -1664,3 +1664,40 @@ failing the boot.
 
 The lesson, recorded because it cost two attempts: **seed data that depends on rows the application creates
 belongs in a runner, not a migration.**
+
+
+**D131 — A tenant may remove a template it owns, softly (owner's request and rulings, 23 Nov 2026).** The owner
+asked whether templates of the same tenant could be removed, noting that seeded ones cannot. The investigation
+found the premise was half the story: **there was no delete at all**. `TemplateController` exposed `GET`,
+`POST /copy` and seven `PUT`s, and the library offered only Copy and Edit — so a tenant that had copied the
+shipped template three times kept all three for ever, and the seeded protection was one of *three* separate
+mechanisms rather than the cause:
+
+| Protection | Applies to |
+|---|---|
+| `tenant_id is null` ⇒ read-only | the shipped `standard-v1` and the three presets |
+| `template.in_use` | any template a run has played |
+| no endpoint at all | everything |
+
+**The rulings: soft, and seeded templates stay undeletable.**
+
+`DELETE /api/templates/{key}` — builder only — refuses `template.read_only` for a shipped template and
+`template.in_use` (with counts of packages, parts and runs) for one still referenced, because
+`simulation_package.template_key` and `run.scenario_key` refer to it by key. Otherwise it sets `scenario.deleted_at`:
+
+- the template disappears from `listVisible` and so from the library and the package pickers;
+- **the row and its whole catalogue stay** — products, segments, rounds, texts — because a run that played it
+  still names it, and its statement detail reads from that key;
+- **nothing is cascade-deleted.** The rule is enforced in the schema as well as the service: a check constraint
+  refuses `deleted_at` on a row with `tenant_id is null`, so a shipped template cannot be soft-deleted even by a
+  direct UPDATE (D119: one rule, enforced where it can be, agreed everywhere).
+
+**A schema assumption caught by the tests, not by review.** The reference check first queried `package_part` and
+inserted into `simulation_package` with a `created_by` column; the real objects are `simulation_package_part` and
+`simulation_package.published_by`. Both tests failed loudly, which is the point of writing them against the real
+schema rather than a remembered one.
+
+**Verified.** `TemplateApiTest` (12 tests, 3 new): a tenant's copy leaves the library while its catalogue survives
+in the row; `standard-v1` and `preset-cost-v1` both refuse with `template.read_only` and stay listed; a template a
+package pins refuses with `template.in_use` and stays live. The builder shows **Remove** only on tenant-owned
+rows, behind a confirmation that says simulations keep their own record. Suite **264 green**.
