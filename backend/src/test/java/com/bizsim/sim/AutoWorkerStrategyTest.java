@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>Porter's generic strategies differ in <em>where the money goes</em>, not in how hard a company pushes. The
  * old matrix only moved price and share, so two of its nine cells looked like strategies while doing the same
- * thing. This test takes one scenario, one level and one personality, varies only the strategy, and asserts the
+ * thing. This test takes one scenario and one level, varies only the strategy, and asserts the
  * three decisions diverge in the three places the strategies are supposed to differ:
  *
  * <ol>
@@ -41,10 +41,10 @@ class AutoWorkerStrategyTest extends PostgresTestBase {
     @Test
     void the_three_strategies_spend_and_price_differently() {
         Scenario scenario = scenarios.load("standard-v1");
-        // One level and one personality for all three runs: strategy is the only thing that changes.
+        // One level for all three runs: strategy is the only thing that changes.
         Map<String, AutoWorker.Decision> byStrategy = new LinkedHashMap<>();
         for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
-            byStrategy.put(strategy, decide(scenario, AutoWorker.profile("MID", "BALANCED", strategy)));
+            byStrategy.put(strategy, decide(scenario, AutoWorker.profile("MID", strategy)));
         }
 
         BigDecimal costPrice = firstPrice(byStrategy.get("COST"));
@@ -91,12 +91,12 @@ class AutoWorkerStrategyTest extends PostgresTestBase {
         // The same strategy at two levels must share its shape: same price posture, same quality appetite as
         // enabled. Level only changes how well it is executed (forecast noise, whether R&D is affordable).
         Scenario scenario = scenarios.load("standard-v1");
-        AutoWorker.Profile mid = AutoWorker.profile("MID", "BALANCED", "DIFFERENTIATION");
-        AutoWorker.Profile high = AutoWorker.profile("HIGH", "BALANCED", "DIFFERENTIATION");
+        AutoWorker.Profile mid = AutoWorker.profile("MID", "DIFFERENTIATION");
+        AutoWorker.Profile high = AutoWorker.profile("HIGH", "DIFFERENTIATION");
         assertThat(high.pricePosture()).isEqualByComparingTo(mid.pricePosture());
         assertThat(high.qualityAppetite()).isEqualByComparingTo(mid.qualityAppetite());
         assertThat(high.strategy()).isEqualTo(mid.strategy());
-        assertThat(AutoWorker.profile("LOW", "BALANCED", "COST").strategy()).isEqualTo("COST");
+        assertThat(AutoWorker.profile("LOW", "COST").strategy()).isEqualTo("COST");
     }
 
     // ------------------------------------------------------------------ harness

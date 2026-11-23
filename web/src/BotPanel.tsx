@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type BotReplay, type BotTraceRow, type Run } from "./api";
-import { useI18n } from "./i18n";
+import { enumLabel, useI18n } from "./i18n";
 import { describeError } from "./errors";
 
 /**
@@ -93,7 +93,7 @@ export default function BotPanel({ run }: { run: Run }) {
                 <td className="num">{row.round}</td>
                 <td>{row.company}</td>
                 <td>
-                  {row.level} · {row.personality}
+                  {row.level} · {enumLabel(t, "strategy", row.strategy)}
                 </td>
                 <td className="num">{row.profileVersion}</td>
                 <td>{t(`bots.mode${row.mode}`)}</td>

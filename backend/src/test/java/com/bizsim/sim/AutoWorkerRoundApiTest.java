@@ -83,7 +83,7 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
         MvcResult created = mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 1", "level", "high"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 1", "level", "high", "strategy", "COST"))))
                 .andExpect(status().isCreated())
                 .andReturn();
         botUserId = json.readTree(created.getResponse().getContentAsString()).get("userId").asLong();

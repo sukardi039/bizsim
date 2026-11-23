@@ -67,17 +67,17 @@ public class InitDataService {
      * copies of one brain: a demo where every opponent behaves identically teaches nothing.
      */
     /*
-     * D128: level, personality, strategy. A demo class should meet all three Porter strategies, each at a
-     * different level of competence, so the opponents differ in *what they are trying to be* and not only in
-     * how hard they push. Personality is kept because it still colours the price and share knobs.
+     * D130: strategy and level — the whole matrix is nine cells, and personality is retired. A demo class should
+     * meet all three Porter strategies at more than one level, so the opponents differ in what they are trying to
+     * be *and* in how well they do it.
      */
     private static final List<String[]> PLAYERS_STYLES = List.of(
-            new String[]{"HIGH", "AGGRESSIVE", "COST"},
-            new String[]{"MID", "CAUTIOUS", "DIFFERENTIATION"},
-            new String[]{"MID", "BALANCED", "FOCUS"},
-            new String[]{"LOW", "AGGRESSIVE", "COST"},
-            new String[]{"HIGH", "CAUTIOUS", "DIFFERENTIATION"},
-            new String[]{"LOW", "BALANCED", "FOCUS"});
+            new String[]{"HIGH", "COST"},
+            new String[]{"MID", "DIFFERENTIATION"},
+            new String[]{"MID", "FOCUS"},
+            new String[]{"LOW", "COST"},
+            new String[]{"HIGH", "DIFFERENTIATION"},
+            new String[]{"LOW", "FOCUS"});
 
     public record Params(int companies, int trainees, int rounds, Integer cycles, String locale,
                          String password, String tenantName, String packageName, String runName) {
@@ -94,6 +94,9 @@ public class InitDataService {
                           String packageName, long runId, String runStatus, int roundsComputed,
                           int rounds, int companies) {
     }
+
+    /** D130: an auto worker's password is unguessable and never shown — login refuses the role anyway (D47). */
+    private final java.security.SecureRandom random = new java.security.SecureRandom();
 
     private final JdbcTemplate jdbc;
     private final UserRepository users;
@@ -170,6 +173,11 @@ public class InitDataService {
             playerEmails.add(email);
         }
 
+        // D130: the auto-player library — the nine strategy × level cells, one per tenant. Tenants are made
+        // here, after migrations have run, so the library cannot be seeded by SQL (a migration joining `tenant`
+        // matches nothing and inserts zero rows, silently).
+        ensureBotLibrary(tenantId, code);
+
         // ---------------------------------------------------------------- template + companies
         String templateKey = ensureDraftTemplate(tenantId, code);
         if (requestedRounds > 0) {
@@ -223,7 +231,7 @@ public class InitDataService {
                 long owner = ownerOf(view, team.id());
                 String[] style = PLAYERS_STYLES.get(index % PLAYERS_STYLES.size());
                 DecisionPayload plan = bots.planFor(tenantId, runId, team.id(), round,
-                        AutoWorker.profile(style[0], style[1], style[2]));
+                        AutoWorker.profile(style[0], style[1]));
                 rounds.submit(tenantId, owner, runId, team.id(), plan);
                 index++;
             }
@@ -256,6 +264,43 @@ public class InitDataService {
         return jdbc.queryForObject("""
                 insert into tenant (code, name, locale) values (?, ?, ?) returning id
                 """, Long.class, code, blankTo(name, code), locale);
+    }
+
+    /** The nine cells, with the name carrying the combination a trainer reads on a scoreboard. */
+    private static final Map<String, String> LIBRARY = new java.util.LinkedHashMap<>();
+
+    static {
+        LIBRARY.put("cost", "Cost leader");
+        LIBRARY.put("differentiation", "Differentiator");
+        LIBRARY.put("focus", "Focus player");
+    }
+
+    /**
+     * D130: one profile per strategy × level for a fresh tenant, each with the identity that signs its
+     * decisions (D47). Idempotent — a second call finds the keys present and does nothing.
+     */
+    private void ensureBotLibrary(long tenantId, String tenantCode) {
+        for (Map.Entry<String, String> strategy : LIBRARY.entrySet()) {
+            for (String level : List.of("HIGH", "MID", "LOW")) {
+                String key = strategy.getKey() + "-" + level.toLowerCase(java.util.Locale.ROOT);
+                String name = strategy.getValue() + " (" + level.toLowerCase(java.util.Locale.ROOT) + ")";
+                String email = key + "@bots.invalid";
+                if (users.findByEmailInTenant(tenantId, email).isPresent()) {
+                    continue;
+                }
+                byte[] secret = new byte[32];
+                random.nextBytes(secret);
+                long profileId = jdbc.queryForObject("""
+                        insert into bot_profile (tenant_id, key, name, level, strategy, params)
+                        values (?, ?, ?, ?, ?, '{}'::jsonb) returning id
+                        """, Long.class, tenantId, key, name, level,
+                        strategy.getKey().toUpperCase(java.util.Locale.ROOT));
+                users.insertBot(tenantId, email, name,
+                        encoder.encode(java.util.HexFormat.of().formatHex(secret)), profileId);
+            }
+        }
+        log.info("init data: auto-player library — {} profiles for tenant '{}'",
+                LIBRARY.size() * 3, tenantCode);
     }
 
     private long ensureUser(long tenantId, String tenantCode, String local, String displayName,

@@ -64,8 +64,8 @@ public class BotProfileRepository {
      * Creates the profile and returns it. The key is derived from the name so two builders naming a
      * bot the same way in the same tenant collide loudly rather than silently.
      */
-    public Profile create(long tenantId, String name, String level, String personality,
-                          String strategy, String paramsJson, long createdBy) {
+    public Profile create(long tenantId, String name, String level, String strategy, String paramsJson,
+                          long createdBy) {
         String key = name.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
         if (key.isEmpty()) {
@@ -75,27 +75,26 @@ public class BotProfileRepository {
             key = key + "-" + UUID.randomUUID().toString().substring(0, 6);
         }
         return jdbc.queryForObject("""
-                insert into bot_profile (tenant_id, key, name, level, personality, strategy, params,
-                                         created_by)
-                values (?, ?, ?, ?, ?, ?, ?::jsonb, ?)
+                insert into bot_profile (tenant_id, key, name, level, strategy, params, created_by)
+                values (?, ?, ?, ?, ?, ?::jsonb, ?)
                 returning *, params::text as params
-                """, MAPPER, tenantId, key, name, level, personality,
-                strategy == null || strategy.isBlank() ? AutoWorker.strategyFor(personality) : strategy,
+                """, MAPPER, tenantId, key, name, level,
+                strategy == null || strategy.isBlank() ? AutoWorker.DEFAULT_STRATEGY : strategy,
                 paramsJson == null || paramsJson.isBlank() ? "{}" : paramsJson, createdBy);
     }
 
     /** Edits bump the version: history stays attached to the version that produced it. */
-    public Profile update(long tenantId, long id, String name, String level, String personality,
-                          String strategy, String paramsJson) {
+    public Profile update(long tenantId, long id, String name, String level, String strategy,
+                          String paramsJson) {
         Profile existing = find(tenantId, id).orElseThrow(
                 () -> ProblemException.notFound("bot.not_found", "no such auto worker"));
         return jdbc.queryForObject("""
                 update bot_profile
-                set name = ?, level = ?, personality = ?, strategy = ?, params = ?::jsonb,
+                set name = ?, level = ?, strategy = ?, params = ?::jsonb,
                     version = version + 1, updated_at = now()
                 where tenant_id = ? and id = ?
                 returning *, params::text as params
-                """, MAPPER, name, level, personality,
+                """, MAPPER, name, level,
                 strategy == null || strategy.isBlank() ? existing.strategy() : strategy,
                 paramsJson == null || paramsJson.isBlank() ? existing.paramsJson() : paramsJson,
                 tenantId, id);

@@ -72,7 +72,10 @@ class AutoWorkerSelfPlayTest extends PostgresTestBase {
         for (String level : List.of("HIGH", "MID", "LOW")) {
             for (int i = 0; i < 2; i++) {
                 long teamId = seed * 100 + players.size();
-                players.add(new Player(teamId, level, AutoWorker.profile(level, "BALANCED"),
+                // D130: level is compared with the strategy held constant. Before personality was retired this
+                // harness varied only level; the two axes are independent, so a level test must not also vary
+                // strategy or it measures neither.
+                players.add(new Player(teamId, level, AutoWorker.profile(level, "COST"),
                         scenario.params().startingCash(), scenario.params().startingBrand()));
             }
         }

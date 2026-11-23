@@ -42,7 +42,7 @@ public class BotRepository {
     }
 
     public record TraceRow(int round, long teamId, String company, String profileKey,
-                           int profileVersion, String level, String personality, String mode,
+                           int profileVersion, String level, String strategy, String mode,
                            Instant decidedAt, String rationale, String payload) {
     }
 
@@ -211,7 +211,7 @@ public class BotRepository {
         return jdbc.query("""
                 select r.number as round_number, bd.team_id, t.company_name, bd.profile_key,
                        bd.profile_version, coalesce(bp.level, '?') as level,
-                       coalesce(bp.personality, '?') as personality, bd.mode, bd.decided_at,
+                       coalesce(bp.strategy, '?') as strategy, bd.mode, bd.decided_at,
                        bd.rationale, null::text as payload
                 from bot_decision bd
                 join round r on r.id = bd.round_id
@@ -222,17 +222,17 @@ public class BotRepository {
                 order by r.number, t.id
                 """, (rs, i) -> new TraceRow(rs.getInt("round_number"), rs.getLong("team_id"),
                 rs.getString("company_name"), rs.getString("profile_key"),
-                rs.getInt("profile_version"), rs.getString("level"), rs.getString("personality"),
+                rs.getInt("profile_version"), rs.getString("level"), rs.getString("strategy"),
                 rs.getString("mode"), ts(rs.getTimestamp("decided_at")), rs.getString("rationale"),
                 null), runId, tenantId);
     }
 
     public BotRoundService.BotProfileView profile(long tenantId, long profileId) {
         return jdbc.query("""
-                select level, personality, strategy, params::text
+                select level, strategy, params::text
                 from bot_profile where tenant_id = ? and id = ?
                 """, (rs, i) -> new BotRoundService.BotProfileView(rs.getString(1), rs.getString(2),
-                rs.getString(3), rs.getString(4)), tenantId, profileId).stream().findFirst()
+                rs.getString(3)), tenantId, profileId).stream().findFirst()
                 .orElseThrow(() -> com.bizsim.web.ProblemException.notFound("bot.not_found",
                         "no such auto worker"));
     }

@@ -70,11 +70,11 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Market 1", "level", "high", "personality", "aggressive"))))
+                                "name", "Market 1", "level", "high", "strategy", "COST"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Market 1_high"))
                 .andExpect(jsonPath("$.level").value("HIGH"))
-                .andExpect(jsonPath("$.personality").value("AGGRESSIVE"))
+                .andExpect(jsonPath("$.strategy").value("COST"))
                 .andReturn();
 
         long profileId = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
@@ -103,7 +103,7 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Market 2_low", "level", "HIGH"))))
+                                "name", "Market 2_low", "level", "HIGH", "strategy", "COST"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("Market 2_low"))
                 .andExpect(jsonPath("$.level").value("LOW"));
@@ -114,7 +114,7 @@ class BotLibraryApiTest extends PostgresTestBase {
         mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + facilitatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 3", "level", "mid"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 3", "level", "mid", "strategy", "FOCUS"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("auth.builder_only"));
     }
@@ -124,7 +124,7 @@ class BotLibraryApiTest extends PostgresTestBase {
         MvcResult created = mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 4", "level", "mid"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 4", "level", "mid", "strategy", "FOCUS"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.version").value(1))
                 .andReturn();
@@ -134,7 +134,7 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Market 4", "level", "high",
+                                "name", "Market 4", "level", "high", "strategy", "FOCUS",
                                 "params", Map.of("targetShare", 0.31)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(2))
@@ -151,7 +151,7 @@ class BotLibraryApiTest extends PostgresTestBase {
         MvcResult created = mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 5", "level", "low"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 5", "level", "low", "strategy", "DIFFERENTIATION"))))
                 .andExpect(status().isCreated())
                 .andReturn();
         long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
@@ -207,17 +207,16 @@ class BotLibraryApiTest extends PostgresTestBase {
     }
 
     /**
-     * D128: the library carries the Porter axis. A bot created with a strategy keeps it, the API answers it
-     * back, and a client that does not send one keeps the old personality mapping rather than being refused.
+     * D130: a profile is a strategy at a level. The strategy is required — there is no personality to fall back
+     * to — and an unknown one is refused rather than guessed.
      */
     @Test
-    void a_bot_carries_its_strategy() throws Exception {
+    void a_bot_carries_its_strategy_and_must_name_one() throws Exception {
         MvcResult created = mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Focus player", "level", "MID", "personality", "BALANCED",
-                                "strategy", "FOCUS"))))
+                                "name", "Focus player", "level", "MID", "strategy", "FOCUS"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.strategy").value("FOCUS"))
                 .andReturn();
@@ -228,18 +227,25 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Focus player", "level", "MID", "personality", "BALANCED",
-                                "strategy", "DIFFERENTIATION"))))
+                                "name", "Focus player", "level", "MID", "strategy", "DIFFERENTIATION"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.strategy").value("DIFFERENTIATION"));
 
-        // No strategy on the wire: the personality decides, exactly as before D128.
+        // No strategy at all: refused. A profile without one is a contradiction now that personality is gone.
+        mvc.perform(post("/api/bots")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of("name", "No strategy", "level", "HIGH"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("bot.strategy_invalid"));
+
+        // An unknown strategy is refused too, not silently mapped to a default.
         mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Old client", "level", "HIGH", "personality", "AGGRESSIVE"))))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.strategy").value("COST"));
+                                "name", "Bad strategy", "level", "HIGH", "strategy", "BLUE_OCEAN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("bot.strategy_invalid"));
     }
 }

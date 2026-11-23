@@ -1608,3 +1608,44 @@ rather than at a cost-leader's −6% or a differentiator's +6%. A second test pi
 1,000,000 list — the policy's own rule, not a strategy: an empty shelf facing unmet demand prices up 5%. That is a
 mechanic worth keeping in a suggestion, so the assertion allows the stock band and separately proves strategy did
 not move the price.
+
+
+**D130 — Personality is retired; the library is the nine strategy × level cells (owner's ruling, 23 Nov 2026).**
+The owner asked whether 27 auto workers were needed to cover the permutations, and on review of that question
+ruled: *"Reduce to 9 (strategy × level) and retire personality from the library."*
+
+**Why.** Personality pushed price and share **on top of** the strategy, so several of the 27 cells contradicted
+their own strategy: COST + AGGRESSIVE double-undercut, while DIFFERENTIATION + AGGRESSIVE resisted its own
+premium. A matrix whose axes fight each other teaches noise, not strategy. The strategy now owns price and share
+outright.
+
+**What the nine are.** `cost-high`, `cost-mid`, `cost-low`, `differentiation-*`, `focus-*`. The name carries the
+combination a trainer reads on a scoreboard: **"Cost leader (high)"**, **"Differentiator (mid)"**, **"Focus
+player (low)"**. Each has the auto-worker identity that signs its decisions (D47).
+
+**The column stays, and stays nullable.** `bot_profile.personality` is written on every historical
+`bot_decision` trace — the "why did this company do that" record a class can be shown — so dropping it would
+lose the record of which profile produced decisions already played. It is a legacy marker now: never written for
+a new profile, never read by the policy. No row is deleted; profiles the pre-D130 library used are retired, not
+removed, and only where no seat or person points at them.
+
+**The API refuses a guess.** `strategy` is required and validated (`bot.strategy_invalid`); there is no
+personality to fall back to, so a client that omits it is told, not defaulted.
+
+**Two defects found by the suite, both real.**
+
+1. **A migration cannot seed a library.** V52 first inserted the nine by cross-joining `tenant` — which matched
+   nothing, because tenants are created by `InitDataService` *after* migrations run. It inserted zero rows and
+   said nothing. The library is now seeded per tenant in `ensureBotLibrary`, and idempotent.
+2. **A HIGH cost leader lost money while MID prospered.** Self-play measured **high −16.6m, mid +30.1m, low
+   −31.6m** — the level ordering inverted. The cause was the R&D gate: `investsInRnd` was `high`, so the best
+   cost leader bought an R&D programme while `qualityAppetite` (0.35) bought it no quality — it paid for the long
+   game and shipped a product nobody preferred. R&D is the differentiator's game now:
+   `strategy == DIFFERENTIATION`. Restored ordering: **high +90.4m, mid +30.4m, low −29.7m**, every level solvent.
+
+The self-play harness itself was also wrong in a way worth naming: it varied level while leaving the strategy
+implicit, so after D128 it was measuring two axes at once. It now holds the strategy constant (COST) and varies
+only level, which is what a level test means.
+
+**Verified.** Suite **261 green**. A fresh stack seeds **9 profiles** with the nine names. The builder shows a
+Strategy selector and a Level selector, no personality; the decision trace shows strategy instead of personality.

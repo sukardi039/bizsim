@@ -30,24 +30,25 @@ import java.util.Map;
 public class BotController {
 
     private static final List<String> LEVELS = List.of("LOW", "MID", "HIGH");
-    private static final List<String> PERSONALITIES = List.of("CAUTIOUS", "BALANCED", "AGGRESSIVE");
+    /** D130: the behavioural axis. Personality is retired and is no longer accepted on the wire. */
+    private static final List<String> STRATEGIES = List.of("COST", "DIFFERENTIATION", "FOCUS");
 
-    /** D128: {@code strategy} is optional on the wire — a client that does not send it keeps the old mapping. */
-    public record BotRequest(@NotBlank String name, String level, String personality, String strategy,
-                             Map<String, Object> params) {
+    /** D130: personality is gone from the wire; a profile is a strategy at a level. */
+    public record BotRequest(@NotBlank String name, String level, String strategy, Map<String, Object> params) {
     }
 
-    public record BotView(long id, String key, String name, String level, String personality,
-                          String strategy, int version, boolean active, Long userId) {
+    public record BotView(long id, String key, String name, String level, String strategy,
+                          int version, boolean active, Long userId) {
     }
 
-    /** D128: an unset or unknown strategy falls back to what the personality used to imply. */
-    private static String strategyOf(BotRequest request, String personality) {
+    /** D130: the strategy is required and validated; there is no personality to fall back to. */
+    private static String strategyOf(BotRequest request) {
         String strategy = request.strategy() == null ? "" : request.strategy().trim().toUpperCase(java.util.Locale.ROOT);
-        return switch (strategy) {
-            case "COST", "DIFFERENTIATION", "FOCUS" -> strategy;
-            default -> AutoWorker.strategyFor(personality);
-        };
+        if (!STRATEGIES.contains(strategy)) {
+            throw ProblemException.badRequest("bot.strategy_invalid",
+                    "strategy must be COST, DIFFERENTIATION or FOCUS");
+        }
+        return strategy;
     }
 
     private final BotProfileRepository bots;
@@ -65,7 +66,7 @@ public class BotController {
         TenantContext.Principal me = TenantContext.require();
         return bots.list(me.tenantId()).stream()
                 .map(profile -> new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                        profile.personality(), profile.strategy(), profile.version(), profile.active(),
+                        profile.strategy(), profile.version(), profile.active(),
                         users.botPersonFor(me.tenantId(), profile.id()).orElse(null)))
                 .toList();
     }
@@ -75,26 +76,24 @@ public class BotController {
     public BotView create(@Valid @RequestBody BotRequest request) {
         TenantContext.Principal me = requireBuilder();
         String level = levelOf(request);
-        String personality = personalityOf(request);
         String name = displayName(request.name(), level);
-        BotProfileRepository.Profile profile = bots.create(me.tenantId(), name, level, personality,
-                strategyOf(request, personality), paramsJson(request.params()), me.userId());
+        BotProfileRepository.Profile profile = bots.create(me.tenantId(), name, level,
+                strategyOf(request), paramsJson(request.params()), me.userId());
         long userId = createBotPerson(me.tenantId(), profile);
         return new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                profile.personality(), profile.strategy(), profile.version(), profile.active(), userId);
+                profile.strategy(), profile.version(), profile.active(), userId);
     }
 
     @PutMapping("/{id}")
     public BotView update(@PathVariable long id, @Valid @RequestBody BotRequest request) {
         TenantContext.Principal me = requireBuilder();
         String level = levelOf(request);
-        String personality = personalityOf(request);
         String name = displayName(request.name(), level);
-        BotProfileRepository.Profile profile = bots.update(me.tenantId(), id, name, level, personality,
-                strategyOf(request, personality), paramsJson(request.params()));
+        BotProfileRepository.Profile profile = bots.update(me.tenantId(), id, name, level,
+                strategyOf(request), paramsJson(request.params()));
         users.renameBotPerson(me.tenantId(), id, name);
         return new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                profile.personality(), profile.strategy(), profile.version(), profile.active(),
+                profile.strategy(), profile.version(), profile.active(),
                 users.botPersonFor(me.tenantId(), id).orElse(null));
     }
 
@@ -143,16 +142,6 @@ public class BotController {
             throw ProblemException.badRequest("bot.level_invalid", "level must be LOW, MID or HIGH");
         }
         return level;
-    }
-
-    private static String personalityOf(BotRequest request) {
-        String personality = request.personality() == null ? "BALANCED"
-                : request.personality().trim().toUpperCase(java.util.Locale.ROOT);
-        if (!PERSONALITIES.contains(personality)) {
-            throw ProblemException.badRequest("bot.personality_invalid",
-                    "personality must be CAUTIOUS, BALANCED or AGGRESSIVE");
-        }
-        return personality;
     }
 
     /** Stored name always ends with `_low|_mid|_high`; a stray suffix in the input is replaced. */

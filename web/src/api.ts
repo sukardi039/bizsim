@@ -697,16 +697,15 @@ export interface AuditRow {
 }
 
 /**
- * A reusable brain: strategy (what it is trying to be) × level (how well it plays) × personality (how hard it
- * pushes). D128: strategy is the Porter axis — COST, DIFFERENTIATION or FOCUS.
+ * A reusable brain: strategy (what it is trying to be) × level (how well it plays). D130 retired personality, so
+ * the matrix is nine cells: COST / DIFFERENTIATION / FOCUS at LOW / MID / HIGH competence.
  */
 export interface BotRow {
- id: number;
- key: string;
- name: string;
- level: "LOW" | "MID" | "HIGH";
- personality: "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
- strategy: "COST" | "DIFFERENTIATION" | "FOCUS";
+  id: number;
+  key: string;
+  name: string;
+  level: "LOW" | "MID" | "HIGH";
+  strategy: "COST" | "DIFFERENTIATION" | "FOCUS";
   version: number;
   active: boolean;
   /** The person that carries this brain; null when it has not been created yet. */
@@ -734,7 +733,8 @@ export interface BotTraceRow {
   profileKey: string;
   profileVersion: number;
   level: string;
-  personality: string;
+  /** D130: the strategy that produced this decision; personality is retired. */
+  strategy: string;
   mode: "SCHEDULED" | "MANUAL" | "NONE";
   decidedAt: string | null;
   rationale: string | null;
@@ -744,7 +744,7 @@ export interface BotReplay {
   round: number;
   teamId: number;
   level: string;
-  personality: string;
+  strategy: string;
   contextDigest: string;
   rationale: string;
   storedPayload: string | null;
@@ -870,9 +870,9 @@ export const api = {
     }),
   // ---------------------------------------------------------------- auto workers (D47–D50)
   bots: () => request<BotRow[]>("/bots"),
-  createBot: (body: { name: string; level: string; personality: string; strategy?: string }) =>
+  createBot: (body: { name: string; level: string; strategy: string }) =>
     request<BotRow>("/bots", { method: "POST", body: JSON.stringify(body) }),
-  updateBot: (id: number, body: { name: string; level: string; personality: string; strategy?: string }) =>
+  updateBot: (id: number, body: { name: string; level: string; strategy: string }) =>
     request<BotRow>(`/bots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   retireBot: (id: number) => request<unknown>(`/bots/${id}/retire`, { method: "POST" }),
   /** What the opponents did: profile version, how they were called, and the one-line reason. */

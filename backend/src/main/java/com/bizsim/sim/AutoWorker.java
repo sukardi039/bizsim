@@ -48,7 +48,7 @@ public final class AutoWorker {
                        BigDecimal pricePosture, BigDecimal forecastBlend, BigDecimal demandNoise,
                        BigDecimal marketingRate, boolean buysMarketReview, boolean investsInRnd,
                        boolean buysQuality, BigDecimal cashBufferMonths) {
-            this(key, level, personality, strategyFor(personality), targetShare, pricePosture,
+            this(key, level, personality, DEFAULT_STRATEGY, targetShare, pricePosture,
                     forecastBlend, demandNoise, marketingRate, buysMarketReview, investsInRnd,
                     buysQuality, cashBufferMonths, BigDecimal.ZERO, BigDecimal.ONE,
                     BigDecimal.ONE, BigDecimal.ONE, 0);
@@ -61,17 +61,10 @@ public final class AutoWorker {
     }
 
     /**
-     * D128: the strategy a personality used to imply, so an old profile keeps behaving as it did.
-     * AGGRESSIVE pushed price and share hardest (a cost shape), CAUTIOUS bought a premium (a differentiation
-     * shape), BALANCED sat between them.
+     * D130: personality is retired. It used to imply a strategy when a client sent none; there is no such
+     * default now — a profile without a strategy is a contradiction, and the caller must name one.
      */
-    public static String strategyFor(String personality) {
-        return switch (personality) {
-            case "AGGRESSIVE" -> "COST";
-            case "CAUTIOUS" -> "DIFFERENTIATION";
-            default -> "FOCUS";
-        };
-    }
+    public static final String DEFAULT_STRATEGY = "COST";
 
     /** Everything the policy is allowed to know. Built by the loader, or by a test harness. */
     public record Context(int round, int totalRounds, BigDecimal cash, BigDecimal brand,
@@ -99,10 +92,6 @@ public final class AutoWorker {
      * flat, a differentiator buys quality and R&amp;D and charges for it, a focus player narrows to the product
      * and channel that serve its class.
      */
-    public static Profile profile(String level, String personality) {
-        return profile(level, personality, strategyFor(personality));
-    }
-
     /**
      * D129: the neutral profile — a baseline plan with no strategic commitment.
      *
@@ -128,8 +117,8 @@ public final class AutoWorker {
                 0);                    // the whole line, not one class's product
     }
 
-    /** D128: the profile for a strategy at a level of competence. */
-    public static Profile profile(String level, String personality, String strategy) {
+    /** D130: the profile for a strategy at a level of competence — the whole matrix, now nine cells. */
+    public static Profile profile(String level, String strategy) {
         BigDecimal[] byLevel = switch (level) {
             case "HIGH" -> new BigDecimal[]{new BigDecimal("0.34"), new BigDecimal("1.00"),
                     new BigDecimal("0.04"), new BigDecimal("0.035")};
@@ -138,16 +127,11 @@ public final class AutoWorker {
             default -> new BigDecimal[]{new BigDecimal("0.25"), new BigDecimal("0.35"),
                     new BigDecimal("0.28"), new BigDecimal("0.008")};
         };
-        BigDecimal posture = switch (personality) {
-            case "AGGRESSIVE" -> new BigDecimal("0.94");
-            case "CAUTIOUS" -> new BigDecimal("1.06");
-            default -> BigDecimal.ONE;
-        };
-        BigDecimal share = switch (personality) {
-            case "AGGRESSIVE" -> new BigDecimal("1.12");
-            case "CAUTIOUS" -> new BigDecimal("0.98");
-            default -> new BigDecimal("1.04");
-        };
+        // D130: the strategy alone now sets price and share. Personality used to move them on top, which made
+        // some cells contradictory — COST + AGGRESSIVE double-undercut, DIFFERENTIATION + AGGRESSIVE resisted its
+        // own premium — so the axis is retired and its character is absorbed by the strategy's bias below.
+        BigDecimal posture = BigDecimal.ONE;
+        BigDecimal share = BigDecimal.ONE;
         boolean high = "HIGH".equals(level);
         boolean mid = "MID".equals(level);
 
@@ -165,7 +149,7 @@ public final class AutoWorker {
             case "DIFFERENTIATION" -> {
                 // Premium price, defensible by product rather than by volume: quality and R&D, no machine race.
                 shareBias = new BigDecimal("0.98");
-                postureBias = new BigDecimal("1.06");
+                postureBias = new BigDecimal("1.06");   // charges ~6% over the template
                 capacityBias = new BigDecimal("0.25");
                 channelBias = BigDecimal.ONE;
                 rndAppetite = new BigDecimal("1.35");
@@ -194,15 +178,17 @@ public final class AutoWorker {
             }
         }
         return new Profile(
-                strategy.toLowerCase(java.util.Locale.ROOT) + "_"
-                        + level.toLowerCase(java.util.Locale.ROOT) + "_"
-                        + personality.toLowerCase(java.util.Locale.ROOT),
-                level, personality, strategy,
+                // D130: the key names the combination that still exists — strategy and level.
+                strategy.toLowerCase(java.util.Locale.ROOT) + "_" + level.toLowerCase(java.util.Locale.ROOT),
+                level, null, strategy,
                 share.multiply(shareBias), posture.multiply(postureBias),
                 byLevel[1], byLevel[2], byLevel[3],
                 mid || high,          // the review pays for itself once the forecast is used properly
-                high,                 // R&D is a long game: a company without the cash does not start one
-                strategy.equals("DIFFERENTIATION") || high,
+                // D130: R&D is the differentiator's game. It was `high`, which made a HIGH cost leader spend on
+                // a programme while buying no quality at all — it paid for the long game and shipped a product
+                // nobody preferred, and the self-play calibration showed it losing money while MID prospered.
+                strategy.equals("DIFFERENTIATION"),
+                strategy.equals("DIFFERENTIATION"),
                 new BigDecimal("2"),
                 capacityBias, channelBias, rndAppetite, qualityAppetite, lineLimit);
     }

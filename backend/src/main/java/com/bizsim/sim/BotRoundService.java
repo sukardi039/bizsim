@@ -202,11 +202,11 @@ public class BotRoundService {
         String stored = roundRepository.decisionPayload(runId, roundNumber, teamId).orElse(null);
         boolean identical = stored != null
                 && canonical(stored).equals(canonical(toJson(replayed)));
-        return new Replay(roundNumber, teamId, profile.level(), profile.personality(),
+        return new Replay(roundNumber, teamId, profile.level(), profile.strategy(),
                 digest(context), decision.rationale(), stored, toJson(replayed), identical);
     }
 
-    public record Replay(int round, long teamId, String level, String personality,
+    public record Replay(int round, long teamId, String level, String strategy,
                          String contextDigest, String rationale, String storedPayload,
                          String replayedPayload, boolean identical) {
     }
@@ -340,23 +340,23 @@ public class BotRoundService {
 
     private static AutoWorker.Profile profileFrom(BotRepository.Due due) {
         return AutoWorker.withParams(
-                AutoWorker.profile(due.level(), due.personality(), due.strategy()),
+                AutoWorker.profile(due.level(), due.strategy()),
                 parse(due.paramsJson()));
     }
 
     private static AutoWorker.Profile profileFrom(BotProfileView view) {
         return AutoWorker.withParams(
-                AutoWorker.profile(view.level(), view.personality(), view.strategy()),
+                AutoWorker.profile(view.level(), view.strategy()),
                 parse(view.paramsJson()));
     }
 
     /**
      * Minimal view so the service can read a brain without depending on the user package.
      *
-     * <p>D128: {@code strategy} is the Porter axis; a row written before it existed reads null and falls back
-     * to the strategy its personality used to imply, so an old class keeps the opponents it had.
+     * <p>D130: {@code strategy} is the only behavioural axis. A row written before the column existed reads
+     * null, and falls back to the shipped default rather than to a personality that no longer exists.
      */
-    public record BotProfileView(String level, String personality, String strategy, String paramsJson) {
+    public record BotProfileView(String level, String strategy, String paramsJson) {
     }
 
     private AutoWorker.Context context(Scenario scenario, long runId, int round,

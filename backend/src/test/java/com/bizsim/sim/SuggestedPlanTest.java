@@ -90,13 +90,18 @@ class SuggestedPlanTest extends PostgresTestBase {
     }
 
     @Test
-    void the_old_pair_would_have_been_a_focus_plan() {
-        // The defect, pinned: what the suggestion used to be. If this ever stops being FOCUS, strategyFor changed
-        // and the reason D129 exists has moved — which is worth knowing loudly rather than silently.
-        AutoWorker.Profile old = AutoWorker.profile("MID", "BALANCED");
-        assertThat(old.strategy()).isEqualTo("FOCUS");
-        assertThat(old.focused()).as("it narrowed the line").isTrue();
-        assertThat(AutoWorker.neutral().focused()).as("the suggestion does not").isFalse();
+    void the_neutral_profile_is_distinguishable_from_every_strategy() {
+        // D129 kept the suggestion neutral because the pair it used before meant FOCUS. D130 retired personality
+        // entirely, so the guard is now against the three strategies: none of them is what the suggestion uses.
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+            AutoWorker.Profile shipped = AutoWorker.profile("MID", strategy);
+            assertThat(shipped.strategy()).isEqualTo(strategy);
+            assertThat(shipped.pricePosture())
+                    .as("%s moves the price away from neutral", strategy)
+                    .isNotEqualByComparingTo(AutoWorker.neutral().pricePosture());
+        }
+        assertThat(AutoWorker.neutral().focused()).as("the suggestion narrows no line").isFalse();
+        assertThat(AutoWorker.profile("MID", "FOCUS").focused()).as("the focus strategy does").isTrue();
     }
 
     private AutoWorker.Decision decide(Scenario scenario, AutoWorker.Profile profile) {

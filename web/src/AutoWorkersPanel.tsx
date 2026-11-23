@@ -17,9 +17,6 @@ export default function AutoWorkersPanel() {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [level, setLevel] = useState<"LOW" | "MID" | "HIGH">("MID");
-  const [personality, setPersonality] = useState<"CAUTIOUS" | "BALANCED" | "AGGRESSIVE">(
-    "BALANCED",
-  );
   /** D128: the Porter axis — what this opponent is trying to be. */
   const [strategy, setStrategy] = useState<"COST" | "DIFFERENTIATION" | "FOCUS">("COST");
 
@@ -41,7 +38,7 @@ export default function AutoWorkersPanel() {
     setBusy(true);
     setProblem(null);
     try {
-      await api.createBot({ name: name.trim(), level, personality, strategy });
+      await api.createBot({ name: name.trim(), level, strategy });
       setName("");
       await load();
     } catch (error) {
@@ -53,14 +50,13 @@ export default function AutoWorkersPanel() {
 
   const change = async (
     bot: BotRow,
-    next: Partial<{ level: string; personality: string; strategy: string }>,
+    next: Partial<{ level: string; strategy: string }>,
   ) => {
     setProblem(null);
     try {
       await api.updateBot(bot.id, {
         name: bot.name,
         level: (next.level ?? bot.level) as string,
-        personality: (next.personality ?? bot.personality) as string,
         strategy: (next.strategy ?? bot.strategy) as string,
       });
       await load();
@@ -104,17 +100,6 @@ export default function AutoWorkersPanel() {
             <option value="HIGH">{t("bots.levelHigh")}</option>
           </select>
         </label>
-        <label>
-          {t("bots.personality")}
-          <select
-            value={personality}
-            onChange={(e) => setPersonality(e.target.value as typeof personality)}
-          >
-            <option value="CAUTIOUS">{t("bots.cautious")}</option>
-            <option value="BALANCED">{t("bots.balanced")}</option>
-            <option value="AGGRESSIVE">{t("bots.aggressive")}</option>
-          </select>
-        </label>
         <button type="submit" disabled={busy || !name.trim()}>
           {t("bots.create")}
         </button>
@@ -129,7 +114,6 @@ export default function AutoWorkersPanel() {
               <th>{t("bots.name")}</th>
               <th>{t("bots.strategy")}</th>
               <th>{t("bots.level")}</th>
-              <th>{t("bots.personality")}</th>
               <th className="num">{t("bots.version")}</th>
               <th>{t("bots.state")}</th>
               <th />
@@ -154,16 +138,6 @@ export default function AutoWorkersPanel() {
                     <option value="LOW">{t("bots.levelLow")}</option>
                     <option value="MID">{t("bots.levelMid")}</option>
                     <option value="HIGH">{t("bots.levelHigh")}</option>
-                  </select>
-                </td>
-                <td>
-                  <select
-                    value={bot.personality}
-                    onChange={(e) => void change(bot, { personality: e.target.value })}
-                  >
-                    <option value="CAUTIOUS">{t("bots.cautious")}</option>
-                    <option value="BALANCED">{t("bots.balanced")}</option>
-                    <option value="AGGRESSIVE">{t("bots.aggressive")}</option>
                   </select>
                 </td>
                 <td className="num">{bot.version}</td>
