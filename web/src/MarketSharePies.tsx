@@ -1,5 +1,5 @@
 /**
- * D112: per-product market share, as a donut the facilitator can show the class.
+ * D112/D121: per-product market share, as a **pie** the facilitator can show the class.
  *
  * <p>**What the slices mean.** The circle is the *served* market for that product — the pieces the
  * class actually contested (`pool × (1 − baselineShare)`) — so the slices add to the whole. Whatever the
@@ -15,9 +15,12 @@ import type { MarketPie } from "./api";
 
 const SIZE = 190;
 const OUTER = 88;
-const INNER = 54;
-const COVER_OUTER = 94;
-const COVER_INNER = 92;
+/**
+ * D121: a solid pie — no hole in the middle. The inner radius is 0, so each slice is a wedge from the
+ * centre. The coverage figure that used to sit in the hole is now stated in the legend, where it can be
+ * read without measuring an area; a solid centre also makes the slices bigger at the same diameter,
+ * which is what the review asked for.
+ */
 
 /** Distinct hues that survive a projector; the auto seat uses a single muted grey instead. */
 const PALETTE = [
@@ -32,23 +35,28 @@ const PALETTE = [
 ];
 const AUTO = "#6b7280";
 
-/** A ring segment between two radii, `from` in degrees clockwise from twelve o'clock. */
-function ring(from: number, sweep: number, outer: number, inner: number): string {
+/**
+ * One slice: a wedge from the centre to `outer`, `from` in degrees clockwise from twelve o'clock.
+ * D121: the same path with inner radius 0 is a pie slice; a single 100 % slice is a full circle.
+ */
+function wedge(from: number, sweep: number, outer: number): string {
   const clamp = Math.min(sweep, 359.999);
+  if (sweep >= 359.999) {
+    return `M ${SIZE / 2} ${SIZE / 2 - outer} A ${outer} ${outer} 0 1 1 ${SIZE / 2 - 0.01} ${SIZE / 2 - outer} Z`;
+  }
   const a0 = ((from - 90) * Math.PI) / 180;
   const a1 = ((from + clamp - 90) * Math.PI) / 180;
   const large = clamp > 180 ? 1 : 0;
   const x = (r: number, a: number) => SIZE / 2 + r * Math.cos(a);
   const y = (r: number, a: number) => SIZE / 2 + r * Math.sin(a);
   return (
-    `M ${x(outer, a0)} ${y(outer, a0)} ` +
-    `A ${outer} ${outer} 0 ${large} 1 ${x(outer, a1)} ${y(outer, a1)} ` +
-    `L ${x(inner, a1)} ${y(inner, a1)} ` +
-    `A ${inner} ${inner} 0 ${large} 0 ${x(inner, a0)} ${y(inner, a0)} Z`
+    `M ${SIZE / 2} ${SIZE / 2} ` +
+    `L ${x(outer, a0)} ${y(outer, a0)} ` +
+    `A ${outer} ${outer} 0 ${large} 1 ${x(outer, a1)} ${y(outer, a1)} Z`
   );
 }
 
-function Donut({ pie }: { pie: MarketPie }) {
+function SolidPie({ pie }: { pie: MarketPie }) {
   const { t, number } = useI18n();
   const totalSold = pie.slices.reduce((sum, slice) => sum + Number(slice.sold), 0);
   const coverage =
@@ -64,7 +72,7 @@ function Donut({ pie }: { pie: MarketPie }) {
     const mine = slice.autoPlayer ? AUTO : PALETTE[colour % PALETTE.length];
     colour += 1;
     const sweep = served > 0 ? (Number(slice.sold) / served) * 360 : 0;
-    const path = sweep > 0 ? ring(cursor, sweep, OUTER, INNER) : null;
+    const path = sweep > 0 ? wedge(cursor, sweep, OUTER) : null;
     cursor += sweep;
     return { slice, mine, sweep, path };
   });
@@ -73,26 +81,17 @@ function Donut({ pie }: { pie: MarketPie }) {
     <figure className="market-pie">
       <figcaption>{pie.productName || pie.product}</figcaption>
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={pie.productName || pie.product}>
-        {coverage > 0 && (
-          <path d={ring(-90, (coverage / 100) * 360, COVER_OUTER, COVER_INNER)} />
-        )}
         {arcs.map(({ slice, mine, path }, index) =>
           path ? (
             <path key={`${slice.label}-${index}`} d={path} fill={mine} data-sweep={arcs[index].sweep} />
           ) : null,
         )}
-        <text
-          x={SIZE / 2}
-          y={SIZE / 2 - 4}
-          textAnchor="middle"
-          className="market-pie-centre"
-        >
-          {number(coverage, 0)}%
-        </text>
-        <text x={SIZE / 2} y={SIZE / 2 + 12} textAnchor="middle" className="market-pie-centre-sub">
-          {t("debrief.coverage")}
-        </text>
       </svg>
+      {/* D121: the coverage reading moved here from the hole in the middle. The hole was where it used to
+          live, and a solid pie has nowhere to put it — the legend is also where a reader looks for it. */}
+      <p className="market-pie-coverage">
+        {t("debrief.coverage")}: <strong>{number(coverage, 0)}%</strong>
+      </p>
       <table className="market-pie-legend">
         <tbody>
           {/* One number per company: its share of the served market — the figure the ring is drawn
@@ -131,7 +130,7 @@ export function MarketSharePies({ pies }: { pies: MarketPie[] }) {
   return (
     <div className="market-pies">
       {pies.map((pie) => (
-        <Donut key={pie.product} pie={pie} />
+        <SolidPie key={pie.product} pie={pie} />
       ))}
     </div>
   );

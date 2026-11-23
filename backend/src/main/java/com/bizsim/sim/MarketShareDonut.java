@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Draws a {@link MarketSharePie} as a donut with two readings on it.
+ * Draws a {@link MarketSharePie} as a **solid pie** (D121) with its coverage stated beside it.
  *
  * <p><strong>Why two readings.</strong> The first attempt drew one ring divided by the served market and
  * gave the unserved remainder its own slice. Arithmetically correct, and useless: a class that stocks out
@@ -35,11 +35,8 @@ public final class MarketShareDonut {
     private static final int SIZE = 220;
     private static final int CX = SIZE / 2;
     private static final int CY = SIZE / 2;
-    private static final double OUTER = 92;
-    private static final double INNER = 58;
-    /** The coverage arc sits outside the ring, with a hairline of background between them. */
-    private static final double COVER_OUTER = 104;
-    private static final double COVER_INNER = 97;
+    /** D121: no inner radius — a wedge from the centre, not a ring. */
+    private static final double OUTER = 96;
 
     private MarketShareDonut() {
     }
@@ -81,7 +78,7 @@ public final class MarketShareDonut {
                     : slice.sold().doubleValue() / pie.servedMarket().doubleValue() * 100.0;
             double sweep = share * 3.6;
             if (sweep > 0) {
-                out.append(ring(start, sweep, OUTER, INNER,
+                out.append(wedge(start, sweep, OUTER,
                         slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length],
                         sweep));
                 start += sweep;
@@ -117,33 +114,28 @@ public final class MarketShareDonut {
         return out.toString();
     }
 
-    /** A ring segment between two radii, `from` in degrees clockwise from twelve o'clock. */
-    private static String ring(double from, double sweep, double outer, double inner, String colour) {
-        return ring(from, sweep, outer, inner, colour, null);
-    }
-
     /**
+     * One slice: a wedge from the centre (D121), `from` in degrees clockwise from twelve o'clock.
+     *
      * @param recorded the sweep to publish as `data-sweep`, or null. Recording it makes the drawing
      *                 measurable from outside: a test can prove that a class which under-serves leaves a
      *                 real gap, instead of a closed circle contradicting its own legend.
      */
-    private static String ring(double from, double sweep, double outer, double inner, String colour,
-                               Double recorded) {
+    private static String wedge(double from, double sweep, double outer, String colour, Double recorded) {
         String marker = recorded == null ? "" : " data-sweep=\"" + n(recorded) + "\"";
+        // A lone 100 % slice is the whole circle. Two arcs rather than one, because an SVG arc cannot
+        // close on its own start point and still fill.
         if (sweep >= 359.999) {
-            return "<circle" + marker + " cx=\"" + CX + "\" cy=\"" + CY + "\" r=\"" + ((outer + inner) / 2)
-                    + "\" fill=\"none\" stroke=\"" + colour + "\" stroke-width=\"" + (outer - inner) + "\"/>";
+            return "<circle" + marker + " cx=\"" + CX + "\" cy=\"" + CY + "\" r=\"" + n(outer)
+                    + "\" fill=\"" + colour + "\"/>";
         }
         double to = from + sweep;
-        double[] a1 = point(from, outer);
-        double[] a2 = point(to, outer);
-        double[] b2 = point(to, inner);
-        double[] b1 = point(from, inner);
+        double[] a = point(from, outer);
+        double[] b = point(to, outer);
         int large = sweep > 180 ? 1 : 0;
-        return "<path d=\"M" + n(a1[0]) + " " + n(a1[1])
-                + " A" + n(outer) + " " + n(outer) + " 0 " + large + " 1 " + n(a2[0]) + " " + n(a2[1])
-                + " L" + n(b2[0]) + " " + n(b2[1])
-                + " A" + n(inner) + " " + n(inner) + " 0 " + large + " 0 " + n(b1[0]) + " " + n(b1[1])
+        return "<path d=\"M" + CX + " " + CY
+                + " L" + n(a[0]) + " " + n(a[1])
+                + " A" + n(outer) + " " + n(outer) + " 0 " + large + " 1 " + n(b[0]) + " " + n(b[1])
                 + " Z\" fill=\"" + colour + "\"" + marker + "/>";
     }
 

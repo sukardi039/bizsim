@@ -1265,3 +1265,36 @@ name is itself a word that has to be translated.
 wrong password: `邮箱或密码不正确。请检查后重试。`; an open round's header: `第 1 轮，共 8 轮 · 平稳`, no
 code. `FieldProblemApiTest` pins both API shapes (a field problem carries no `message`; a bad sign-in carries
 `auth.invalid_credentials`); suite **250** green.
+
+
+**D121 — The market-share charts are pies, not donuts (owner's review, 23 Nov 2026).** The review verdict:
+*"donut chart is not as acceptable as full pie chart by user — can we change the donut chart in system to pie
+chart (without the hole at the middle of the chart)?"*
+
+**Ruling.** Every market-share chart in the system is a **solid pie**: slices run from the centre, with no
+inner radius and no hole. This covers all three places the chart appears, because they are drawn by two
+renderers and both had to change:
+
+| Where | Renderer | Change |
+|---|---|---|
+| Facilitator's debrief, trainee pop-up (D117) | `MarketSharePies.tsx` (React) | inner radius 54 → **0**; each slice is a wedge from the centre |
+| Shared link `/share/map/{token}` (D103/D112) | `MarketShareDonut` (Java) | stroked ring → **filled wedge**; a lone 100 % slice is a full circle |
+
+**What did not change — the arithmetic.** Slices still sweep on the **served market**, so demand the class
+could not supply stays a visible gap in the circle (D113). A pie drawn on units sold would close the circle
+and contradict its own legend; that defect was reported on 20 Nov and is not being reintroduced by a change
+of geometry.
+
+**The one thing the hole carried.** The coverage percentage was printed in the centre of the donut. A solid
+pie has nowhere to put it, so it moved **under the chart** as a line of text (`市场份额: 90%`), which is also
+where a reader looks for it. The claim that it is the same measurement is what the legend and that line
+carry; nothing about the slice areas depends on it.
+
+**Why the removal is safe, and why it needed a test.** The donut and the pie state the same legend and the
+same percentages, so only a shape check tells them apart. `MarketSharePieTest` now asserts that each slice
+path **starts at the centre** (`M110 110 L…`) and that no `stroke-width` ring is emitted — the assertion
+fails on the old renderer and passes on this one.
+
+**Verified in a browser, in Chinese, at all three surfaces**: the facilitator's debrief (3 pies × 6 wedges,
+coverage 90 % / 72 % / 81 %), the trainee's pop-up for round 1 (same three), and the shared link (3 × 6
+wedges, unserved 9.6 % / 28.0 % / 19.5 % visible as a gap). Suite **252** green.

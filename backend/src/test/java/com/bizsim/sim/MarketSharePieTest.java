@@ -140,9 +140,28 @@ class MarketSharePieTest {
         assertThat(pie.slices()).extracting(MarketSharePie.Slice::label).containsExactly("Company 1");
     }
 
-    /** The donut is one closed shape per slice, and a lone 100 % slice is a ring, not nothing. */
+    /**
+     * D121: a solid pie. Each slice is a wedge from the centre — measured from the path itself, because a
+     * ring would draw the same legend and the same percentages and only a shape check tells them apart.
+     */
     @Test
-    void a_single_company_holding_the_whole_market_draws_a_full_ring() {
+    void every_slice_is_a_wedge_from_the_centre_not_a_ring() {
+        List<MarketSharePie.Company> companies = List.of(
+                new MarketSharePie.Company(1, "Company 1", false, List.of(line("P1", 600, 0, 600))),
+                new MarketSharePie.Company(2, "Company 2", false, List.of(line("P1", 300, 0, 300))));
+
+        MarketSharePie.Pie pie = MarketSharePie.build(List.of("P1"), Map.of(),
+                Map.of("P1", BigDecimal.valueOf(900)), companies).get(0);
+
+        String html = MarketShareDonut.render("en", pie, "Basic", "unserved", "—", "share of market");
+        // 220 / 2 = 110: the centre. Every path starts there and closes back to it.
+        assertThat(html).as("each slice starts at the centre").contains("d=\"M110 110 L");
+        assertThat(html).as("no ring, so no stroke-only circle for a partial slice").doesNotContain("stroke-width");
+    }
+
+    /** A lone 100 % slice is the whole circle, not nothing. */
+    @Test
+    void a_single_company_holding_the_whole_market_draws_a_full_circle() {
         List<MarketSharePie.Company> companies = List.of(
                 new MarketSharePie.Company(1, "Company 1", false, List.of(line("P1", 900, 0, 900))));
 
@@ -150,7 +169,7 @@ class MarketSharePieTest {
                 Map.of("P1", BigDecimal.valueOf(900)), companies).get(0);
 
         String html = MarketShareDonut.render("en", pie, "Basic", "unserved", "—", "share of market");
-        assertThat(html).as("a 100 % slice must be a full ring; an arc from a point to itself draws nothing")
+        assertThat(html).as("a 100 % slice must be a full circle; an arc from a point to itself draws nothing")
                 .contains("<circle");
     }
 }

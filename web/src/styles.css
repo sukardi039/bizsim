@@ -95,8 +95,9 @@ input.inherited { color: var(--muted); font-style: italic; }
   margin-bottom: .3rem;
 }
 .market-pie svg { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto; }
-.market-pie-centre { fill: #e6eaf0; font-size: 20px; font-weight: 600; }
-.market-pie-centre-sub { fill: var(--muted); font-size: 9px; }
+/* D121: a solid pie states its coverage beneath the chart rather than in a hole in the middle. */
+.market-pie-coverage { font-size: .78rem; color: var(--muted); margin: .35rem 0 .1rem; text-align: center; }
+.market-pie-coverage strong { color: var(--text); font-weight: 600; }
 .market-pie-legend { width: 100%; font-size: .78rem; margin-top: .4rem; }
 .market-pie-legend td { padding: .12rem .25rem; border: none; }
 .market-pie-legend .swatch {

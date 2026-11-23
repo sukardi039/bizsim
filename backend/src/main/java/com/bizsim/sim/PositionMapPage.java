@@ -346,7 +346,7 @@ public class PositionMapPage {
                   .position-map figcaption h3{margin:0 0 .15rem;font-size:1rem}
                   .position-map figcaption p{margin:0 0 .4rem;font-size:.9rem;color:#8b96a6}
                   .position-map svg{width:min(620px,92vw);height:auto;display:block;margin:0 auto}
-                  /* D112: one donut per product, side by side on a wide screen and stacked on a phone. */
+                  /* D112/D121: one solid pie per product, side by side on a wide screen, stacked on a phone. */
                   .share-pies{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:0 0 .8rem}
                   .share-pie{margin:0;background:#161b23;border:1px solid #2a313d;border-radius:10px;padding:.6rem}
                   .share-pie figcaption{font-size:.86rem;font-weight:600;margin:0 0 .35rem}
