@@ -696,13 +696,17 @@ export interface AuditRow {
   at: string;
 }
 
-/** A reusable brain: level (how well it plays) × personality (what it wants). */
+/**
+ * A reusable brain: strategy (what it is trying to be) × level (how well it plays) × personality (how hard it
+ * pushes). D128: strategy is the Porter axis — COST, DIFFERENTIATION or FOCUS.
+ */
 export interface BotRow {
-  id: number;
-  key: string;
-  name: string;
-  level: "LOW" | "MID" | "HIGH";
-  personality: "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
+ id: number;
+ key: string;
+ name: string;
+ level: "LOW" | "MID" | "HIGH";
+ personality: "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
+ strategy: "COST" | "DIFFERENTIATION" | "FOCUS";
   version: number;
   active: boolean;
   /** The person that carries this brain; null when it has not been created yet. */
@@ -866,9 +870,9 @@ export const api = {
     }),
   // ---------------------------------------------------------------- auto workers (D47–D50)
   bots: () => request<BotRow[]>("/bots"),
-  createBot: (body: { name: string; level: string; personality: string }) =>
+  createBot: (body: { name: string; level: string; personality: string; strategy?: string }) =>
     request<BotRow>("/bots", { method: "POST", body: JSON.stringify(body) }),
-  updateBot: (id: number, body: { name: string; level: string; personality: string }) =>
+  updateBot: (id: number, body: { name: string; level: string; personality: string; strategy?: string }) =>
     request<BotRow>(`/bots/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   retireBot: (id: number) => request<unknown>(`/bots/${id}/retire`, { method: "POST" }),
   /** What the opponents did: profile version, how they were called, and the one-line reason. */

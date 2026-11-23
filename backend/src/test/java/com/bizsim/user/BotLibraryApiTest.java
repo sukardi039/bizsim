@@ -205,4 +205,41 @@ class BotLibraryApiTest extends PostgresTestBase {
                 .andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
+
+    /**
+     * D128: the library carries the Porter axis. A bot created with a strategy keeps it, the API answers it
+     * back, and a client that does not send one keeps the old personality mapping rather than being refused.
+     */
+    @Test
+    void a_bot_carries_its_strategy() throws Exception {
+        MvcResult created = mvc.perform(post("/api/bots")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Focus player", "level", "MID", "personality", "BALANCED",
+                                "strategy", "FOCUS"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.strategy").value("FOCUS"))
+                .andReturn();
+        long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
+
+        // Changing the strategy is an edit like any other, and bumps the version.
+        mvc.perform(put("/api/bots/" + id)
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Focus player", "level", "MID", "personality", "BALANCED",
+                                "strategy", "DIFFERENTIATION"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.strategy").value("DIFFERENTIATION"));
+
+        // No strategy on the wire: the personality decides, exactly as before D128.
+        mvc.perform(post("/api/bots")
+                        .header("Authorization", "Bearer " + builderToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "name", "Old client", "level", "HIGH", "personality", "AGGRESSIVE"))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.strategy").value("COST"));
+    }
 }

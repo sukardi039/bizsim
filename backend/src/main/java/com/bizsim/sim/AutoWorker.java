@@ -25,12 +25,52 @@ import java.util.Map;
  */
 public final class AutoWorker {
 
-    /** The knobs, all of them numbers a trainer can tune without a code change. */
-    public record Profile(String key, String level, String personality,
+    /**
+     * The knobs, all of them numbers a trainer can tune without a code change.
+     *
+     * <p>D128: {@code strategy} is the competitive strategy (Porter) and {@code level} is how well the company
+     * executes it — two independent axes, so "a cost leader that plays badly" is a profile rather than a
+     * contradiction. The levers that make the strategies different are all here as data:
+     * {@code capacityBias} (how much of the free cash goes into machines), {@code channelBias} (spend the
+     * channel that reaches your class harder than the rest), {@code rndAppetite} and {@code qualityAppetite}
+     * (independent of level), and {@code lineLimit} (produce only the products aimed at your class).
+     */
+    public record Profile(String key, String level, String personality, String strategy,
                           BigDecimal targetShare, BigDecimal pricePosture, BigDecimal forecastBlend,
                           BigDecimal demandNoise, BigDecimal marketingRate,
                           boolean buysMarketReview, boolean investsInRnd, boolean buysQuality,
-                          BigDecimal cashBufferMonths) {
+                          BigDecimal cashBufferMonths,
+                          BigDecimal capacityBias, BigDecimal channelBias,
+                          BigDecimal rndAppetite, BigDecimal qualityAppetite, int lineLimit) {
+
+        /** The pre-D128 shape, kept so callers that only know level × personality still compile. */
+        public Profile(String key, String level, String personality, BigDecimal targetShare,
+                       BigDecimal pricePosture, BigDecimal forecastBlend, BigDecimal demandNoise,
+                       BigDecimal marketingRate, boolean buysMarketReview, boolean investsInRnd,
+                       boolean buysQuality, BigDecimal cashBufferMonths) {
+            this(key, level, personality, strategyFor(personality), targetShare, pricePosture,
+                    forecastBlend, demandNoise, marketingRate, buysMarketReview, investsInRnd,
+                    buysQuality, cashBufferMonths, BigDecimal.ZERO, BigDecimal.ONE,
+                    BigDecimal.ONE, BigDecimal.ONE, 0);
+        }
+
+        /** True when this profile narrows its line to the products aimed at one customer class. */
+        public boolean focused() {
+            return lineLimit > 0;
+        }
+    }
+
+    /**
+     * D128: the strategy a personality used to imply, so an old profile keeps behaving as it did.
+     * AGGRESSIVE pushed price and share hardest (a cost shape), CAUTIOUS bought a premium (a differentiation
+     * shape), BALANCED sat between them.
+     */
+    public static String strategyFor(String personality) {
+        return switch (personality) {
+            case "AGGRESSIVE" -> "COST";
+            case "CAUTIOUS" -> "DIFFERENTIATION";
+            default -> "FOCUS";
+        };
     }
 
     /** Everything the policy is allowed to know. Built by the loader, or by a test harness. */
@@ -50,8 +90,21 @@ public final class AutoWorker {
 
     // ------------------------------------------------------------------ profiles
 
-    /** The shipped matrix: nine combinations of level and personality. */
+    /**
+     * The shipped matrix: three strategies × three levels (D128).
+     *
+     * <p>Level is competence and stays where it was: the forecast's honesty, whether the review is bought, how
+     * much of a plan it dares to make. Strategy is what the company is trying to be, and it moves the levers
+     * in different directions rather than by different amounts — a cost leader buys machines and keeps quality
+     * flat, a differentiator buys quality and R&amp;D and charges for it, a focus player narrows to the product
+     * and channel that serve its class.
+     */
     public static Profile profile(String level, String personality) {
+        return profile(level, personality, strategyFor(personality));
+    }
+
+    /** D128: the profile for a strategy at a level of competence. */
+    public static Profile profile(String level, String personality, String strategy) {
         BigDecimal[] byLevel = switch (level) {
             case "HIGH" -> new BigDecimal[]{new BigDecimal("0.34"), new BigDecimal("1.00"),
                     new BigDecimal("0.04"), new BigDecimal("0.035")};
@@ -72,14 +125,61 @@ public final class AutoWorker {
         };
         boolean high = "HIGH".equals(level);
         boolean mid = "MID".equals(level);
+
+        // D128: the strategy re-states the two knobs the personality used to own, then adds the levers the old
+        // matrix had no place for. Level still gates *whether* the company can afford a long game (R&D needs
+        // free cash), but it no longer decides *whether it wants one* — that is the strategy's job.
+        BigDecimal shareBias;
+        BigDecimal postureBias;
+        BigDecimal capacityBias;
+        BigDecimal channelBias;
+        BigDecimal rndAppetite;
+        BigDecimal qualityAppetite;
+        int lineLimit;
+        switch (strategy) {
+            case "DIFFERENTIATION" -> {
+                // Premium price, defensible by product rather than by volume: quality and R&D, no machine race.
+                shareBias = new BigDecimal("0.98");
+                postureBias = new BigDecimal("1.06");
+                capacityBias = new BigDecimal("0.25");
+                channelBias = BigDecimal.ONE;
+                rndAppetite = new BigDecimal("1.35");
+                qualityAppetite = new BigDecimal("1.60");
+                lineLimit = 0;
+            }
+            case "FOCUS" -> {
+                // One class, served properly: the product aimed at it and the channel that reaches it.
+                shareBias = new BigDecimal("1.04");
+                postureBias = new BigDecimal("1.02");
+                capacityBias = new BigDecimal("0.35");
+                channelBias = new BigDecimal("1.80");
+                rndAppetite = new BigDecimal("0.90");
+                qualityAppetite = new BigDecimal("1.20");
+                lineLimit = 1;
+            }
+            default -> {
+                // COST: price and volume, with the cost structure to justify it.
+                shareBias = new BigDecimal("1.12");
+                postureBias = new BigDecimal("0.94");
+                capacityBias = new BigDecimal("1.00");
+                channelBias = BigDecimal.ONE;
+                rndAppetite = new BigDecimal("0.90");
+                qualityAppetite = new BigDecimal("0.35");
+                lineLimit = 0;
+            }
+        }
         return new Profile(
-                level.toLowerCase(java.util.Locale.ROOT) + "_" + personality.toLowerCase(java.util.Locale.ROOT),
-                level, personality,
-                share, posture, byLevel[1], byLevel[2], byLevel[3],
+                strategy.toLowerCase(java.util.Locale.ROOT) + "_"
+                        + level.toLowerCase(java.util.Locale.ROOT) + "_"
+                        + personality.toLowerCase(java.util.Locale.ROOT),
+                level, personality, strategy,
+                share.multiply(shareBias), posture.multiply(postureBias),
+                byLevel[1], byLevel[2], byLevel[3],
                 mid || high,          // the review pays for itself once the forecast is used properly
-                high,                 // R&D is a long game: only the best level plans it
-                high,                 // quality is expensive: only the best level buys it
-                new BigDecimal("2"));
+                high,                 // R&D is a long game: a company without the cash does not start one
+                strategy.equals("DIFFERENTIATION") || high,
+                new BigDecimal("2"),
+                capacityBias, channelBias, rndAppetite, qualityAppetite, lineLimit);
     }
 
     /** A profile row's params override the shipped numbers, so tuning needs no release. */
@@ -88,7 +188,7 @@ public final class AutoWorker {
             return base;
         }
         return new Profile(
-                base.key(), base.level(), base.personality(),
+                base.key(), base.level(), base.personality(), base.strategy(),
                 num(params, "targetShare", base.targetShare()),
                 num(params, "pricePosture", base.pricePosture()),
                 num(params, "forecastBlend", base.forecastBlend()),
@@ -97,7 +197,12 @@ public final class AutoWorker {
                 bool(params, "buysMarketReview", base.buysMarketReview()),
                 bool(params, "investsInRnd", base.investsInRnd()),
                 bool(params, "buysQuality", base.buysQuality()),
-                num(params, "cashBufferMonths", base.cashBufferMonths()));
+                num(params, "cashBufferMonths", base.cashBufferMonths()),
+                num(params, "capacityBias", base.capacityBias()),
+                num(params, "channelBias", base.channelBias()),
+                num(params, "rndAppetite", base.rndAppetite()),
+                num(params, "qualityAppetite", base.qualityAppetite()),
+                (int) num(params, "lineLimit", BigDecimal.valueOf(base.lineLimit())).intValue());
     }
 
     private static BigDecimal num(Map<String, Object> params, String key, BigDecimal fallback) {
@@ -127,6 +232,8 @@ public final class AutoWorker {
         Map<String, BigDecimal> unitsByProduct = new LinkedHashMap<>();
         Map<String, BigDecimal> priceByProduct = new LinkedHashMap<>();
         List<Scenario.ProductSpec> carries = carried(scenario, context);
+        // D128: the classes this company's own products serve — the target of a focus strategy.
+        List<String> ownClasses = ownClasses(scenario, carries);
         for (Scenario.ProductSpec spec : carries) {
             ScoringEngine.ProductLine previous = last.get(spec.code());
             BigDecimal forecast = forecast(spec, previous, context, profile, seedKey);
@@ -147,6 +254,12 @@ public final class AutoWorker {
                         .min(forecast.multiply(new BigDecimal("0.20"))));
             }
             planned = planned.min(spec.baseDemand().multiply(new BigDecimal("1.5")));
+            // D128: a focused company does not push the products outside its class. It still sends a row for
+            // them — the validator wants the whole line — but the row is a plan for the stock it has, not for
+            // a market it is not competing in.
+            if (!inLine(spec, ownClasses, profile)) {
+                planned = BigDecimal.ZERO;   // outside the chosen class: sell down the shelf, build nothing
+            }
             planned = planned.setScale(0, RoundingMode.HALF_UP);
             unitsByProduct.put(spec.code(), planned);
             priceByProduct.put(spec.code(), price);
@@ -184,15 +297,31 @@ public final class AutoWorker {
                 .setScale(-5, RoundingMode.HALF_UP);
         List<DecisionPayload.ChannelRow> channels = new ArrayList<>();
         if (!scenario.channels().isEmpty() && marketing.signum() > 0) {
-            BigDecimal totalReach = scenario.channels().stream().map(Scenario.ChannelSpec::reachWeight)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            // D128: weight by the reach this company actually gets, and by the strategy's channel bias for the
+            // classes its products serve. A focus player puts its money where its class is reachable; a cost
+            // leader and a differentiator keep the neutral, reach-proportional split they had.
+            List<BigDecimal> weights = new ArrayList<>();
+            BigDecimal totalReach = BigDecimal.ZERO;
+            for (Scenario.ChannelSpec channel : scenario.channels()) {
+                BigDecimal weight = channel.reachWeight();
+                for (String classCode : ownClasses) {
+                    if (profile.channelBias().compareTo(BigDecimal.ONE) > 0) {
+                        weight = weight.multiply(channel.reachFor(classCode)
+                                        .multiply(profile.channelBias())
+                                        .add(BigDecimal.ONE.subtract(profile.channelBias())
+                                                .multiply(channel.reachWeight())));
+                    }
+                }
+                weights.add(weight);
+                totalReach = totalReach.add(weight);
+            }
             BigDecimal allocated = BigDecimal.ZERO;
             for (int i = 0; i < scenario.channels().size(); i++) {
                 Scenario.ChannelSpec channel = scenario.channels().get(i);
                 boolean lastChannel = i == scenario.channels().size() - 1;
                 BigDecimal share = totalReach.signum() == 0 ? BigDecimal.ONE
                         .divide(BigDecimal.valueOf(scenario.channels().size()), 4, RoundingMode.HALF_UP)
-                        : channel.reachWeight().divide(totalReach, 4, RoundingMode.HALF_UP);
+                        : weights.get(i).divide(totalReach, 4, RoundingMode.HALF_UP);
                 BigDecimal spend = lastChannel ? marketing.subtract(allocated)
                         : marketing.multiply(share).setScale(-4, RoundingMode.HALF_UP);
                 allocated = allocated.add(spend);
@@ -209,6 +338,8 @@ public final class AutoWorker {
                 BigDecimal pace = project.hintBand() == null ? BigDecimal.ZERO
                         : project.hintBand().divide(BigDecimal.valueOf(Math.max(1, project.durationMonths())), 0,
                         RoundingMode.HALF_UP);
+                // D128: the strategy decides how hard to push the slate, not just whether to play it.
+                pace = pace.multiply(profile.rndAppetite()).setScale(0, RoundingMode.HALF_UP);
                 if (open && pace.signum() > 0) {
                     rnd.add(new DecisionPayload.RndRow(project.code(), pace));
                     rndSpend = rndSpend.add(pace);
@@ -221,11 +352,33 @@ public final class AutoWorker {
         if (profile.buysQuality() && scenario.params().qualityUpgrade()
                 && comfortable(context, scenario, profile) && !carries.isEmpty()) {
             Scenario.ProductSpec first = carries.get(0);
-            qualitySpend = scenario.params().qualityCostPerPoint();
+            // D128: a differentiator buys more than one point where it can afford to; a cost leader buys the
+            // cheapest defensible amount (it is the level's call how much of the line it protects).
+            int points = profile.qualityAppetite().compareTo(new BigDecimal("1.30")) >= 0 ? 2 : 1;
+            qualitySpend = scenario.params().qualityCostPerPoint()
+                    .multiply(BigDecimal.valueOf(points));
             quality.add(new DecisionPayload.QualityRow(first.code(), qualitySpend));
         }
 
         boolean review = profile.buysMarketReview() && comfortable(context, scenario, profile);
+
+        // D128: the cost leader buys capacity out of its slack — that is what makes a low price survivable.
+        // The other two grow through the crew instead, so they keep their cash for quality, R&D or channel.
+        if (profile.capacityBias().signum() > 0 && comfortable(context, scenario, profile)) {
+            BigDecimal costPerMachine = scenario.params().machineCostPerWorker();
+            if (costPerMachine != null && costPerMachine.signum() > 0) {
+                BigDecimal slack = context.cash()
+                        .subtract(scenario.params().fixedCostPerMonth().multiply(profile.cashBufferMonths()))
+                        .subtract(marketing).subtract(rndSpend).subtract(qualitySpend)
+                        .subtract(review ? scenario.params().marketReportCost() : BigDecimal.ZERO);
+                BigDecimal room = slack.max(BigDecimal.ZERO)
+                        .multiply(new BigDecimal("0.10")).multiply(profile.capacityBias())
+                        .setScale(-6, RoundingMode.DOWN);
+                if (room.compareTo(costPerMachine) >= 0) {
+                    machines = room.divide(costPerMachine, 0, RoundingMode.DOWN).multiply(costPerMachine);
+                }
+            }
+        }
 
         // Stay inside the cash: trim the discretionary spend, never the production plan (the engine
         // refuses an unaffordable plan, and a bot that keeps being refused never plays).
@@ -343,6 +496,33 @@ public final class AutoWorker {
             }
         }
         return out;
+    }
+
+    /**
+     * D128: the customer classes this company's own products are aimed at. A focused company serves these and
+     * nothing else, so they decide both where the marketing goes and how wide the line stays.
+     */
+    private static List<String> ownClasses(Scenario scenario, List<Scenario.ProductSpec> carries) {
+        List<String> classes = new ArrayList<>();
+        for (Scenario.ProductSpec spec : carries) {
+            String target = spec.targetSegment();
+            if (target != null && !target.isBlank() && !classes.contains(target)) {
+                classes.add(target);
+            }
+        }
+        return classes;
+    }
+
+    /**
+     * D128: line discipline. A focused company produces only the products aimed at its class; the rest of the
+     * catalogue is carried but not pushed, so the line narrows without the company refusing to submit (which
+     * the validator would reject).
+     */
+    private static boolean inLine(Scenario.ProductSpec spec, List<String> ownClasses, Profile profile) {
+        if (!profile.focused() || ownClasses.isEmpty()) {
+            return true;
+        }
+        return spec.targetSegment() != null && ownClasses.contains(spec.targetSegment());
     }
 
     private static boolean comfortable(Context context, Scenario scenario, Profile profile) {

@@ -338,16 +338,23 @@ public class BotRoundService {
 
     private static AutoWorker.Profile profileFrom(BotRepository.Due due) {
         return AutoWorker.withParams(
-                AutoWorker.profile(due.level(), due.personality()), parse(due.paramsJson()));
+                AutoWorker.profile(due.level(), due.personality(), due.strategy()),
+                parse(due.paramsJson()));
     }
 
     private static AutoWorker.Profile profileFrom(BotProfileView view) {
-        return AutoWorker.withParams(AutoWorker.profile(view.level(), view.personality()),
+        return AutoWorker.withParams(
+                AutoWorker.profile(view.level(), view.personality(), view.strategy()),
                 parse(view.paramsJson()));
     }
 
-    /** Minimal view so the service can read a brain without depending on the user package. */
-    public record BotProfileView(String level, String personality, String paramsJson) {
+    /**
+     * Minimal view so the service can read a brain without depending on the user package.
+     *
+     * <p>D128: {@code strategy} is the Porter axis; a row written before it existed reads null and falls back
+     * to the strategy its personality used to imply, so an old class keeps the opponents it had.
+     */
+    public record BotProfileView(String level, String personality, String strategy, String paramsJson) {
     }
 
     private AutoWorker.Context context(Scenario scenario, long runId, int round,

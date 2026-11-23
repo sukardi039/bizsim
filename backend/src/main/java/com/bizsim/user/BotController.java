@@ -1,5 +1,6 @@
 package com.bizsim.user;
 
+import com.bizsim.sim.AutoWorker;
 import com.bizsim.web.ProblemException;
 import com.bizsim.tenant.TenantContext;
 import jakarta.validation.Valid;
@@ -31,12 +32,22 @@ public class BotController {
     private static final List<String> LEVELS = List.of("LOW", "MID", "HIGH");
     private static final List<String> PERSONALITIES = List.of("CAUTIOUS", "BALANCED", "AGGRESSIVE");
 
-    public record BotRequest(@NotBlank String name, String level, String personality,
+    /** D128: {@code strategy} is optional on the wire — a client that does not send it keeps the old mapping. */
+    public record BotRequest(@NotBlank String name, String level, String personality, String strategy,
                              Map<String, Object> params) {
     }
 
     public record BotView(long id, String key, String name, String level, String personality,
-                          int version, boolean active, Long userId) {
+                          String strategy, int version, boolean active, Long userId) {
+    }
+
+    /** D128: an unset or unknown strategy falls back to what the personality used to imply. */
+    private static String strategyOf(BotRequest request, String personality) {
+        String strategy = request.strategy() == null ? "" : request.strategy().trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (strategy) {
+            case "COST", "DIFFERENTIATION", "FOCUS" -> strategy;
+            default -> AutoWorker.strategyFor(personality);
+        };
     }
 
     private final BotProfileRepository bots;
@@ -54,7 +65,7 @@ public class BotController {
         TenantContext.Principal me = TenantContext.require();
         return bots.list(me.tenantId()).stream()
                 .map(profile -> new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                        profile.personality(), profile.version(), profile.active(),
+                        profile.personality(), profile.strategy(), profile.version(), profile.active(),
                         users.botPersonFor(me.tenantId(), profile.id()).orElse(null)))
                 .toList();
     }
@@ -67,10 +78,10 @@ public class BotController {
         String personality = personalityOf(request);
         String name = displayName(request.name(), level);
         BotProfileRepository.Profile profile = bots.create(me.tenantId(), name, level, personality,
-                paramsJson(request.params()), me.userId());
+                strategyOf(request, personality), paramsJson(request.params()), me.userId());
         long userId = createBotPerson(me.tenantId(), profile);
         return new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                profile.personality(), profile.version(), profile.active(), userId);
+                profile.personality(), profile.strategy(), profile.version(), profile.active(), userId);
     }
 
     @PutMapping("/{id}")
@@ -80,10 +91,10 @@ public class BotController {
         String personality = personalityOf(request);
         String name = displayName(request.name(), level);
         BotProfileRepository.Profile profile = bots.update(me.tenantId(), id, name, level, personality,
-                paramsJson(request.params()));
+                strategyOf(request, personality), paramsJson(request.params()));
         users.renameBotPerson(me.tenantId(), id, name);
         return new BotView(profile.id(), profile.key(), profile.name(), profile.level(),
-                profile.personality(), profile.version(), profile.active(),
+                profile.personality(), profile.strategy(), profile.version(), profile.active(),
                 users.botPersonFor(me.tenantId(), id).orElse(null));
     }
 

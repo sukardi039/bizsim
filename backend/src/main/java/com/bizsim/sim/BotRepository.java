@@ -29,7 +29,7 @@ public class BotRepository {
     /** A seat that has to act: which round, which company, which brain. */
     public record Due(long roundId, int roundNumber, long runId, long tenantId, String scenarioKey,
                       long teamId, long userId, long profileId, String profileKey, String level,
-                      String personality, int profileVersion, String paramsJson,
+                      String personality, String strategy, int profileVersion, String paramsJson,
                       String companyName, Instant openedAt, Integer roundMinutes, Instant closesAt) {
     }
 
@@ -65,7 +65,7 @@ public class BotRepository {
                 select r.id as round_id, r.number as round_number, r.opened_at, r.closes_at,
                        run.id as run_id, run.tenant_id, run.scenario_key,
                        p.team_id, p.user_id, b.id as profile_id, b.key as profile_key, b.level,
-                       b.personality, b.version as profile_version, b.params::text as params,
+                       b.personality, b.strategy, b.version as profile_version, b.params::text as params,
                        t.company_name,
                        null::integer as round_minutes
                 from round r
@@ -85,7 +85,8 @@ public class BotRepository {
                 rs.getLong("round_id"), rs.getInt("round_number"), rs.getLong("run_id"),
                 rs.getLong("tenant_id"), rs.getString("scenario_key"), rs.getLong("team_id"),
                 rs.getLong("user_id"), rs.getLong("profile_id"), rs.getString("profile_key"),
-                rs.getString("level"), rs.getString("personality"), rs.getInt("profile_version"),
+                rs.getString("level"), rs.getString("personality"), rs.getString("strategy"),
+                rs.getInt("profile_version"),
                 rs.getString("params"), rs.getString("company_name"),
                 ts(rs.getTimestamp("opened_at")), (Integer) rs.getObject("round_minutes"),
                 ts(rs.getTimestamp("closes_at"))), runId, runId, tenantId, tenantId);
@@ -228,9 +229,10 @@ public class BotRepository {
 
     public BotRoundService.BotProfileView profile(long tenantId, long profileId) {
         return jdbc.query("""
-                select level, personality, params::text from bot_profile where tenant_id = ? and id = ?
+                select level, personality, strategy, params::text
+                from bot_profile where tenant_id = ? and id = ?
                 """, (rs, i) -> new BotRoundService.BotProfileView(rs.getString(1), rs.getString(2),
-                rs.getString(3)), tenantId, profileId).stream().findFirst()
+                rs.getString(3), rs.getString(4)), tenantId, profileId).stream().findFirst()
                 .orElseThrow(() -> com.bizsim.web.ProblemException.notFound("bot.not_found",
                         "no such auto worker"));
     }

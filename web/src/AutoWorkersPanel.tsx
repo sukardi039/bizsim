@@ -20,6 +20,8 @@ export default function AutoWorkersPanel() {
   const [personality, setPersonality] = useState<"CAUTIOUS" | "BALANCED" | "AGGRESSIVE">(
     "BALANCED",
   );
+  /** D128: the Porter axis — what this opponent is trying to be. */
+  const [strategy, setStrategy] = useState<"COST" | "DIFFERENTIATION" | "FOCUS">("COST");
 
   const load = async () => {
     try {
@@ -39,7 +41,7 @@ export default function AutoWorkersPanel() {
     setBusy(true);
     setProblem(null);
     try {
-      await api.createBot({ name: name.trim(), level, personality });
+      await api.createBot({ name: name.trim(), level, personality, strategy });
       setName("");
       await load();
     } catch (error) {
@@ -49,13 +51,17 @@ export default function AutoWorkersPanel() {
     }
   };
 
-  const change = async (bot: BotRow, next: Partial<{ level: string; personality: string }>) => {
+  const change = async (
+    bot: BotRow,
+    next: Partial<{ level: string; personality: string; strategy: string }>,
+  ) => {
     setProblem(null);
     try {
       await api.updateBot(bot.id, {
         name: bot.name,
         level: (next.level ?? bot.level) as string,
         personality: (next.personality ?? bot.personality) as string,
+        strategy: (next.strategy ?? bot.strategy) as string,
       });
       await load();
     } catch (error) {
@@ -85,6 +91,12 @@ export default function AutoWorkersPanel() {
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Market 1" />
         </label>
         <label>
+          {t("bots.strategy")}
+          <select value={strategy} onChange={(e) => setStrategy(e.target.value as typeof strategy)}>
+            <option value="COST">{t("bots.strategyCost")}</option>
+            <option value="DIFFERENTIATION">{t("bots.strategyDifferentiation")}</option>
+            <option value="FOCUS">{t("bots.strategyFocus")}</option>
+          </select>
           {t("bots.level")}
           <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
             <option value="LOW">{t("bots.levelLow")}</option>
@@ -115,6 +127,7 @@ export default function AutoWorkersPanel() {
           <thead>
             <tr>
               <th>{t("bots.name")}</th>
+              <th>{t("bots.strategy")}</th>
               <th>{t("bots.level")}</th>
               <th>{t("bots.personality")}</th>
               <th className="num">{t("bots.version")}</th>
@@ -126,6 +139,16 @@ export default function AutoWorkersPanel() {
             {bots.map((bot) => (
               <tr key={bot.id}>
                 <td>{bot.name}</td>
+                <td>
+                  <select
+                    value={bot.strategy}
+                    onChange={(e) => void change(bot, { strategy: e.target.value })}
+                  >
+                    <option value="COST">{t("bots.strategyCost")}</option>
+                    <option value="DIFFERENTIATION">{t("bots.strategyDifferentiation")}</option>
+                    <option value="FOCUS">{t("bots.strategyFocus")}</option>
+                  </select>
+                </td>
                 <td>
                   <select value={bot.level} onChange={(e) => void change(bot, { level: e.target.value })}>
                     <option value="LOW">{t("bots.levelLow")}</option>
@@ -157,6 +180,8 @@ export default function AutoWorkersPanel() {
           </tbody>
         </table>
       )}
+      {/* D128: the strategies are a teaching taxonomy, not decoration — say what each one does. */}
+      <p className="muted">{t("bots.strategyHint")}</p>
       <p className="muted">{t("bots.seatHint")}</p>
     </section>
   );

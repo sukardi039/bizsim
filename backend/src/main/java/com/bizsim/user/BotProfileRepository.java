@@ -1,5 +1,6 @@
 package com.bizsim.user;
 
+import com.bizsim.sim.AutoWorker;
 import com.bizsim.web.ProblemException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -24,14 +25,19 @@ import java.util.UUID;
 @Repository
 public class BotProfileRepository {
 
+    /**
+     * D128: {@code strategy} is the Porter axis (COST / DIFFERENTIATION / FOCUS); {@code level} is how well the
+     * company executes it and {@code personality} still colours price and share.
+     */
     public record Profile(long id, long tenantId, String key, String name, String level,
-                          String personality, int version, boolean active, String paramsJson) {
+                          String personality, String strategy, int version, boolean active,
+                          String paramsJson) {
     }
 
     private static final RowMapper<Profile> MAPPER = (rs, i) -> new Profile(
             rs.getLong("id"), rs.getLong("tenant_id"), rs.getString("key"), rs.getString("name"),
-            rs.getString("level"), rs.getString("personality"), rs.getInt("version"),
-            rs.getBoolean("active"), rs.getString("params"));
+            rs.getString("level"), rs.getString("personality"), rs.getString("strategy"),
+            rs.getInt("version"), rs.getBoolean("active"), rs.getString("params"));
 
     private final JdbcTemplate jdbc;
 
@@ -59,7 +65,7 @@ public class BotProfileRepository {
      * bot the same way in the same tenant collide loudly rather than silently.
      */
     public Profile create(long tenantId, String name, String level, String personality,
-                          String paramsJson, long createdBy) {
+                          String strategy, String paramsJson, long createdBy) {
         String key = name.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
         if (key.isEmpty()) {
@@ -69,25 +75,28 @@ public class BotProfileRepository {
             key = key + "-" + UUID.randomUUID().toString().substring(0, 6);
         }
         return jdbc.queryForObject("""
-                insert into bot_profile (tenant_id, key, name, level, personality, params, created_by)
-                values (?, ?, ?, ?, ?, ?::jsonb, ?)
+                insert into bot_profile (tenant_id, key, name, level, personality, strategy, params,
+                                         created_by)
+                values (?, ?, ?, ?, ?, ?, ?::jsonb, ?)
                 returning *, params::text as params
                 """, MAPPER, tenantId, key, name, level, personality,
+                strategy == null || strategy.isBlank() ? AutoWorker.strategyFor(personality) : strategy,
                 paramsJson == null || paramsJson.isBlank() ? "{}" : paramsJson, createdBy);
     }
 
     /** Edits bump the version: history stays attached to the version that produced it. */
     public Profile update(long tenantId, long id, String name, String level, String personality,
-                          String paramsJson) {
+                          String strategy, String paramsJson) {
         Profile existing = find(tenantId, id).orElseThrow(
                 () -> ProblemException.notFound("bot.not_found", "no such auto worker"));
         return jdbc.queryForObject("""
                 update bot_profile
-                set name = ?, level = ?, personality = ?, params = ?::jsonb,
+                set name = ?, level = ?, personality = ?, strategy = ?, params = ?::jsonb,
                     version = version + 1, updated_at = now()
                 where tenant_id = ? and id = ?
                 returning *, params::text as params
                 """, MAPPER, name, level, personality,
+                strategy == null || strategy.isBlank() ? existing.strategy() : strategy,
                 paramsJson == null || paramsJson.isBlank() ? existing.paramsJson() : paramsJson,
                 tenantId, id);
     }

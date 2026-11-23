@@ -66,13 +66,18 @@ public class InitDataService {
      * Who plays the seeded companies, position by position. Deliberately a spread rather than five
      * copies of one brain: a demo where every opponent behaves identically teaches nothing.
      */
+    /*
+     * D128: level, personality, strategy. A demo class should meet all three Porter strategies, each at a
+     * different level of competence, so the opponents differ in *what they are trying to be* and not only in
+     * how hard they push. Personality is kept because it still colours the price and share knobs.
+     */
     private static final List<String[]> PLAYERS_STYLES = List.of(
-            new String[]{"HIGH", "BALANCED"},
-            new String[]{"MID", "AGGRESSIVE"},
-            new String[]{"MID", "CAUTIOUS"},
-            new String[]{"LOW", "BALANCED"},
-            new String[]{"HIGH", "AGGRESSIVE"},
-            new String[]{"LOW", "CAUTIOUS"});
+            new String[]{"HIGH", "AGGRESSIVE", "COST"},
+            new String[]{"MID", "CAUTIOUS", "DIFFERENTIATION"},
+            new String[]{"MID", "BALANCED", "FOCUS"},
+            new String[]{"LOW", "AGGRESSIVE", "COST"},
+            new String[]{"HIGH", "CAUTIOUS", "DIFFERENTIATION"},
+            new String[]{"LOW", "BALANCED", "FOCUS"});
 
     public record Params(int companies, int trainees, int rounds, Integer cycles, String locale,
                          String password, String tenantName, String packageName, String runName) {
@@ -218,7 +223,7 @@ public class InitDataService {
                 long owner = ownerOf(view, team.id());
                 String[] style = PLAYERS_STYLES.get(index % PLAYERS_STYLES.size());
                 DecisionPayload plan = bots.planFor(tenantId, runId, team.id(), round,
-                        AutoWorker.profile(style[0], style[1]));
+                        AutoWorker.profile(style[0], style[1], style[2]));
                 rounds.submit(tenantId, owner, runId, team.id(), plan);
                 index++;
             }

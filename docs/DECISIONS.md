@@ -1491,3 +1491,56 @@ backfilled, so a trainer who renamed a channel keeps the trainer's words.
 Verified on a **fresh stack with 49 migrations**: the seeded frozen package's three channels all carry their
 Chinese description. (Also verified the hard way that a test on port 8099 must be checked for *which* jar is
 answering — the first run reported success against the previous build, which was still holding the port.)
+
+
+**D128 — The auto players play Porter's strategies, not tempers (owner's request, 23 Nov 2026).** The owner's
+question — *"are we able to align their characteristics to competitive strategy of Michael Porter? currently we
+have three levels of playing approach and three levels of aggressiveness within each approach"* — with the
+correction he supplied himself: two of the three cells only *looked* like Porter, and the third had no lever
+behind it at all.
+
+**What was actually there.** Level × personality: level (LOW/MID/HIGH) is competence — forecast honesty, whether
+the review is bought, whether a long game is affordable. Personality (CAUTIOUS/BALANCED/AGGRESSIVE) moved only
+`pricePosture` and `targetShare`. So an AGGRESSIVE bot was a *discounter*, not a cost leader, and a MID-CAUTIOUS
+bot sold at a premium while buying no quality — differentiation's price with none of its substance. And focus
+had no mechanic: the policy split marketing pro rata to channel reach and produced whatever the company carried,
+never touching `targetSegment`, which the scoring engine already honours.
+
+**The ruling.** Two axes, and they are genuinely independent:
+
+- **strategy** (new, `bot_profile.strategy`): **COST**, **DIFFERENTIATION**, **FOCUS** — what the company is
+  trying to be.
+- **level**: how well it executes that strategy. Level still gates what is *affordable* (a company without free
+  cash does not start an R&D programme); it no longer decides what the company *wants*.
+
+Each strategy moves the levers in different directions, not by different amounts:
+
+| Strategy | Price | Quality / R&D | Capacity | Channel |
+|---|---|---|---|---|
+| COST | ×0.94 — undercut | appetite ×0.35, no quality buy | buys machines from its slack (bias 1.00) | reach-proportional |
+| DIFFERENTIATION | ×1.06 — premium | quality ×1.60 and two points where affordable, R&D ×1.35 | barely (0.25) — grows through the crew | reach-proportional |
+| FOCUS | ×1.02 | ×1.20 | 0.35 | **×1.80 toward the channel that reaches its class**, and it produces only the products aimed at that class |
+
+The focus lever is not new machinery: `targetSegment` and `channel.reachFor(class)` already existed and the
+engine already weights classes by them. The policy simply started reading them.
+
+**Migration (V50).** `strategy` is added with a default and backfilled by the old personality mapping, so a class
+running when the release lands keeps the opponents it had. Only rows still carrying the nine shipped key shapes
+are spread across the three strategies.
+
+**Builder UI.** A **Strategy** selector beside Level and Personality, in the creation form and as an editable
+column, with a paragraph explaining what each one does — the panel is where a trainer meets the taxonomy, so it
+is where the taxonomy has to be legible.
+
+**Verified.** `AutoWorkerStrategyTest` holds level and personality fixed and varies only the strategy, asserting
+they diverge where they are supposed to:
+
+```
+cost            price 987,000   quality 0          rnd 0   channels {DIGITAL 10.6m, FIELD 8.5m, TRADE 12.7m}
+differentiation price 1,113,000 quality 120,000,000 rnd 0   channels {DIGITAL 11.9m, FIELD 9.5m, TRADE 14.2m}
+focus           price 1,071,000 quality 0          rnd 0   channels {DIGITAL 9.9m,  FIELD 4.1m, TRADE 20.5m}
+```
+
+Focus takes 58 % of its budget through the channel that reaches its class; the neutral split takes 35 %.
+`BotLibraryApiTest` pins the wire: a strategy is stored, editable, and a client that omits it keeps the old
+mapping. Suite **258** green, 50 migrations on a fresh database, builder panel verified in Chinese.
