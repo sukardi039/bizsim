@@ -755,6 +755,9 @@ public class RoundService {
             row.put("name", spec.nameIn(productLang));
             row.put("reachWeight", spec.reachWeight());
             row.put("brandAlpha", spec.brandAlpha());
+            // D127: what the money buys inside this channel. Null when the template has not described it —
+            // the console then shows the name and weights alone rather than a paragraph nobody wrote.
+            row.put("description", spec.descriptionIn(productLang));
             channels.add(row);
         }
         body.put("channels", channels);
@@ -829,7 +832,9 @@ public class RoundService {
         body.put("cost", scenario.params().marketReportCost());
         body.put("current", environment.conditions(scenario, runId, round.number(),
                 runs.langOf(runId)));
-        body.put("forecast", environment.forecast(scenario, runId, round.number()));
+        // D127: the paid review reveals the months' scheduled events alongside the indices — that is part
+        // of what the purchase buys. The public conditions endpoint stays limited to what has already begun.
+        body.put("forecast", environment.forecast(scenario, runId, round.number(), true));
         return body;
     }
 

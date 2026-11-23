@@ -1434,3 +1434,45 @@ the tick after a read is stored without it), alongside the two unchanged ones: u
 unbilled, and the review cannot be read before it is bought. In the browser, Chinese, the box renders ticked and
 disabled, and pressing **更新决策** submits a plan whose stored `marketReport` is `true` — the form, not the
 server, carried it. Suite **256** green.
+
+
+**D127 — The paid review explains itself, and a channel says what its money buys (owner's enhancements, 23 Nov
+2026).** Two requests: *"the purchased report, other than the indicators, should have more wording expanding the
+impact of the indicators for clarity, it may be good to include some hint to the events that may occur in the
+forecasted months"*, and *"for players to better bet on the channels' return, there should be a general
+description of the activities that will occur within the scope of the channel. e.g. trade show, facebook
+market, SEO, postals, etc"*.
+
+**1. The forecast now reads.** Each month carries a sentence derived from its own numbers — demand up/down, cost
+up/down, or steady — saying what it means for the decision in front of the trainee (plan more units, hold back,
+raise price to protect margin, undercut to take share). The sentence is generated from the indices the report
+shows, so the words cannot describe a movement the figures do not have; that is the defect being fixed, a bare
+list of three numbers.
+
+**The scheduled events are revealed for the near months.** The deck is drawn when the run is created, so its
+schedule is knowable — and a forecast without it is a forecast of half the future. `GET …/market-report` now asks
+for them (`forecast(..., revealEvents = true)`), showing name and description in the class language for the first
+**two** months of the horizon (`EnvironmentService.EVENT_HORIZON`). Only what is *scheduled*: never the hidden
+multipliers, and never on the public conditions endpoint, which still shows only events that have already begun.
+A month with two events shows both — the honest answer, not a summary that hides one.
+
+**2. A channel describes its activities.** `channel_text` gained a `description` (V48), alongside the name it
+already carries per language (D114), and `ContextChannel` passes it to the console, which prints it under the
+channel's spend box. The shipped three now say what the money actually buys:
+
+| Channel | The activities |
+|---|---|
+| Digital | paid search and SEO, social and display, marketplace listings, email to the existing list — broad and fast, rented month to month |
+| Trade | listing fees and shelf space, trade promotions and volume discounts, distributor incentives, point-of-sale display, the annual trade show — widest physical reach, slowest to move |
+| Field | account visits and demonstrations, tender and procurement work, technical support, after-sales service, relationship building — narrowest reach, strongest effect on named customers |
+
+An undescribed channel shows no paragraph at all: a template's own channels are somebody's own business, and
+inventing activities for them would be a claim the template never made.
+
+**One migration failure worth recording:** V42 seeded the **`zh`** channel_text rows only, so writing both
+languages as inserts collides on `channel_text_pkey`. V48 updates the shipped rows in place and only where the
+row still carries the shipped name — the same guard V43 used, so a trainer's own wording is never overwritten.
+
+**Verified.** Local, Chinese, four-company class: the marketing section shows three channel paragraphs; the
+review shows every month with its impact sentence, the scheduled events for rounds 2 and 3 with names and
+descriptions, and the "what this purchase is worth" line. `Successfully applied 48 migrations`. Suite green.

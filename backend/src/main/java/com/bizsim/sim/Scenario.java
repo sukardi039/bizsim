@@ -219,6 +219,16 @@ public record Scenario(String key, Params params, List<ProductSpec> products,
             return text == null || text.name() == null || text.name().isBlank() ? name : text.name();
         }
 
+        /**
+         * D127: what happens inside this channel, in {@code lang}. Null when nobody has written it — the
+         * console omits the paragraph rather than inventing activities the template does not describe.
+         */
+        public String descriptionIn(String lang) {
+            Text text = texts == null ? null : texts.get(lang);
+            return text == null || text.description() == null || text.description().isBlank()
+                    ? null : text.description();
+        }
+
         /** The weight this channel reaches {@code segment} with; the channel's own when none is stated. */
         public BigDecimal reachFor(String segment) {
             BigDecimal stated = reachBySegment == null || segment == null

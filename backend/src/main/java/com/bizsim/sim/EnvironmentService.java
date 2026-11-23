@@ -307,7 +307,19 @@ public class EnvironmentService {
      * or the run's draw, so paying for the report cannot reveal a hidden event, only the ordinary
      * economics with a band around it.
      */
-    public List<Map<String, Object>> forecast(Scenario scenario, long runId, int round) {
+    /** D127: how many months of the event deck a reader may ask the paid review to reveal. */
+    public static final int EVENT_HORIZON = 2;
+
+    /**
+     * The forecast a paid review reports (D127: also the months' planned events).
+     *
+     * <p>{@code revealEvents} is the paid part: the deck is drawn when the run is created, so its schedule
+     * is knowable — and the owner's point is that a forecast without it is a forecast of half the future.
+     * It is not public though (a player reading the run's conditions sees only what has already started), so
+     * it travels only on the endpoint behind the purchase.
+     */
+    public List<Map<String, Object>> forecast(Scenario scenario, long runId, int round,
+                                              boolean revealEvents) {
         int horizon = Math.max(1, scenario.params().forecastHorizon());
         BigDecimal band = nz(scenario.params().forecastBand());
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -329,12 +341,52 @@ public class EnvironmentService {
                     band).setScale(2, RoundingMode.HALF_UP));
             row.put("trendLabel", base.trendLabel());
             row.put("band", band);
+            if (revealEvents && step <= EVENT_HORIZON) {
+                row.put("events", scheduledEvents(scenario, runId, target));
+            }
             rows.add(row);
         }
         for (Map<String, Object> row : rows) {
             row.put("outlook", outlook((BigDecimal) row.get("demandIndex")));
         }
         return rows;
+    }
+
+    /** Backwards-compatible form for callers that want the indices only. */
+    public List<Map<String, Object>> forecast(Scenario scenario, long runId, int round) {
+        return forecast(scenario, runId, round, false);
+    }
+
+    /**
+     * The events the frozen deck will start in {@code round} — name and description in the class language,
+     * because the deck was drawn per language when the run was created (D84).
+     *
+     * <p>Only what is <em>scheduled</em>, never the hidden multipliers: a paid review buys the diary, not the
+     * maths. If two events land in one month the player sees both, which is the honest answer.
+     */
+    private List<Map<String, Object>> scheduledEvents(Scenario scenario, long runId, int round) {
+        Map<String, Scenario.EventSpec> specs = new LinkedHashMap<>();
+        for (Scenario.EventSpec spec : scenario.events()) {
+            specs.put(spec.code(), spec);
+        }
+        List<Map<String, Object>> found = new ArrayList<>();
+        jdbc.query("""
+                select event_code from run_environment_event
+                where run_id = ? and starts_round = ?
+                order by event_code
+                """, rs -> {
+            Scenario.EventSpec spec = specs.get(rs.getString("event_code"));
+            if (spec == null) {
+                return;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("code", spec.code());
+            row.put("name", spec.name());
+            row.put("description", spec.description());
+            row.put("category", spec.category());
+            found.add(row);
+        }, runId, round);
+        return found;
     }
 
     /**

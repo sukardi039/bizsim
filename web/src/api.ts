@@ -307,6 +307,8 @@ export interface ContextChannel {
   name: string;
   reachWeight: number;
   brandAlpha: number;
+  /** D127: what happens inside this channel — the activities the spend buys. Null when not described. */
+  description?: string | null;
 }
 
 export interface ContextProject {
@@ -349,6 +351,8 @@ export interface MarketForecast {
   trendLabel: string;
   band: number;
   outlook: string;
+  /** D127: the events the frozen deck will start that month — on the paid review only, and only the near ones. */
+  events?: { code: string; name: string; description?: string | null; category?: string | null }[];
 }
 
 export interface TemplateRound {

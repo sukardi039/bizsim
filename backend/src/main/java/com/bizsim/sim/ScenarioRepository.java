@@ -235,11 +235,12 @@ public class ScenarioRepository {
     private Map<String, Map<String, Scenario.Text>> channelTextsOf(String key) {
         Map<String, Map<String, Scenario.Text>> byChannel = new LinkedHashMap<>();
         jdbc.query("""
-                select channel_code, lang, name from channel_text
+                select channel_code, lang, name, description from channel_text
                 where scenario_key = ?
                 """, (org.springframework.jdbc.core.RowCallbackHandler) rs ->
                 byChannel.computeIfAbsent(rs.getString("channel_code"), k -> new LinkedHashMap<>())
-                        .put(rs.getString("lang"), new Scenario.Text(rs.getString("name"), null)), key);
+                        .put(rs.getString("lang"), new Scenario.Text(rs.getString("name"),
+                                rs.getString("description"))), key);
         return byChannel;
     }
 
@@ -483,8 +484,8 @@ public class ScenarioRepository {
         // D114: a channel's name per language is catalogue data too. Placed after the channel rows so the
         // foreign key has both sides — the D108 ordering bug, not repeated.
         jdbc.update("""
-                insert into channel_text (scenario_key, channel_code, lang, name)
-                select ?, channel_code, lang, name from channel_text where scenario_key = ?
+                insert into channel_text (scenario_key, channel_code, lang, name, description)
+                select ?, channel_code, lang, name, description from channel_text where scenario_key = ?
                 """, key, sourceKey);
         jdbc.update("""
                 insert into rnd_project (scenario_key, code, name, lang, target_product,
@@ -883,11 +884,12 @@ public class ScenarioRepository {
                 if (text == null || isBlank(text.lang()) || isBlank(text.name())) {
                     continue;
                 }
+                // D127: the description travels with the name — it is the same row of the same table.
                 jdbc.update("""
-                        insert into channel_text (scenario_key, channel_code, lang, name)
-                        values (?, ?, ?, ?)
+                        insert into channel_text (scenario_key, channel_code, lang, name, description)
+                        values (?, ?, ?, ?, ?)
                         """, key, row.code(), text.lang().trim().toLowerCase(java.util.Locale.ROOT),
-                        text.name());
+                        text.name(), isBlank(text.description()) ? null : text.description());
             }
         }
         jdbc.update("update scenario set version = version + 1 where key = ?", key);

@@ -98,6 +98,11 @@ input.inherited { color: var(--muted); font-style: italic; }
 /* D121: a solid pie states its coverage beneath the chart rather than in a hole in the middle. */
 .market-pie-coverage { font-size: .78rem; color: var(--muted); margin: .35rem 0 .1rem; text-align: center; }
 .market-pie-coverage strong { color: var(--text); font-weight: 600; }
+/* D127: what the paid forecast means, and what each channel's money buys. */
+.forecast-impact { margin: .15rem 0 0; font-size: .82rem; }
+.forecast-events { margin: .2rem 0 .4rem; padding-left: 1.1rem; font-size: .82rem; }
+.forecast-events li { margin: .1rem 0; }
+.channel-what { display: block; margin-top: .2rem; font-size: .78rem; line-height: 1.35; }
 .market-pie-legend { width: 100%; font-size: .78rem; margin-top: .4rem; }
 .market-pie-legend td { padding: .12rem .25rem; border: none; }
 .market-pie-legend .swatch {

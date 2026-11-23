@@ -136,6 +136,20 @@ function toPayload(context: DecisionFormContext, draft: Draft): DecisionInput {
   };
 }
 
+/**
+ * D127: which sentence explains this month. Derived from the numbers the report actually shows, so the words
+ * cannot describe a movement the figures do not have — the defect this replaced was a bare list of indices.
+ */
+function impactKey(row: { demandIndex: number; costIndex: number }): string {
+  const demand = Number(row.demandIndex);
+  const cost = Number(row.costIndex);
+  if (cost >= 1.02) return "player.impactCostUp";
+  if (cost <= 0.98) return "player.impactCostDown";
+  if (demand >= 1.02) return "player.impactDemandUp";
+  if (demand <= 0.98) return "player.impactDemandDown";
+  return "player.impactSteady";
+}
+
 /* ------------------------------------------------------------------ screen */
 
 export default function PlayerConsole({ userId, onSignOut }: { userId: number; onSignOut: () => void }) {
@@ -876,6 +890,8 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
             reading the three channels as three audiences. */}
         <p className="muted">{t("player.marketingScope")}</p>
         <div className="row">
+          {/* D127: what each channel's money buys — a trainee betting on a return needs to know whether it is
+              bought media, a distributor's shelf, or sales visits. Templates without a description show none. */}
           {context.channels.map((channel) => (
             <label key={channel.code}>
               {channel.name}
@@ -886,6 +902,9 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
                 value={draft.marketing[channel.code] ?? 0}
                 onChange={(spend) => setIn("marketing", channel.code, spend)}
               />
+              {channel.description && (
+                <small className="muted channel-what">{channel.description}</small>
+              )}
             </label>
           ))}
         </div>
@@ -1005,19 +1024,45 @@ export default function PlayerConsole({ userId, onSignOut }: { userId: number; o
           {t("player.showReview")}
         </button>
         {report && (
-          <ul className="forecast">
-            {report.forecast.map((row) => (
-              <li key={row.round}>
-                <span className="muted">{t("player.forecastRound", { round: row.round })}</span>{" "}
-                {t("player.forecastRow", {
-                  outlook: enumLabel(t, "outlook", row.outlook),
-                  trend: row.trendLabel,
-                  demand: plain(row.demandIndex),
-                  costs: plain(row.costIndex),
-                })}
-              </li>
-            ))}
-          </ul>
+          <>
+            {/* D127: the indices alone were three numbers with no reading. Each month now says what the
+                numbers mean for the decision in front of the trainee, and the months already scheduled
+                name the events the frozen deck will start. */}
+            <ul className="forecast forecast-months">
+              {report.forecast.map((row) => (
+                <li key={row.round}>
+                  <span className="muted">{t("player.forecastRound", { round: row.round })}</span>{" "}
+                  {t("player.forecastRow", {
+                    outlook: enumLabel(t, "outlook", row.outlook),
+                    trend: row.trendLabel,
+                    demand: plain(row.demandIndex),
+                    costs: plain(row.costIndex),
+                  })}
+                  <p className="muted forecast-impact">
+                    {t("player.forecastSummary", {
+                      pct: plain(row.demandIndex * 100, 0),
+                      cost: plain(row.costIndex * 100, 0),
+                      impact: t(impactKey(row)),
+                    })}
+                  </p>
+                  {row.events && row.events.length > 0 && (
+                    <ul className="forecast-events">
+                      {row.events.map((event) => (
+                        <li key={event.code}>
+                          <strong>{event.name}</strong>
+                          {event.description ? ` — ${event.description}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {/* D127: what the purchase is worth in decision terms, not in abstract value. */}
+            <p className="muted forecast-worth">
+              {t("player.forecastHours", { cost: money(context.marketReportCost) })}
+            </p>
+          </>
         )}
       </section>
 
