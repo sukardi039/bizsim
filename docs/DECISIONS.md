@@ -1544,3 +1544,28 @@ focus           price 1,071,000 quality 0          rnd 0   channels {DIGITAL 9.9
 Focus takes 58 % of its budget through the channel that reaches its class; the neutral split takes 35 %.
 `BotLibraryApiTest` pins the wire: a strategy is stored, editable, and a client that omits it keeps the old
 mapping. Suite **258** green, 50 migrations on a fresh database, builder panel verified in Chinese.
+
+
+**V51 — the builder-created library is re-spread across the three strategies.** V50 added `strategy` with a COST
+default and re-spread only the nine *shipped* key shapes (`high_aggressive` and friends). The live tenant's
+library was built through the builder, so its keys are `autowork-<level>-<letter>-<level>` — none of them matched,
+every row kept the default, and the demo class went from a varied spread to **nine cost leaders**. The live check
+after v0.31.0 deployed reported exactly that.
+
+V51 re-spreads them at each level, matching strategy to the personality the row already carried:
+
+| Key slot | Personality | Strategy |
+|---|---|---|
+| `-a-` | AGGRESSIVE | COST — it already pushed price and share hardest |
+| `-b-` | BALANCED | FOCUS — now it narrows to one class |
+| `-c-` | CAUTIOUS | DIFFERENTIATION — it already charged a premium |
+
+Two guards, both deliberate: only rows **still COST** (a trainer's own edit is never overwritten), and only keys
+of the builder shape matched against `^autowork-[a-z]+-[abc]-[a-z]+$`. The version is bumped on the rows it
+changes, because history stays attached to the version that produced it.
+
+**Proven before release, not after.** `.dev/v51_probe.py` rebuilds the live shape on a throwaway database — nine
+builder keys all COST plus one trainer-named row — rewinds to the pre-V51 state, applies the migration's exact
+statement, and asserts the outcome: **COST 3, FOCUS 3, DIFFERENTIATION 3**, `my-own-bot` still COST at v1 while
+the nine moved to v2. The predicate was also checked against the real key strings first, including shapes it must
+ignore (`high_aggressive`, `my-custom-bot`).
