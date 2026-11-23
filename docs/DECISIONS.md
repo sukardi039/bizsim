@@ -1398,3 +1398,39 @@ unbilled; read-then-unticked stays billed; the report cannot be read before it i
 report.not_purchased`). Run against the previous `RoundService`, **all three fail** — the tests describe the rule
 rather than the code. In the browser, Chinese: after reading, the box renders ticked, disabled, with the new
 explanation. Suite **256** green.
+
+
+**D126 — The server stores the plan it was sent; the lock on a read review lives in the form (owner's
+objection, 23 Nov 2026).** On D125 the owner rejected one line of it outright: *"read → unticked → submitted →
+still billed (stored plan rewritten to true); this is not acceptable and can be challenged by players if
+implemented. when report is read (under the condition of purchased status), the purchase marker cannot be
+unticked."*
+
+He is right, and the objection is about evidence, not logic. D125 made the server rewrite a submitted plan to
+`marketReport: true` when the trainee had sent `false`. A player can defend a plan they can see themselves
+having submitted; they cannot defend a stored plan that contradicts it. The record must be exactly what was
+sent.
+
+**The rule now.**
+
+- **The server stores the payload it received, unchanged.** No rewriting, no inferred purchase. `submit`
+  simply persists the plan (the `withMarketReport` rewrite and its helper are gone).
+- **The lock lives in the form**, which is the only route a trainee submits through. Once the review has been
+  read *and* the round is bought, the box renders **ticked and disabled** and the draft itself carries the
+  tick — so every payload that form can build includes the purchase. There is no state in which a trainee sees
+  an unticked box and their submission bills them.
+- **Before the read, the box is an ordinary choice**: tick, submit, untick, submit again, and the final plan
+  decides the charge.
+- Reading still requires a purchase (`402 report.not_purchased`) and still records the read (`report_purchase`),
+  which is what the form uses to lock itself.
+
+**What this gives up, and why it is acceptable:** an attacker who bypasses the console and posts a plan with
+`marketReport: false` after reading is not billed. That is a trainee falsifying their own submission, not a
+system charging for something unseen — and the console shows them, and their facilitator, the same ticked box
+throughout the round.
+
+**Verified.** `ReportPurchaseTest` now asserts storing-as-sent as the third behaviour (a plan arriving without
+the tick after a read is stored without it), alongside the two unchanged ones: unticked-before-read ends
+unbilled, and the review cannot be read before it is bought. In the browser, Chinese, the box renders ticked and
+disabled, and pressing **更新决策** submits a plan whose stored `marketReport` is `true` — the form, not the
+server, carried it. Suite **256** green.

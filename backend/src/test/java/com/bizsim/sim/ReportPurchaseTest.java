@@ -121,22 +121,24 @@ class ReportPurchaseTest extends PostgresTestBase {
         assertThat(billed()).as("a report nobody read is not charged").isFalse();
     }
 
-    /** Once read, the report cannot be kept while its cost is withdrawn. */
+    /**
+     * D126: the server stores the plan it was sent. The lock on a read review lives in the form, which is
+     * what a trainee actually submits through — a payload built elsewhere is their own plan, and rewriting it
+     * would be a record they cannot defend.
+     */
     @Test
-    void reading_the_review_locks_the_purchase_for_the_round() throws Exception {
+    void a_submitted_plan_is_stored_exactly_as_sent() throws Exception {
         submit(true);
         mvc.perform(get("/api/runs/" + runId + "/teams/" + teamId + "/market-report")
                         .header("Authorization", "Bearer " + trainee))
                 .andExpect(status().isOk());
-
         context().andExpect(jsonPath("$.reportRead").value(true));
 
-        // The trainee edits the plan and submits with the review cleared — the hole this closes.
+        // A plan that arrives without the tick is stored without it — no silent rewrite to match the read.
         submit(false);
-
         context().andExpect(jsonPath("$.reportRead").value(true))
-                .andExpect(jsonPath("$.decision.marketReport").value(true));
-        assertThat(billed()).as("re-submitting cannot withdraw the cost of a report already read").isTrue();
+                .andExpect(jsonPath("$.decision.marketReport").value(false));
+        assertThat(billed()).as("what was sent is what is billed").isFalse();
     }
 
     /** Reading is only possible once the review has been bought by a submitted plan. */

@@ -51,11 +51,6 @@ public record DecisionPayload(List<ProductRow> production,
         return Boolean.TRUE.equals(marketReport);
     }
 
-    /** D124: the same plan, with the bought review kept on — used when a round was already billed for it. */
-    public DecisionPayload withMarketReport() {
-        return new DecisionPayload(production, price, marketing, manpower, rnd, quality,
-                capacityPurchase, Boolean.TRUE);
-    }
 
     public BigDecimal units(String product) {
         return production == null ? BigDecimal.ZERO : production.stream()

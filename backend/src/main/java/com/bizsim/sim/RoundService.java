@@ -114,13 +114,11 @@ public class RoundService {
             throw new CashShortfallException(input.cash(), commitment.discretionary(), lines);
         }
 
-        // D125: charging follows the **final** submission's purchase status, so a ticked box may be unticked
-        // and re-submitted — until the review has been read. Reading locks it: a trainee who has seen the
-        // forecast cannot withdraw its cost, and every later submission of the round carries the charge.
-        DecisionPayload stored = rounds.reportRead(round.id(), teamId) && !payload.marketReportRequested()
-                ? payload.withMarketReport()
-                : payload;
-        rounds.upsertDecision(round.id(), teamId, stored, userId);
+        // D126: the submitted plan is stored **exactly as sent**. There is no rewriting of a plan the trainee
+        // did not write — a player who unticks and submits has not bought the review, and a record that says
+        // otherwise is a plan they cannot defend. The lock on a read review lives in the form: once read, the
+        // box is disabled and the tick is carried in every submission the trainee can actually make.
+        rounds.upsertDecision(round.id(), teamId, payload, userId);
         events.publishAfterCommit(runId, "decision.submitted",
                 Map.of("round", round.number(), "teamId", teamId));
     }
