@@ -32,6 +32,25 @@ class StrategyCalibrationTest extends PostgresTestBase {
     @Autowired
     private EnvironmentService environment;
 
+    /**
+     * D133: the measurement that motivated the quality-led preset, run on both economies.
+     *
+     * <p>`standard-v1` is what every historical run played and must not change. `quality-led-v1` is the same
+     * economy with quality worth having and cheaper to buy. Printing both side by side is the whole point: it
+     * says whether the new preset turns a quality strategy from a losing one into a competitive one.
+     */
+    @Test
+    void quality_becomes_a_real_strategy_in_the_quality_led_economy() {
+        for (String economy : List.of("standard-v1", "quality-led-v1")) {
+            Scenario scenario = scenarios.load(economy);
+            Measurement m = measure(scenario, "HIGH");
+            System.out.printf("%nECONOMY %s (HIGH level, %d rounds)%n", economy, scenario.params().rounds());
+            for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+                System.out.printf("  %-16s avg profit/round %14s%n", strategy, m.profit(strategy));
+            }
+        }
+    }
+
     @Test
     void the_three_strategies_are_competitive_at_the_same_level() {
         Scenario scenario = scenarios.load("standard-v1");

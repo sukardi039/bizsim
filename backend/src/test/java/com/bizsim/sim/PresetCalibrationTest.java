@@ -48,7 +48,10 @@ class PresetCalibrationTest extends PostgresTestBase {
         List<Contest> contests = List.of(
                 new Contest("preset-cost-v1", List.of(Plan.COST, Plan.DIFF), "COST"),
                 new Contest("preset-diff-v1", List.of(Plan.COST, Plan.DIFF), "DIFF"),
-                new Contest("preset-focus-v1", List.of(Plan.FOCUS, Plan.DIFF), "FOCUS"));
+                new Contest("preset-focus-v1", List.of(Plan.FOCUS, Plan.DIFF), "FOCUS"),
+                // D133: the economy where quality actually pays. Same plans as the shipped economy, so the
+                // contest is the same and only the economics differ — which is the point of the preset.
+                new Contest("quality-led-v1", List.of(Plan.COST, Plan.DIFF), "DIFF"));
 
         System.out.printf("%n| preset | plan | cumulative profit | revenue | cash |%n");
         System.out.printf("|---|---|---|---|---|%n");

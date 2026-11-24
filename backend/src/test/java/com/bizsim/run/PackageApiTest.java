@@ -648,10 +648,11 @@ class PackageApiTest extends PostgresTestBase {
             assertThat(jdbc.queryForObject("select count(*) from scenario where key = ?",
                     Integer.class, key)).as("copy %s removed", key).isZero();
         }
-        // The library is what the picker reads: nothing of the programme is left in it.
+        // The library is what the picker reads: nothing of the programme is left in it — only the shipped
+        // templates. (Five global + this package's own draft template = 6; before D133 it was 5.)
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(5));
+                .andExpect(jsonPath("$.length()").value(6));
     }
 
     /**
@@ -665,10 +666,10 @@ class PackageApiTest extends PostgresTestBase {
                 values ('pkg-acme-deadbeef', 'Ghost programme · Part B (v6)', '{"rounds":6}'::jsonb, 6)
                 """);
 
-        // Only the shipped template is left in the library: the inserted copy is not offered.
+        // Only the shipped templates are left in the library: the inserted copy is not offered.
         mvc.perform(get("/api/templates").header("Authorization", "Bearer " + builder))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(4))
+                .andExpect(jsonPath("$.length()").value(5))
                 .andExpect(jsonPath("$[*].key",
                         org.hamcrest.Matchers.hasItem("standard-v1")));
     }

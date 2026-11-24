@@ -1752,3 +1752,52 @@ weakest strategy was a different one, and that the strongest is now "spend nothi
 factor of three of the best) at HIGH and MID — the ranking is reported, not gated, because it is information
 rather than a contract. The money change is covered by `tsc` and the build; no test can assert a locale bug that
 was only visible by rendering both.
+
+
+**D133 — `quality-led-v1`: the preset where quality actually pays (owner's ruling, 24 Nov 2026).** After D132's
+measurement showed FOCUS out-earning both other strategies by simply spending nothing, the owner asked for a
+recommendation. The recommendation was **not to tune the bots** — they behave sensibly given the economics — but to
+offer a variant economy, because `standard-v1` is what every historical run played and its numbers must not move.
+
+**Why the shipped economy cannot support differentiation.** One quality point costs **60m a month** and lifts
+attractiveness by `(51/50)^0.8 = 1.6 %`. A **6 % price cut** — which costs nothing to hold — lifts it by
+`1.06^1.5 = 9 %`. Price is roughly thirty times more efficient per unit of money than quality, so the quality
+strategy is playing a mechanic that cannot pay back at these rates.
+
+**`quality-led-v1` — two knobs, nothing else:**
+
+| Knob | `standard-v1` | `quality-led-v1` | Why |
+|---|---|---|---|
+| `elasticity.quality` | 0.80 | **1.30** | quality becomes a genuine differentiator |
+| `qualityCostPerPoint` | 60m | **40m** | still ≈0.8 months of fixed cost per point — a real commitment |
+
+It keeps the shipped market size, unit costs and **price** elasticity, so the only thing a class experiences
+differently is what quality is worth. That is what makes it a usable A/B rather than another themed economy. The
+copy is written with V35's generic jsonb clone, so a later column addition cannot silently drop data from it.
+
+**Measured, both economies, HIGH level, two companies per strategy, 8 rounds:**
+
+| Strategy | `standard-v1` | `quality-led-v1` |
+|---|---|---|
+| COST | +7.8m/round | +8.0m/round |
+| **DIFFERENTIATION** | **+16.5m/round** | **+36.4m/round** |
+| FOCUS | +51.5m/round | +50.7m/round |
+
+Differentiation **more than doubles** in the new economy and closes most of the gap to FOCUS, while COST is
+unaffected and FOCUS barely moves — exactly the shape a targeted economic change should have.
+
+**The preset's own calibration passes.** `PresetCalibrationTest` extends to `quality-led-v1` with the same two
+plans the shipped economy uses (COST vs DIFF) and asserts DIFF wins:
+
+```
+quality-led-v1 | COST | -944,326,974 |  quality-led-v1 | DIFF | +1,117,113,617
+```
+
+That is the strongest form of the claim: in the shipped economy those same two plans finish `+1,968m` and
+`+1,764m` — the discount wins; in the quality-led economy the same two plans finish `−944m` and `+1,117m` — the
+quality strategy wins by 2.1bn. The economics, not the bot, decide the winner.
+
+**What is deliberately unchanged.** `standard-v1` and the three D100 presets keep their numbers. FOCUS keeps its
+behaviour. No bot policy changed in this release at all — only a new template and the tests that prove it.
+
+Suite **266 green** (TemplateApiTest now expects five shipped templates).
