@@ -43,8 +43,31 @@ class BotLibraryFillTest extends PostgresTestBase {
                 from bot_profile where tenant_id = ? and key = 'cost-high'
                 """, tenant, tenant);
 
+        // Two of twelve active — exactly the partial state live was in after V55 (it had six, of the two new
+        // positions; two is enough to prove the fill). The keys are real positions that are not yet active.
+        for (String[] row : new String[][] {{"cost-mid", "MID"}, {"cost-low", "LOW"}}) {
+            jdbc.update("""
+                    insert into bot_profile (tenant_id, key, name, level, personality, strategy, params, active)
+                    values (?, ?, ?, ?, 'BALANCED', 'COST', '{}'::jsonb, true)
+                    """, tenant, row[0], row[0], row[1]);
+        }
         seeder.ensureBotLibrary(tenant, "fill-probe");
 
+        java.util.List<String> accts = jdbc.queryForList(
+                "select u.email from app_user u where u.tenant_id = ? and u.role = 'AUTO_WORKER' order by u.email",
+                String.class, tenant);
+        System.out.println("accounts (" + accts.size() + "): " + accts);
+        java.util.List<String> present = jdbc.queryForList(
+                "select key from bot_profile where tenant_id = ? order by key", String.class, tenant);
+        System.out.println("present after seeding (" + present.size() + "): " + present);
+        java.util.List<String> expectedKeys = new java.util.ArrayList<>();
+        for (String position : new String[] {"cost", "differentiation", "cost_focus", "differentiation_focus"}) {
+            for (String level : new String[] {"high", "mid", "low"}) {
+                expectedKeys.add(position + "-" + level);
+            }
+        }
+        expectedKeys.removeAll(present);
+        System.out.println("missing: " + expectedKeys);
         Integer active = jdbc.queryForObject(
                 "select count(*) from bot_profile where tenant_id = ? and active", Integer.class, tenant);
         org.assertj.core.api.Assertions.assertThat(active)
@@ -62,3 +85,4 @@ class BotLibraryFillTest extends PostgresTestBase {
                 .isEqualTo(12);
     }
 }
+

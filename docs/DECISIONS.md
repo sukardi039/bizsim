@@ -1926,3 +1926,20 @@ The seeder now asks the question that matters: *does this position have an activ
 the key but is retired, it is **reactivated** rather than duplicated (the key is unique per tenant), and the
 existing bot account is reused. `BotLibraryFillTest` starts from exactly the state V55 leaves — a retired profile
 with a live account — and asserts twelve active positions, one `cost-high` row, and twelve bot accounts.
+
+
+**D138 — A complete library is profiles *and* accounts, and "some are active" is not "complete".** Two gaps,
+found by watching live after v0.36.2: the library stayed at **6 of 12**.
+
+1. **The startup gate measured the wrong thing.** `BotLibraryRunner` skipped a tenant as soon as `active > 0`. After
+   V55 retired the old nine, live held six active profiles — the two new positions at three levels — so the runner
+   decided the library existed and did nothing. The gate is now `active >= expectedLibrarySize()`, and the expected
+   number comes from `limits.json` (`positions × levels`), not a literal.
+
+2. **An active profile without a bot account cannot be seated.** `ensureBotLibrary` skipped a position whose profile
+   was already active — and a profile can be active with no account (deleted, or created by hand). The package
+   seating picker then cannot offer it. The seeder now repairs that: if the position is active but the account is
+   missing, the account is created; the same check runs on the reactivation path.
+
+`BotLibraryFillTest` starts from the state V55 leaves — one retired profile whose account survives, two active
+profiles with no account — and asserts twelve active positions, one row per key, and **twelve** bot accounts.

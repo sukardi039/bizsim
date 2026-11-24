@@ -283,6 +283,11 @@ public class InitDataService {
      * path, so a library introduced after it was created would never appear. V52 retired its old profiles and the
      * live class was left with none. {@code BotLibraryRunner} calls this on every startup.
      */
+    /** D138: how many auto players a complete library holds — positions x levels, from limits.json. */
+    public int expectedLibrarySize() {
+        return limits.autoWorkerLibrarySize();
+    }
+
     public void ensureBotLibrary(long tenantId, String tenantCode) {
         for (String strategy : limits.strategies()) {
             for (String level : limits.levels()) {
@@ -300,6 +305,19 @@ public class InitDataService {
                         select count(*) from bot_profile p
                         where p.tenant_id = ? and p.key = ? and p.active
                         """, Integer.class, tenantId, key) > 0) {
+                    // D138: an active *profile* is not a seatable opponent — it also needs its bot account.
+                    // A position can be active with no account (deleted, or a row created by hand), and then it
+                    // is invisible in the package seating picker. Repair that here rather than skipping.
+                    if (users.findByEmailInTenant(tenantId, email).isEmpty()) {
+                        byte[] renewed = new byte[32];
+                        random.nextBytes(renewed);
+                        Long profileId = jdbc.queryForObject(
+                                "select id from bot_profile where tenant_id = ? and key = ?",
+                                Long.class, tenantId, key);
+                        users.insertBot(tenantId, email, name,
+                                encoder.encode(java.util.HexFormat.of().formatHex(renewed)), profileId);
+                        log.info("init data: created the missing bot account for active {}", key);
+                    }
                     continue;
                 }
                 // A profile on this key may already exist but be retired (V55 set active = false on the old
@@ -313,7 +331,17 @@ public class InitDataService {
                             set active = true, name = ?, level = ?, strategy = ?, updated_at = now()
                             where id = ?
                             """, name, level, strategy, existing);
-                    log.info("init data: reactivated auto-player {} for tenant '{}'", key, tenantCode);
+                    // D138: reactivating the profile is not enough — the position also needs its bot account,
+                    // and an account can be missing (deleted, or never created because the row predates it).
+                    // Without this the library holds twelve profiles and ten accounts, and seating the missing
+                    // two fails at the point a trainer tries it.
+                    if (users.findByEmailInTenant(tenantId, email).isEmpty()) {
+                        byte[] renewed = new byte[32];
+                        random.nextBytes(renewed);
+                        users.insertBot(tenantId, email, name,
+                                encoder.encode(java.util.HexFormat.of().formatHex(renewed)), existing);
+                        log.info("init data: recreated the bot account for reactivated {}", key);
+                    }
                     continue;
                 }
                 byte[] secret = new byte[32];
