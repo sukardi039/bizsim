@@ -98,7 +98,7 @@ class SeatLimitTest extends PostgresTestBase {
                                 "templateKey", "standard-v1",
                                 "locale", "en",
                                 "companyProfileIds", profiles.subList(0, 12),
-                                "seatLimit", 12))))
+                                "seatLimit", 12, "facilitatorId", jdbc.queryForObject("select id from app_user where email = 'trainer@acme.test'", Long.class)))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.seatLimit").value(12))
                 .andReturn();
@@ -118,7 +118,7 @@ class SeatLimitTest extends PostgresTestBase {
                                 "templateKey", "standard-v1",
                                 "locale", "en",
                                 "companyProfileIds", profiles.subList(0, 13),
-                                "seatLimit", 12))))
+                                "seatLimit", 12, "facilitatorId", jdbc.queryForObject("select id from app_user where email = 'trainer@acme.test'", Long.class)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.too_many_companies"));
 
@@ -131,7 +131,7 @@ class SeatLimitTest extends PostgresTestBase {
                                 "templateKey", "standard-v1",
                                 "locale", "en",
                                 "companyProfileIds", profiles.subList(0, 31),
-                                "seatLimit", 31))))
+                                "seatLimit", 31, "facilitatorId", jdbc.queryForObject("select id from app_user where email = 'trainer@acme.test'", Long.class)))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.seat_limit_invalid"));
 

@@ -54,8 +54,16 @@ class PreparedSessionApiTest extends PostgresTestBase {
     @BeforeEach
     void seed() throws Exception {
         for (String table : List.of("round_statement", "round_result", "decision", "round", "player",
-                "company_product", "company_staff", "company_rnd", "team", "run", "simulation",
-                "app_user", "company_profile", "tenant")) {
+                "company_product", "company_staff", "company_rnd", "team", "run", "simulation")) {
+            jdbc.update("delete from " + table);
+        }
+        // D140: a package names its facilitator, so packages (and the templates they froze) go before accounts.
+        jdbc.update("update scenario set frozen_for_package = null where frozen_for_package is not null");
+        for (String table : List.of("simulation_package_seat", "simulation_package_part",
+                "simulation_package")) {
+            jdbc.update("delete from " + table);
+        }
+        for (String table : List.of("app_user", "company_profile", "tenant")) {
             jdbc.update("delete from " + table);
         }
         // The shipped profile the migration seeds.

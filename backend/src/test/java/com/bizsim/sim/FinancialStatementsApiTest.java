@@ -60,6 +60,7 @@ class FinancialStatementsApiTest extends PostgresTestBase {
         }
         jdbc.update("delete from scenario where key like 'pkg-%' or tenant_id is not null");
         jdbc.update("delete from company_profile");
+        jdbc.update("delete from simulation_package");
         jdbc.update("delete from app_user");
         jdbc.update("delete from tenant");
     }

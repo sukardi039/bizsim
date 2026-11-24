@@ -348,6 +348,11 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
 
     @Test
     void a_package_can_seat_an_opponent_beside_a_person() throws Exception {
+        // D140: a package is prepared for one facilitator and only they may start it, so the third facilitator is
+        // created before the publish and named as the owner.
+        user("trainer3@acme.test", "FACILITATOR");
+        long thirdFacilitatorId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer3@acme.test'", Long.class);
         long alpha = profile("Alpha");
         long market = profile("Market 1_high");
 
@@ -357,7 +362,8 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "With an opponent", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(alpha, market),
-                                "traineeIds", java.util.Arrays.asList(null, botUserId)))))
+                                "traineeIds", java.util.Arrays.asList(null, botUserId),
+                                "facilitatorId", thirdFacilitatorId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.seats.length()").value(1))
                 .andExpect(jsonPath("$.seats[0].position").value(1))
@@ -365,8 +371,8 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
         long packageId = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
 
         // The session started from that package seats the opponent like anyone else. A facilitator
-        // may hold only one session in progress, and the seed already has one.
-        user("trainer3@acme.test", "FACILITATOR");
+        // may hold only one session in progress, and the seed already has one — so this package is prepared for
+        // a third facilitator (D140: the package names its owner, and only that person can run it).
         String thirdFacilitator = login("trainer3@acme.test");
         MvcResult session = mvc.perform(post("/api/packages/" + packageId + "/sessions")
                         .header("Authorization", "Bearer " + thirdFacilitator)
@@ -393,7 +399,10 @@ class AutoWorkerRoundApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "No opponents", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(alpha, market),
-                                "traineeIds", java.util.Arrays.asList(null, botUserId)))))
+                                "traineeIds", java.util.Arrays.asList(null, botUserId),
+                                "facilitatorId", jdbc.queryForObject(
+                                        "select id from app_user where email = 'trainer@acme.test'",
+                                        Long.class)))))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("bot.switch_off"));
 

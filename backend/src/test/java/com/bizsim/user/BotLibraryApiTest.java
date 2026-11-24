@@ -54,6 +54,9 @@ class BotLibraryApiTest extends PostgresTestBase {
             jdbc.update("update app_user set bot_profile_id = null");
         }
         jdbc.update("delete from bot_profile");
+        // D140: a package is referenced by its frozen template copies, so release those first.
+        jdbc.update("update scenario set frozen_for_package = null where frozen_for_package is not null");
+        jdbc.update("delete from simulation_package");
         jdbc.update("delete from app_user");
         jdbc.update("delete from tenant");
         tenantId = jdbc.queryForObject(

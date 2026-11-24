@@ -646,6 +646,10 @@ export const en: Dict = {
   "packages.name": "Package",
   "packages.namePlaceholder": "Autumn 2026 cohort",
   "packages.status": "Status",
+  "packages.facilitator": "Facilitator",
+  "packages.facilitatorChoose": "Choose a facilitator",
+  "packages.facilitatorHint":
+    "Only this person sees the package and starts its sessions. An administrator can still see and run every package.",
   "packages.publishedAt": "Published",
   "packages.retire": "Retire",
   "packages.retireConfirm": "Retire \"{name}\"? Sessions already run from it keep their history; no new session can use it.",
@@ -1441,6 +1445,10 @@ export const zh: Dict = {
   "packages.name": "模拟包",
   "packages.namePlaceholder": "2026 秋季班",
   "packages.status": "状态",
+  "packages.facilitator": "主持人",
+  "packages.facilitatorChoose": "选择主持人",
+  "packages.facilitatorHint":
+    "只有这个人能看到这个包并开启它的场次。管理员仍然可以看到并运行所有包。",
   "packages.publishedAt": "发布时间",
   "packages.retire": "停用",
   "packages.retireConfirm": "停用“{name}”？已进行的模拟保留记录，但不能再用于新模拟。",

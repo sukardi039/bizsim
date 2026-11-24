@@ -52,6 +52,9 @@ class PackageApiTest extends PostgresTestBase {
     private String otherFacilitator;
     private String player;
     private long profileId;
+    /** D140: the facilitator a package is prepared for, and a second one for the visibility test. */
+    private long facilitatorUserId;
+    private long secondFacilitatorUserId;
 
     @BeforeEach
     void seed() throws Exception {
@@ -76,6 +79,8 @@ class PackageApiTest extends PostgresTestBase {
         other = tenant("other");
         user(acme, "builder@acme.test", "BUILDER");
         user(acme, "trainer@acme.test", "FACILITATOR");
+        // D140: a second facilitator, so "only my packages" is testable with two real people.
+        user(acme, "second@acme.test", "FACILITATOR");
         user(acme, "ada@acme.test", "PLAYER");
         user(other, "trainer@other.test", "FACILITATOR");
         builder = login("acme", "builder@acme.test");
@@ -87,6 +92,11 @@ class PackageApiTest extends PostgresTestBase {
                 insert into company_profile (tenant_id, name, company_name, products)
                 values (?, 'Alpha Industries', 'Alpha Industries', '["P1","P2"]'::jsonb) returning id
                 """, Long.class, acme);
+        // D140: packages are prepared for a named facilitator; that account is the default in this suite.
+        facilitatorUserId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@acme.test'", Long.class);
+        secondFacilitatorUserId = jdbc.queryForObject(
+                "select id from app_user where email = 'second@acme.test'", Long.class);
     }
 
     @Test
@@ -104,7 +114,7 @@ class PackageApiTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Mine", "templateKey", "standard-v1",
-                                "companyProfileIds", List.of(profileId)))))
+                                "companyProfileIds", List.of(profileId), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("auth.builder_only"));
 
@@ -166,7 +176,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Broken", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
-                                "traineeIds", List.of(1L)))))
+                                "traineeIds", List.of(1L), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.seats_mismatch"));
 
@@ -192,7 +202,7 @@ class PackageApiTest extends PostgresTestBase {
                                                 + "where email = 'ada@acme.test'", Long.class)),
                                 "parts", List.of(
                                         Map.of("name", "Basics", "templateKey", "standard-v1"),
-                                        Map.of("name", "Competition", "templateKey", second))))))
+                                        Map.of("name", "Competition", "templateKey", second)), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.parts.length()").value(2))
                 .andExpect(jsonPath("$.parts[0].position").value(1))
@@ -320,7 +330,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Autumn 2026", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
-                                "traineeIds", java.util.Arrays.asList(ada, null)))))
+                                "traineeIds", java.util.Arrays.asList(ada, null), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.seats.length()").value(1))
                 .andExpect(jsonPath("$.seats[0].position").value(0))
@@ -363,7 +373,7 @@ class PackageApiTest extends PostgresTestBase {
                                 "traineeIds", List.of(jdbc.queryForObject(
                                         "select id from app_user where email = 'ada@acme.test'",
                                         Long.class)),
-                                "locale", "zh"))))
+                                "locale", "zh", "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.locale").value("zh"))
                 .andReturn();
@@ -405,7 +415,7 @@ class PackageApiTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Plain cohort", "templateKey", "standard-v1",
-                                "companyProfileIds", List.of(profileId)))))
+                                "companyProfileIds", List.of(profileId), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.locale_required"));
 
@@ -417,7 +427,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "name", "Bad language", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId),
-                                "locale", "fra"))))
+                                "locale", "fra", "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.locale_invalid"));
     }
@@ -439,7 +449,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
-                                "traineeIds", List.of(ada)))))
+                                "traineeIds", List.of(ada), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.seats_mismatch"));
 
@@ -450,7 +460,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId, beta),
-                                "traineeIds", List.of(ada, ada)))))
+                                "traineeIds", List.of(ada, ada), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("package.trainee_twice"));
 
@@ -461,7 +471,7 @@ class PackageApiTest extends PostgresTestBase {
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Bad", "templateKey", "standard-v1",
                                 "companyProfileIds", List.of(profileId),
-                                "traineeIds", List.of(trainer)))))
+                                "traineeIds", List.of(trainer), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("user.not_found"));
     }
@@ -627,7 +637,7 @@ class PackageApiTest extends PostgresTestBase {
                                 "companyProfileIds", List.of(profileId),
                                 "parts", List.of(
                                         Map.of("name", "Part A", "templateKey", draft),
-                                        Map.of("name", "Part B", "templateKey", draft))))))
+                                        Map.of("name", "Part B", "templateKey", draft)), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isCreated())
                 .andReturn();
         long id = json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
@@ -684,7 +694,7 @@ class PackageApiTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", name, "templateKey", templateKey,
-                                "companyProfileIds", List.of(profileId)))))
+                                "companyProfileIds", List.of(profileId), "facilitatorId", facilitatorUserId))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return json.readTree(published.getResponse().getContentAsString()).get("id").asLong();
@@ -719,5 +729,89 @@ class PackageApiTest extends PostgresTestBase {
                 .andExpect(status().isOk())
                 .andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
+    }
+
+    /**
+     * D140: a facilitator sees **only their own** packages, and cannot run anyone else's.
+     *
+     * <p>Two guards, and both matter: the list filter stops the wrong package being *offered*, while the start
+     * refusal stops it being *run* — a hidden row is not a protected row, so an id in hand must not be enough.
+     */
+    @Test
+    void a_facilitator_sees_only_their_own_packages_and_cannot_start_anothers() throws Exception {
+        long mine = publish("Prepared for me");
+
+        // The same builder prepares a package for the OTHER facilitator.
+        MvcResult theirsResult = mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "locale", "en", "name", "Prepared for someone else",
+                                "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "facilitatorId", secondFacilitatorUserId))))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long theirs = json.readTree(theirsResult.getResponse().getContentAsString()).get("id").asLong();
+
+        // The list is filtered: only the package prepared for this facilitator comes back.
+        mvc.perform(get("/api/packages").header("Authorization", "Bearer " + facilitator))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.hasItem((int) mine)))
+                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem((int) theirs))))
+                // The fixture sets display_name to the email, so that is what the console will show here.
+                .andExpect(jsonPath("$[?(@.id==" + mine + ")].facilitatorName")
+                        .value(org.hamcrest.Matchers.hasItem("trainer@acme.test")));
+
+        // The builder still sees both, because managing the assignments is their job.
+        mvc.perform(get("/api/packages").header("Authorization", "Bearer " + builder))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].id", org.hamcrest.Matchers.hasItem((int) theirs)));
+
+        // And the other package cannot be started, even with its id in hand.
+        mvc.perform(post("/api/packages/" + theirs + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("package.not_yours"));
+
+        // The owner can start their own.
+        mvc.perform(post("/api/packages/" + mine + "/sessions")
+                        .header("Authorization", "Bearer " + facilitator)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated());
+    }
+
+    /** D140: a package with no facilitator is refused — an ownerless package is visible to everyone or nobody. */
+    @Test
+    void publishing_requires_a_facilitator_in_this_tenant() throws Exception {
+        // A player is not a facilitator, even in the same tenant.
+        long playerId = jdbc.queryForObject(
+                "select id from app_user where email = 'ada@acme.test'", Long.class);
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "locale", "en", "name", "For a player", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "facilitatorId", playerId))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("package.facilitator_invalid"));
+
+        // A facilitator in ANOTHER tenant is refused too — cross-tenant assignment must be impossible.
+        long otherFacilitatorId = jdbc.queryForObject(
+                "select id from app_user where email = 'trainer@other.test'", Long.class);
+        mvc.perform(post("/api/packages")
+                        .header("Authorization", "Bearer " + builder)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "locale", "en", "name", "Cross tenant", "templateKey", "standard-v1",
+                                "companyProfileIds", List.of(profileId),
+                                "facilitatorId", otherFacilitatorId))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("user.not_found"));
     }
 }

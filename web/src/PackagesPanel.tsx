@@ -38,7 +38,11 @@ export default function PackagesPanel() {
     parts: [] as { name: string; templateKey: string }[],
     /** D118: how many companies this class may have. Ten is the old fixed size; the ceiling is 30. */
     seatLimit: 0, // filled from the server's limits on load (D119) — never a literal here
+    /** D140: the facilitator this package is prepared for. Required by the server. */
+    facilitatorId: 0,
   });
+  /** D140: the facilitators a package can be prepared for. */
+  const [facilitators, setFacilitators] = useState<UserRow[]>([]);
   /** D119: the server's class-size bounds; the picker and the field both read these. */
   const [limits, setLimits] = useState<{ min: number; max: number; default: number } | null>(null);
   const [busy, setBusy] = useState<number | "new" | null>(null);
@@ -74,6 +78,10 @@ export default function PackagesPanel() {
       settle(t("nav.packages"), api.packages(), setPackages),
       settle(t("start.companies"), api.companies(), setCompanies),
       settle(t("start.trainees"), api.trainees(), setTrainees),
+      // D140: every package is prepared for one facilitator, so the builder picks them here.
+      settle(t("packages.facilitator"),
+        api.users().then((all) => all.filter((u) => u.role === "FACILITATOR" && u.active)),
+        setFacilitators),
       settle(t("nav.bots"), api.bots(), setBots),
       settle(t("packages.tidy"), api.tidyPreview(), setTidy),
       settle(t("start.template"), api.templates(), (list) => {
@@ -106,6 +114,7 @@ export default function PackagesPanel() {
         traineeIds: draft.companyIds.map((id) => (seats[id] ? Number(seats[id]) : null)),
         locale: draft.locale || null,
         seatLimit: draft.seatLimit,
+        facilitatorId: draft.facilitatorId,
         // The first part is the package's own template; extra parts make it a programme.
         parts:
           draft.parts.length === 0
@@ -123,6 +132,8 @@ export default function PackagesPanel() {
         locale: String(locale),
         seatLimit: limits?.default ?? 0,
         parts: [],
+        // Kept on purpose: a builder preparing a programme usually makes several packages for the same person.
+        facilitatorId: draft.facilitatorId,
       });
       setSeats({});
       await load();
@@ -210,6 +221,7 @@ export default function PackagesPanel() {
             <thead>
               <tr>
                 <th>{t("packages.name")}</th>
+                <th>{t("packages.facilitator")}</th>
                 <th>{t("start.template")}</th>
                 <th>{t("start.companies")}</th>
                 <th>{t("packages.status")}</th>
@@ -221,6 +233,7 @@ export default function PackagesPanel() {
               {packages.map((entry) => (
                 <tr key={entry.id}>
                   <td>{entry.name}</td>
+                  <td className="muted">{entry.facilitatorName}</td>
                   <td className="muted">
                     {entry.sourceTemplateKey} · v{entry.templateVersion}
                   </td>
@@ -399,6 +412,22 @@ export default function PackagesPanel() {
               </li>
             ))}
           </ul>
+
+          <label>
+            {t("packages.facilitator")}
+            <select
+              value={draft.facilitatorId}
+              onChange={(e) => setDraft((d) => ({ ...d, facilitatorId: Number(e.target.value) }))}
+            >
+              <option value={0}>{t("packages.facilitatorChoose")}</option>
+              {facilitators.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.displayName || person.email}
+                </option>
+              ))}
+            </select>
+            <small className="muted">{t("packages.facilitatorHint")}</small>
+          </label>
 
           <label>
             {t("packages.seatLimit")}

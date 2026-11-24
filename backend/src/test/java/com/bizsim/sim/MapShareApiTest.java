@@ -283,7 +283,7 @@ class MapShareApiTest extends PostgresTestBase {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
                                 "locale", "en", "name", "Autumn", "templateKey", "standard-v1",
-                                "companyProfileIds", List.of(profileAlpha, profileBeta)))))
+                                "companyProfileIds", List.of(profileAlpha, profileBeta), "facilitatorId", jdbc.queryForObject("select id from app_user where email = 'trainer@acme.test'", Long.class)))))
                 .andExpect(status().isCreated())
                 .andReturn();
         return json.readTree(published.getResponse().getContentAsString()).get("id").asLong();

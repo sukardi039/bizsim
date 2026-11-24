@@ -1970,3 +1970,43 @@ keeps every existing caller that has no position.
 **Verified.** `MarketSharePieTest` gains two cases: two bots at different positions must differ, two bots at the
 same position must match (four occurrences — two slices, two swatches), a human seat keeps the ordinary palette,
 and a bot with no position falls back to grey. Suite **276 green**.
+
+
+**D140 — A package is prepared for one facilitator, and only they see and run it (owner's requirement, 24 Nov 2026).**
+A tenant has several facilitators; an administrator or builder prepares a package *for a named facilitator*, and
+when that person signs in they see only their own packages. The point is that a class is never run by the wrong
+person. This is a **visibility and ownership** rule — the one-open-run-per-facilitator guard is untouched.
+
+**What was there.** `simulation_package` had no owner. Every facilitator in the tenant saw and could start every
+package; the facilitator was recorded only on `simulation`, and always as whoever clicked start.
+
+**What changed.**
+
+| Layer | Rule |
+|---|---|
+| Schema | `simulation_package.facilitator_id` — not null, `references app_user`, indexed by `(facilitator_id, tenant_id)` |
+| Publish | requires `facilitatorId`; the account must be an active **FACILITATOR in the same tenant**, or `package.facilitator_required` / `package.facilitator_invalid` / `user.not_found` |
+| `GET /api/packages` | a facilitator gets **only their own**; ADMIN and BUILDER get everything, because managing the assignments is their job |
+| Start a session | **403 `package.not_yours`** when the package is not the caller's |
+
+**Hiding is not protecting.** The list filter stops the wrong package being *offered*; the start refusal stops it
+being *run*. Without the second, an id in hand — from a copied URL, a stale screen, a script — would still execute
+another facilitator's class, which is exactly the "misexecution" this rule exists to prevent.
+
+**Existing packages.** The ruling was that they belong to the current facilitator. V56 adds the column nullable,
+fills it, and only then makes it not null — the ordering V55 got wrong. The backfill takes the **oldest active
+FACILITATOR** in the tenant, falling back to the oldest active ADMIN only when a tenant has no facilitator at all.
+If a package still has no owner after both, the migration **refuses to complete** rather than invent one.
+
+**Verified against a populated database, not an empty one.** `.dev/v56_populated_probe.py` builds the pre-V56 shape
+with real packages across two tenants — one with two facilitators, one with only an admin — runs V56, and asserts:
+every package owned; the two-facilitator tenant goes to the oldest; the admin-only tenant falls back correctly; no
+package ends up owned by someone in another tenant; an ownerless insert is refused by the database.
+`PackageOwnerMigrationTest` (3 tests) keeps the same rules in the suite.
+
+`PackageApiTest` gains two tests: a facilitator sees only their own packages and gets 403 on another's, while the
+builder still sees everything; and publishing refuses a missing facilitator, a player, and a facilitator from
+another tenant. Suite **282 green**.
+
+**Also touched.** Nine test cleanup helpers deleted `app_user` without first removing packages; the new foreign key
+correctly refused. They now clear packages (and the frozen template copies pointing at them) first.

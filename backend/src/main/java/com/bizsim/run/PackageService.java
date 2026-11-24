@@ -34,7 +34,13 @@ public class PackageService {
     public record PublishRequest(String name, String templateKey, List<Long> companyProfileIds,
                                  List<Long> traineeIds, String locale, List<PartRequest> parts,
                                  /** D118: how many companies this class may have; null keeps the old ten. */
-                                 Integer seatLimit) {
+                                 Integer seatLimit,
+                                 /**
+                                  * D140: the facilitator this package is prepared for. Required — a package
+                                  * without an owner would be visible to nobody, or to everybody, and the whole
+                                  * point is that a class is run by the person it was prepared for.
+                                  */
+                                 Long facilitatorId) {
     }
 
     /** D119: the class-size bounds come from limits.json — this class states none of them. */
@@ -74,6 +80,20 @@ public class PackageService {
         }
         ScenarioRepository.TemplateRow template = templates.findVisible(tenantId, request.templateKey())
                 .orElseThrow(() -> ProblemException.notFound("template.not_found", "no such template"));
+
+        // D140: the package belongs to one facilitator, and it must be a real facilitator in THIS tenant —
+        // otherwise a builder could hand a package to a player, an admin of another tenant, or nobody.
+        // D140: preferred — the builder names the facilitator the package is prepared for.
+        if (request.facilitatorId() == null) {
+            throw ProblemException.badRequest("package.facilitator_required",
+                    "choose the facilitator this package is for", "field", "facilitatorId");
+        }
+        UserRepository.AppUser owner = users.findByIdInTenant(request.facilitatorId(), tenantId)
+                .orElseThrow(() -> ProblemException.notFound("user.not_found", "no such user"));
+        if (!"FACILITATOR".equals(owner.role())) {
+            throw ProblemException.badRequest("package.facilitator_invalid",
+                    "a package is prepared for a facilitator in this organisation", "field", "facilitatorId");
+        }
 
         List<Long> profileIds = request.companyProfileIds() == null ? List.of() : request.companyProfileIds();
         if (profileIds.isEmpty()) {
@@ -187,7 +207,7 @@ public class PackageService {
         // session start, the reports, the list — keeps working on a single-part package unchanged.
         long id = packages.insert(tenantId, request.name().trim(), frozenKeys.get(0),
                 partTemplates.get(0).key(), partTemplates.get(0).version(), profileIds, seats, locale,
-                actorId, seatLimit);
+                actorId, seatLimit, request.facilitatorId());
         for (int i = 0; i < frozenKeys.size(); i++) {
             ScenarioRepository.TemplateRow partTemplate = partTemplates.get(i);
             String partName = requestedParts.get(i).name() == null

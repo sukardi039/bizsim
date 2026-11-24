@@ -53,6 +53,9 @@ class RunApiTest extends PostgresTestBase {
         jdbc.update("delete from team");
         jdbc.update("delete from run");
         jdbc.update("delete from simulation");
+        // D140: a package is referenced by its frozen template copies, so release those first.
+        jdbc.update("update scenario set frozen_for_package = null where frozen_for_package is not null");
+        jdbc.update("delete from simulation_package");
         jdbc.update("delete from app_user");
         jdbc.update("delete from tenant");
 

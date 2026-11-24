@@ -39,7 +39,9 @@ public class PackageRepository {
                              String locale, String status, String publishedAt,
                              List<PartRow> parts, List<Integer> startedParts,
                              /** D118: how many companies this package may run. */
-                             int seatLimit) {
+                             int seatLimit,
+                             /** D140: the facilitator this package was prepared for. */
+                             long facilitatorId, String facilitatorName) {
     }
 
     private final JdbcTemplate jdbc;
@@ -58,14 +60,14 @@ public class PackageRepository {
     @Transactional
     public long insert(long tenantId, String name, String templateKey, String sourceTemplateKey,
                        int templateVersion, List<Long> companyProfileIds, List<Long> seats,
-                       String locale, long publishedBy, int seatLimit) {
+                       String locale, long publishedBy, int seatLimit, long facilitatorId) {
         long id = jdbc.queryForObject("""
                 insert into simulation_package
                     (tenant_id, name, template_key, source_template_key, template_version,
-                     company_profile_ids, locale, published_by, seat_limit)
-                values (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?) returning id
+                     company_profile_ids, locale, published_by, seat_limit, facilitator_id)
+                values (?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?, ?) returning id
                 """, Long.class, tenantId, name, templateKey, sourceTemplateKey, templateVersion,
-                writeIds(companyProfileIds), locale, publishedBy, seatLimit);
+                writeIds(companyProfileIds), locale, publishedBy, seatLimit, facilitatorId);
         if (seats != null) {
             for (int position = 0; position < seats.size(); position++) {
                 Long userId = seats.get(position);
@@ -80,19 +82,41 @@ public class PackageRepository {
         return id;
     }
 
+    /** Every package in the tenant — for an ADMIN or BUILDER managing the assignments (D140). */
     public List<PackageRow> list(long tenantId) {
+        return list(tenantId, null);
+    }
+
+    /**
+     * D140: the packages a facilitator may see and run. A null {@code facilitatorId} means "everything", which is
+     * what an ADMIN or BUILDER gets; a facilitator passes their own id and sees only their own packages, so a class
+     * cannot be picked up by the wrong person.
+     */
+    public List<PackageRow> list(long tenantId, Long facilitatorId) {
         return jdbc.query("""
-                select id, name, template_key, source_template_key, template_version,
-                       company_profile_ids::text, locale, status, seat_limit,
-                       to_char(published_at, 'YYYY-MM-DD HH24:MI') as published_at
-                from simulation_package where tenant_id = ? order by published_at desc, id desc
+                select p.id, p.name, p.template_key, p.source_template_key, p.template_version,
+                       p.company_profile_ids::text, p.locale, p.status, p.seat_limit,
+                       p.facilitator_id, u.display_name as facilitator_name,
+                       to_char(p.published_at, 'YYYY-MM-DD HH24:MI') as published_at
+                from simulation_package p
+                join app_user u on u.id = p.facilitator_id
+                where p.tenant_id = ?
+                  and (?::bigint is null or p.facilitator_id = ?::bigint)
+                order by p.published_at desc, p.id desc
                 """, (rs, i) -> new PackageRow(rs.getLong("id"), rs.getString("name"),
                 rs.getString("template_key"), rs.getString("source_template_key"),
                 rs.getInt("template_version"), readIds(rs.getString("company_profile_ids")),
                 seatsOf(rs.getLong("id")), rs.getString("locale"), rs.getString("status"),
                 rs.getString("published_at"), partsOf(rs.getLong("id")),
-                startedPartsOf(tenantId, rs.getLong("id")), rs.getInt("seat_limit")),
-                tenantId);
+                startedPartsOf(tenantId, rs.getLong("id")), rs.getInt("seat_limit"),
+                rs.getLong("facilitator_id"), rs.getString("facilitator_name")),
+                tenantId, facilitatorId, facilitatorId);
+    }
+
+    /** D140: who owns a package, so a start can be refused when it is not the caller's. */
+    public java.util.Optional<Long> facilitatorOf(long tenantId, long packageId) {
+        return jdbc.query("select facilitator_id from simulation_package where tenant_id = ? and id = ?",
+                (rs, i) -> rs.getLong(1), tenantId, packageId).stream().findFirst();
     }
 
     /**

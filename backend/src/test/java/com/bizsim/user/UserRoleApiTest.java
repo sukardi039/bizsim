@@ -218,9 +218,11 @@ class UserRoleApiTest extends PostgresTestBase {
                 """, Long.class, acme);
         Long packageId = jdbc.queryForObject("""
                 insert into simulation_package (tenant_id, name, template_key, template_version,
-                                                company_profile_ids)
-                values (?, 'Autumn 2026', 'standard-v1', 1, to_jsonb(array[?])) returning id
-                """, Long.class, acme, profile);
+                                                company_profile_ids, facilitator_id)
+                values (?, 'Autumn 2026', 'standard-v1', 1, to_jsonb(array[?]),
+                        (select id from app_user where tenant_id = ? and role = 'FACILITATOR' limit 1))
+                returning id
+                """, Long.class, acme, profile, acme);
         jdbc.update("insert into simulation_package_seat (package_id, position, user_id) values (?, 0, ?)",
                 packageId, ada);
 

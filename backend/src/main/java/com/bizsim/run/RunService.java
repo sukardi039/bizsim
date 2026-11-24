@@ -296,6 +296,13 @@ public class RunService {
                                     Integer requestedCycles, Integer partPosition) {
         PackageRepository.PackageRow pkg = packages.find(tenantId, packageId).orElseThrow(
                 () -> ProblemException.notFound("package.not_found", "no such package"));
+        // D140: a package belongs to the facilitator it was prepared for. The list already hides the others, but
+        // hiding is not protecting — a copied id or a stray request would still run the wrong person's class, so
+        // this is refused here rather than left to the screen.
+        if (pkg.facilitatorId() != facilitatorId) {
+            throw ProblemException.forbidden("package.not_yours",
+                    "this package was prepared for another facilitator");
+        }
         if (!"PUBLISHED".equals(pkg.status())) {
             throw ProblemException.conflict("package.retired",
                     "this package has been retired; ask your builder for a current one",

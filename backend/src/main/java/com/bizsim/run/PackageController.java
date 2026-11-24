@@ -48,9 +48,16 @@ public class PackageController {
         this.runs = runs;
     }
 
+    /**
+     * D140: what this caller may see. A facilitator sees **only the packages prepared for them**, so a class is
+     * never picked up by the wrong person; an ADMIN or BUILDER sees every package in the tenant, because managing
+     * the assignments is their job.
+     */
     @GetMapping
     public List<PackageRepository.PackageRow> list() {
-        return packages.list(requireStaff().tenantId());
+        TenantContext.Principal me = requireStaff();
+        boolean seesEverything = "ADMIN".equals(me.role()) || "BUILDER".equals(me.role());
+        return packages.list(me.tenantId(), seesEverything ? null : me.userId());
     }
 
     /** Publishing is a builder's act. A facilitator consumes packages; they do not mint them. */

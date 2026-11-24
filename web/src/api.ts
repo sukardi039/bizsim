@@ -580,6 +580,9 @@ export interface SimulationPackage {
   startedParts?: number[];
   /** D118: how many companies this package may run — the class size the builder chose. */
   seatLimit: number;
+  /** D140: the facilitator this package was prepared for. */
+  facilitatorId: number;
+  facilitatorName: string;
 }
 
 /** One simulation inside a programme. Omit parts entirely for a single-simulation package. */
@@ -976,6 +979,8 @@ export const api = {
   tidyUp: () =>
     request<{ removed: number; names: string[] }>("/packages/tidy-up", { method: "POST" }),
   publishPackage: (body: {
+    /** D140: the facilitator the package is prepared for; the server refuses a package without one. */
+    facilitatorId: number;
     name: string;
     templateKey: string;
     companyProfileIds: number[];

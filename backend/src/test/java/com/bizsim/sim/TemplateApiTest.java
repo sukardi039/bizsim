@@ -62,8 +62,17 @@ class TemplateApiTest extends PostgresTestBase {
         // Play data first: a test that creates a run leaves a simulation pointing at its template, and
         // `delete from scenario` then fails on simulation_scenario_key_fkey.
         for (String table : List.of("round_statement", "round_result", "decision", "round", "player",
-                "company_product", "company_staff", "company_rnd", "team", "run", "simulation",
-                "app_user", "tenant")) {
+                "company_product", "company_staff", "company_rnd", "team", "run", "simulation")) {
+            jdbc.update("delete from " + table);
+        }
+        // D140: a package names its facilitator and its frozen template copies point back at it, so both go
+        // before the accounts and templates they reference.
+        jdbc.update("update scenario set frozen_for_package = null where frozen_for_package is not null");
+        for (String table : List.of("simulation_package_seat", "simulation_package_part",
+                "simulation_package")) {
+            jdbc.update("delete from " + table);
+        }
+        for (String table : List.of("app_user", "tenant")) {
             jdbc.update("delete from " + table);
         }
         // Only tenant-owned templates; the shipped template stays.
@@ -551,9 +560,11 @@ class TemplateApiTest extends PostgresTestBase {
         String key = copyStandard();
         // A package pins its template by key; the delete must say so rather than break the package.
         jdbc.update("""
-                insert into simulation_package (tenant_id, name, template_key, template_version)
-                values (?, 'Pinned', ?, 1)
-                """, acme, key);
+                insert into simulation_package (tenant_id, name, template_key, template_version,
+                                                facilitator_id)
+                values (?, 'Pinned', ?, 1,
+                        (select id from app_user where tenant_id = ? and role = 'FACILITATOR' limit 1))
+                """, acme, key, acme);
 
         mvc.perform(delete("/api/templates/" + key)
                         .header("Authorization", "Bearer " + acmeFacilitator))
