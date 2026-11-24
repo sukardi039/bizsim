@@ -1915,3 +1915,14 @@ column is wide enough for the longest position name. Restoring the old statement
 database. It is verified against a database holding **the rows the migration has to change**. Every earlier
 migration in this project that only added a table passed that test by accident — there were no rows to move. V55
 moved rows, and that is exactly where the habit failed.
+
+
+**D137 — The library is filled by missing *positions*, not by missing accounts.** V55 retired the old nine profiles
+(`active = false`) but left their bot accounts in place. The seeder skipped any position whose **account** already
+existed, so on live it created only the two new positions and left ten retired — the class came up with **6 of 12**
+auto players.
+
+The seeder now asks the question that matters: *does this position have an active profile?* If a profile exists on
+the key but is retired, it is **reactivated** rather than duplicated (the key is unique per tenant), and the
+existing bot account is reused. `BotLibraryFillTest` starts from exactly the state V55 leaves — a retired profile
+with a live account — and asserts twelve active positions, one `cost-high` row, and twelve bot accounts.

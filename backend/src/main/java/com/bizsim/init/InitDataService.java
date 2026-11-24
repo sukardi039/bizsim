@@ -291,7 +291,29 @@ public class InitDataService {
                 String name = LIBRARY_NAMES.getOrDefault(strategy, strategy)
                         + " (" + level.toLowerCase(java.util.Locale.ROOT) + ")";
                 String email = key + "@bots.invalid";
-                if (users.findByEmailInTenant(tenantId, email).isPresent()) {
+                // D137: the check is "does this position have an **active profile**", not "does the bot account
+                // exist". V55 retired the old nine by setting active = false, but their accounts remained — so
+                // keying the skip on the account left those positions retired for ever and the library half
+                // filled (6 of 12 on live: the two new positions only). A position whose profile is missing or
+                // inactive gets one created and activated; the account is reused when it is already there.
+                if (jdbc.queryForObject("""
+                        select count(*) from bot_profile p
+                        where p.tenant_id = ? and p.key = ? and p.active
+                        """, Integer.class, tenantId, key) > 0) {
+                    continue;
+                }
+                // A profile on this key may already exist but be retired (V55 set active = false on the old
+                // nine). Reactivate that row instead of inserting a second one: the key is unique per tenant.
+                Long existing = jdbc.query("""
+                        select id from bot_profile where tenant_id = ? and key = ?
+                        """, rs -> rs.next() ? rs.getLong(1) : null, tenantId, key);
+                if (existing != null) {
+                    jdbc.update("""
+                            update bot_profile
+                            set active = true, name = ?, level = ?, strategy = ?, updated_at = now()
+                            where id = ?
+                            """, name, level, strategy, existing);
+                    log.info("init data: reactivated auto-player {} for tenant '{}'", key, tenantCode);
                     continue;
                 }
                 byte[] secret = new byte[32];
