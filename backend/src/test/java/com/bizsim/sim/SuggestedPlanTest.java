@@ -93,7 +93,7 @@ class SuggestedPlanTest extends PostgresTestBase {
     void the_neutral_profile_is_distinguishable_from_every_strategy() {
         // D129 kept the suggestion neutral because the pair it used before meant FOCUS. D130 retired personality
         // entirely, so the guard is now against the three strategies: none of them is what the suggestion uses.
-        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
             AutoWorker.Profile shipped = AutoWorker.profile("MID", strategy);
             assertThat(shipped.strategy()).isEqualTo(strategy);
             assertThat(shipped.pricePosture())
@@ -101,7 +101,7 @@ class SuggestedPlanTest extends PostgresTestBase {
                     .isNotEqualByComparingTo(AutoWorker.neutral().pricePosture());
         }
         assertThat(AutoWorker.neutral().focused()).as("the suggestion narrows no line").isFalse();
-        assertThat(AutoWorker.profile("MID", "FOCUS").focused()).as("the focus strategy does").isTrue();
+        assertThat(AutoWorker.profile("MID", "COST_FOCUS").focused()).as("the focus strategy does").isTrue();
     }
 
     private AutoWorker.Decision decide(Scenario scenario, AutoWorker.Profile profile) {

@@ -75,8 +75,9 @@ public class BotProfileRepository {
             key = key + "-" + UUID.randomUUID().toString().substring(0, 6);
         }
         return jdbc.queryForObject("""
-                insert into bot_profile (tenant_id, key, name, level, strategy, params, created_by)
-                values (?, ?, ?, ?, ?, ?::jsonb, ?)
+                insert into bot_profile (tenant_id, key, name, level, personality, strategy, params,
+                                         created_by)
+                values (?, ?, ?, ?, 'BALANCED', ?, ?::jsonb, ?)
                 returning *, params::text as params
                 """, MAPPER, tenantId, key, name, level,
                 strategy == null || strategy.isBlank() ? AutoWorker.DEFAULT_STRATEGY : strategy,

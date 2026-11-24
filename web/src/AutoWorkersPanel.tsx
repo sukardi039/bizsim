@@ -18,8 +18,9 @@ export default function AutoWorkersPanel() {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [level, setLevel] = useState<"LOW" | "MID" | "HIGH">("MID");
-  /** D128: the Porter axis — what this opponent is trying to be. */
-  const [strategy, setStrategy] = useState<"COST" | "DIFFERENTIATION" | "FOCUS">("COST");
+  /** D135: the positions come from limits.json via /api/limits — this screen does not restate them. */
+  const [positions, setPositions] = useState<string[]>([]);
+  const [strategy, setStrategy] = useState("");
 
   const load = async () => {
     try {
@@ -31,6 +32,16 @@ export default function AutoWorkersPanel() {
 
   useEffect(() => {
     void load();
+    // The picker renders whatever the one authority lists; a failure leaves it empty and blocks creation
+    // rather than inventing a position the server would refuse.
+    api
+      .limits()
+      .then((limits) => {
+        const codes = limits.strategies.positions.map((position) => position.code);
+        setPositions(codes);
+        setStrategy((current) => current || codes[0] || "");
+      })
+      .catch((error) => setProblem(describeError(error, t)));
   }, []);
 
   const create = async (event: React.FormEvent) => {
@@ -90,9 +101,11 @@ export default function AutoWorkersPanel() {
         <label>
           {t("bots.strategy")}
           <select value={strategy} onChange={(e) => setStrategy(e.target.value as typeof strategy)}>
-            <option value="COST">{t("bots.strategyCost")}</option>
-            <option value="DIFFERENTIATION">{t("bots.strategyDifferentiation")}</option>
-            <option value="FOCUS">{t("bots.strategyFocus")}</option>
+            {positions.map((code) => (
+              <option key={code} value={code}>
+                {t(`strategy.${code}`)}
+              </option>
+            ))}
           </select>
           {t("bots.level")}
           <select value={level} onChange={(e) => setLevel(e.target.value as typeof level)}>
@@ -129,9 +142,11 @@ export default function AutoWorkersPanel() {
                     value={bot.strategy}
                     onChange={(e) => void change(bot, { strategy: e.target.value })}
                   >
-                    <option value="COST">{t("bots.strategyCost")}</option>
-                    <option value="DIFFERENTIATION">{t("bots.strategyDifferentiation")}</option>
-                    <option value="FOCUS">{t("bots.strategyFocus")}</option>
+                    {positions.map((code) => (
+                      <option key={code} value={code}>
+                        {t(`strategy.${code}`)}
+                      </option>
+                    ))}
                   </select>
                 </td>
                 <td>

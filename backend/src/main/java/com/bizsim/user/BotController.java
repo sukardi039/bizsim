@@ -1,5 +1,6 @@
 package com.bizsim.user;
 
+import com.bizsim.config.Limits;
 import com.bizsim.sim.AutoWorker;
 import com.bizsim.web.ProblemException;
 import com.bizsim.tenant.TenantContext;
@@ -30,8 +31,7 @@ import java.util.Map;
 public class BotController {
 
     private static final List<String> LEVELS = List.of("LOW", "MID", "HIGH");
-    /** D130: the behavioural axis. Personality is retired and is no longer accepted on the wire. */
-    private static final List<String> STRATEGIES = List.of("COST", "DIFFERENTIATION", "FOCUS");
+    /** D130: personality is retired. D135: the positions come from limits.json, not a second list here. */
 
     /** D130: personality is gone from the wire; a profile is a strategy at a level. */
     public record BotRequest(@NotBlank String name, String level, String strategy, Map<String, Object> params) {
@@ -42,11 +42,12 @@ public class BotController {
     }
 
     /** D130: the strategy is required and validated; there is no personality to fall back to. */
-    private static String strategyOf(BotRequest request) {
-        String strategy = request.strategy() == null ? "" : request.strategy().trim().toUpperCase(java.util.Locale.ROOT);
-        if (!STRATEGIES.contains(strategy)) {
+    private String strategyOf(BotRequest request) {
+        String strategy = request.strategy() == null ? ""
+                : request.strategy().trim().toUpperCase(java.util.Locale.ROOT);
+        if (!limits.strategies().contains(strategy)) {
             throw ProblemException.badRequest("bot.strategy_invalid",
-                    "strategy must be COST, DIFFERENTIATION or FOCUS");
+                    "strategy must be one of " + String.join(", ", limits.strategies()));
         }
         return strategy;
     }
@@ -56,9 +57,13 @@ public class BotController {
     private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
     private final SecureRandom random = new SecureRandom();
 
-    public BotController(BotProfileRepository bots, UserRepository users) {
+    /** D135: the strategy list comes from limits.json, so a new position is one edit there. */
+    private final Limits limits;
+
+    public BotController(BotProfileRepository bots, UserRepository users, Limits limits) {
         this.bots = bots;
         this.users = users;
+        this.limits = limits;
     }
 
     @GetMapping

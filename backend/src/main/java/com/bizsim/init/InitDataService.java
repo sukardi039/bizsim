@@ -266,14 +266,15 @@ public class InitDataService {
                 """, Long.class, code, blankTo(name, code), locale);
     }
 
-    /** The nine cells, with the name carrying the combination a trainer reads on a scoreboard. */
-    private static final Map<String, String> LIBRARY = new java.util.LinkedHashMap<>();
-
-    static {
-        LIBRARY.put("cost", "Cost leader");
-        LIBRARY.put("differentiation", "Differentiator");
-        LIBRARY.put("focus", "Focus player");
-    }
+    /**
+     * D135: how a position reads on a scoreboard. The list of positions itself comes from limits.json, so adding
+     * one is an edit there — this map only supplies the words, and an unmapped position falls back to its code.
+     */
+    private static final Map<String, String> LIBRARY_NAMES = Map.of(
+            "COST", "Cost leader",
+            "DIFFERENTIATION", "Differentiator",
+            "COST_FOCUS", "Cost focus",
+            "DIFFERENTIATION_FOCUS", "Differentiation focus");
 
     /**
      * D130: one profile per strategy × level for a tenant, each with the identity that signs its decisions (D47).
@@ -283,10 +284,12 @@ public class InitDataService {
      * live class was left with none. {@code BotLibraryRunner} calls this on every startup.
      */
     public void ensureBotLibrary(long tenantId, String tenantCode) {
-        for (Map.Entry<String, String> strategy : LIBRARY.entrySet()) {
-            for (String level : List.of("HIGH", "MID", "LOW")) {
-                String key = strategy.getKey() + "-" + level.toLowerCase(java.util.Locale.ROOT);
-                String name = strategy.getValue() + " (" + level.toLowerCase(java.util.Locale.ROOT) + ")";
+        for (String strategy : limits.strategies()) {
+            for (String level : limits.levels()) {
+                String key = strategy.toLowerCase(java.util.Locale.ROOT) + "-"
+                        + level.toLowerCase(java.util.Locale.ROOT);
+                String name = LIBRARY_NAMES.getOrDefault(strategy, strategy)
+                        + " (" + level.toLowerCase(java.util.Locale.ROOT) + ")";
                 String email = key + "@bots.invalid";
                 if (users.findByEmailInTenant(tenantId, email).isPresent()) {
                     continue;
@@ -294,16 +297,15 @@ public class InitDataService {
                 byte[] secret = new byte[32];
                 random.nextBytes(secret);
                 long profileId = jdbc.queryForObject("""
-                        insert into bot_profile (tenant_id, key, name, level, strategy, params)
-                        values (?, ?, ?, ?, ?, '{}'::jsonb) returning id
-                        """, Long.class, tenantId, key, name, level,
-                        strategy.getKey().toUpperCase(java.util.Locale.ROOT));
+                        insert into bot_profile (tenant_id, key, name, level, personality, strategy, params)
+                        values (?, ?, ?, ?, 'BALANCED', ?, '{}'::jsonb) returning id
+                        """, Long.class, tenantId, key, name, level, strategy);
                 users.insertBot(tenantId, email, name,
                         encoder.encode(java.util.HexFormat.of().formatHex(secret)), profileId);
             }
         }
         log.info("init data: auto-player library — {} profiles for tenant '{}'",
-                LIBRARY.size() * 3, tenantCode);
+                limits.autoWorkerLibrarySize(), tenantCode);
     }
 
     private long ensureUser(long tenantId, String tenantCode, String local, String displayName,

@@ -146,6 +146,29 @@ public final class AutoWorker {
         BigDecimal qualityAppetite;
         int lineLimit;
         switch (strategy) {
+            // D135: Porter's grid is two by two. NARROW positions keep the fine-grained levers of their broad
+            // sibling -- a cost focus still buys capacity and shuns quality, a differentiation focus still buys
+            // quality -- and add the two things that make focus work: a narrow line and a channel aimed at the
+            // class it serves. What focus must NOT be is "spend nothing", which is what the single FOCUS
+            // position had become: it won by restraint rather than by advantage.
+            case "COST_FOCUS" -> {
+                shareBias = new BigDecimal("1.08");     // wins its niche on price, not the whole market
+                postureBias = new BigDecimal("0.96");
+                capacityBias = new BigDecimal("0.80");
+                channelBias = new BigDecimal("1.80");
+                rndAppetite = new BigDecimal("0.90");
+                qualityAppetite = new BigDecimal("0.35");
+                lineLimit = 1;
+            }
+            case "DIFFERENTIATION_FOCUS" -> {
+                shareBias = new BigDecimal("0.98");
+                postureBias = new BigDecimal("1.08");   // the niche pays for what it values
+                capacityBias = new BigDecimal("0.20");
+                channelBias = new BigDecimal("1.80");
+                rndAppetite = new BigDecimal("1.35");
+                qualityAppetite = new BigDecimal("1.60");
+                lineLimit = 1;
+            }
             case "DIFFERENTIATION" -> {
                 // Premium price, defensible by product rather than by volume: quality and R&D, no machine race.
                 shareBias = new BigDecimal("0.98");
@@ -155,16 +178,6 @@ public final class AutoWorker {
                 rndAppetite = new BigDecimal("1.35");
                 qualityAppetite = new BigDecimal("1.60");
                 lineLimit = 0;
-            }
-            case "FOCUS" -> {
-                // One class, served properly: the product aimed at it and the channel that reaches it.
-                shareBias = new BigDecimal("1.04");
-                postureBias = new BigDecimal("1.02");
-                capacityBias = new BigDecimal("0.35");
-                channelBias = new BigDecimal("1.80");
-                rndAppetite = new BigDecimal("0.90");
-                qualityAppetite = new BigDecimal("1.20");
-                lineLimit = 1;
             }
             default -> {
                 // COST: price and volume, with the cost structure to justify it.
@@ -187,8 +200,11 @@ public final class AutoWorker {
                 // D130: R&D is the differentiator's game. It was `high`, which made a HIGH cost leader spend on
                 // a programme while buying no quality at all — it paid for the long game and shipped a product
                 // nobody preferred, and the self-play calibration showed it losing money while MID prospered.
-                strategy.equals("DIFFERENTIATION"),
-                strategy.equals("DIFFERENTIATION"),
+                // D135: the two differentiation positions buy quality; the two cost positions do not. R&D
+                // appetite follows the same split, so a cost focus competes on cost and a differentiation
+                // focus competes on product -- neither is "spend nothing".
+                strategy.contains("DIFFERENTIATION"),
+                strategy.contains("DIFFERENTIATION"),
                 new BigDecimal("2"),
                 capacityBias, channelBias, rndAppetite, qualityAppetite, lineLimit);
     }
@@ -553,7 +569,7 @@ public final class AutoWorker {
                 }
             }
         }
-        if ("DIFFERENTIATION".equals(profile.strategy())) {
+        if (profile.strategy().contains("DIFFERENTIATION")) {
             // The product with the highest base price: that is where a premium is defensible.
             Scenario.ProductSpec premium = carries.get(0);
             for (Scenario.ProductSpec spec : carries) {

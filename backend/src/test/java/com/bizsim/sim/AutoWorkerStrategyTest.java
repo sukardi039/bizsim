@@ -43,7 +43,7 @@ class AutoWorkerStrategyTest extends PostgresTestBase {
         Scenario scenario = scenarios.load("standard-v1");
         // One level for all three runs: strategy is the only thing that changes.
         Map<String, AutoWorker.Decision> byStrategy = new LinkedHashMap<>();
-        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
             byStrategy.put(strategy, decide(scenario, AutoWorker.profile("MID", strategy)));
         }
 
@@ -64,17 +64,17 @@ class AutoWorkerStrategyTest extends PostgresTestBase {
         System.out.printf("%nSTRATEGY (MID/BALANCED):%n"
                         + "  cost            price %s  quality %s  rnd %s  channels %s%n"
                         + "  differentiation price %s  quality %s  rnd %s  channels %s%n"
-                        + "  focus           price %s  quality %s  rnd %s  channels %s%n",
+                        + "  cost focus      price %s  quality %s  rnd %s  channels %s%n",
                 costPrice, costQuality, rndSpend(byStrategy.get("COST")),
                 channels(byStrategy.get("COST")),
                 diffPrice, diffQuality, rndSpend(byStrategy.get("DIFFERENTIATION")),
                 channels(byStrategy.get("DIFFERENTIATION")),
-                firstPrice(byStrategy.get("FOCUS")), qualitySpend(byStrategy.get("FOCUS")),
-                rndSpend(byStrategy.get("FOCUS")), channels(byStrategy.get("FOCUS")));
+                firstPrice(byStrategy.get("COST_FOCUS")), qualitySpend(byStrategy.get("COST_FOCUS")),
+                rndSpend(byStrategy.get("COST_FOCUS")), channels(byStrategy.get("COST_FOCUS")));
         assertThat(diffQuality).as("the differentiator invests in quality").isGreaterThan(costQuality);
 
         // 3. Channel split: a focused company concentrates where its class is reachable, the others are neutral.
-        Map<String, BigDecimal> focusSplit = channels(byStrategy.get("FOCUS"));
+        Map<String, BigDecimal> focusSplit = channels(byStrategy.get("COST_FOCUS"));
         Map<String, BigDecimal> neutralSplit = channels(byStrategy.get("COST"));
         assertThat(focusSplit.values().stream().map(BigDecimal::doubleValue).reduce(0.0, Double::sum))
                 .as("the focus player still spends the whole budget")
@@ -146,4 +146,38 @@ class AutoWorkerStrategyTest extends PostgresTestBase {
     }
 
     private static final long QUIET_RUN = 987_654_321L;
+
+    /**
+     * D135: the two focus positions are Porter's two cells, not a rename.
+     *
+     * <p>Both are narrow — one product line, the budget concentrated on the class's channel — but they must differ
+     * in the thing Porter says distinguishes them: the source of advantage. A cost focus undercuts and buys no
+     * quality; a differentiation focus premiums and buys quality. If these two ever converge, the grid has
+     * collapsed back into the single "FOCUS" position that D130 shipped and D135 replaced, which won by spending
+     * nothing rather than by competing.
+     */
+    @Test
+    void the_two_focus_positions_differ_in_their_source_of_advantage() {
+        Scenario scenario = scenarios.load("standard-v1");
+        AutoWorker.Decision costFocus = decide(scenario, AutoWorker.profile("HIGH", "COST_FOCUS"));
+        AutoWorker.Decision diffFocus = decide(scenario, AutoWorker.profile("HIGH", "DIFFERENTIATION_FOCUS"));
+
+        assertThat(firstPrice(costFocus))
+                .as("a cost focus undercuts a differentiation focus")
+                .isLessThan(firstPrice(diffFocus));
+        assertThat(qualitySpend(costFocus))
+                .as("a cost focus buys no quality")
+                .isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(qualitySpend(diffFocus))
+                .as("a differentiation focus buys quality")
+                .isPositive();
+
+        // Both are narrow: the same single product line, so scope is genuinely shared.
+        assertThat(AutoWorker.profile("HIGH", "COST_FOCUS").focused()).isTrue();
+        assertThat(AutoWorker.profile("HIGH", "DIFFERENTIATION_FOCUS").focused()).isTrue();
+
+        System.out.printf("%nFOCUS POSITIONS: cost focus price %s quality %s | diff focus price %s quality %s%n",
+                firstPrice(costFocus), qualitySpend(costFocus),
+                firstPrice(diffFocus), qualitySpend(diffFocus));
+    }
 }

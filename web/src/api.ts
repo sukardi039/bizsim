@@ -460,6 +460,9 @@ export interface Limits {
   classSize: { min: number; max: number; default: number };
   maxRounds: number;
   maxProducts: number;
+  /** D135: Porter's positions, in the order the picker shows them — the one authority, not a copy. */
+  strategies: { positions: { code: string; shape: "broad" | "narrow"; advantage: "cost" | "differentiation" }[] };
+  levels: string[];
 }
 
 /** D117: the chart the facilitator is showing on the class's screens right now. */
@@ -697,15 +700,17 @@ export interface AuditRow {
 }
 
 /**
- * A reusable brain: strategy (what it is trying to be) × level (how well it plays). D130 retired personality, so
- * the matrix is nine cells: COST / DIFFERENTIATION / FOCUS at LOW / MID / HIGH competence.
+ * A reusable brain: strategy (what it is trying to be) × level (how well it plays). D135 makes the matrix
+ * Porter's two-by-two — broad/narrow scope against cost/differentiation advantage — at three levels, so twelve
+ * cells. The positions come from limits.json; this type does not restate them.
  */
 export interface BotRow {
   id: number;
   key: string;
   name: string;
   level: "LOW" | "MID" | "HIGH";
-  strategy: "COST" | "DIFFERENTIATION" | "FOCUS";
+  /** D135: a cell of Porter's grid. The list is limits.json's — the picker renders whatever the server sends. */
+  strategy: string;
   version: number;
   active: boolean;
   /** The person that carries this brain; null when it has not been created yet. */

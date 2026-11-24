@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.io.IOException;
 import java.io.InputStream;
 
@@ -38,6 +41,10 @@ public class Limits {
     private final int classSizeDefault;
     private final int maxRounds;
     private final int maxProducts;
+    /** D135: the competitive positions, in the order the picker shows them. */
+    private final List<String> strategies;
+    /** D135: the competence levels. */
+    private final List<String> levels;
     private final JsonNode raw;
 
     public Limits() {
@@ -52,6 +59,8 @@ public class Limits {
         this.classSizeDefault = required(raw.path("classSize").path("default"), "classSize.default");
         this.maxRounds = required(raw.path("maxRounds"), "maxRounds");
         this.maxProducts = required(raw.path("maxProducts"), "maxProducts");
+        this.strategies = codes(raw.path("strategies").path("positions"), "strategies.positions");
+        this.levels = texts(raw.path("levels"), "levels");
     }
 
     /**
@@ -79,6 +88,61 @@ public class Limits {
         if (maxRounds < 1 || maxProducts < 1) {
             throw new IllegalStateException("limits.json: maxRounds and maxProducts must be positive");
         }
+        // D135: a position is a (shape, advantage) pair. Porter's grid is two by two, so a list that repeats a
+        // pair, or names a shape or advantage outside the grid, is a file that would seed a library nobody can
+        // make sense of — refused at startup rather than discovered as a trainer's confusing picker.
+        List<String> codes = codes(raw.path("strategies").path("positions"), "strategies.positions");
+        if (codes.isEmpty()) {
+            throw new IllegalStateException("limits.json: strategies.positions must not be empty");
+        }
+        if (codes.size() != codes.stream().distinct().count()) {
+            throw new IllegalStateException("limits.json: strategies.positions repeats a code");
+        }
+        Set<String> pairs = new java.util.LinkedHashSet<>();
+        for (JsonNode position : raw.path("strategies").path("positions")) {
+            String shape = text(position.path("shape"), "strategies.positions[].shape");
+            String advantage = text(position.path("advantage"), "strategies.positions[].advantage");
+            if (!Set.of("broad", "narrow").contains(shape)) {
+                throw new IllegalStateException("limits.json: shape '" + shape
+                        + "' must be broad or narrow");
+            }
+            if (!Set.of("cost", "differentiation").contains(advantage)) {
+                throw new IllegalStateException("limits.json: advantage '" + advantage
+                        + "' must be cost or differentiation");
+            }
+            if (!pairs.add(shape + "/" + advantage)) {
+                throw new IllegalStateException("limits.json: the " + shape + "/" + advantage
+                        + " position is named twice — Porter's grid has four cells, one each");
+            }
+        }
+        if (texts(raw.path("levels"), "levels").isEmpty()) {
+            throw new IllegalStateException("limits.json: levels must not be empty");
+        }
+    }
+
+    /** The codes of an array of objects, in file order. */
+    private static List<String> codes(JsonNode positions, String field) {
+        List<String> out = new ArrayList<>();
+        for (JsonNode position : positions) {
+            out.add(text(position.path("code"), field + "[].code"));
+        }
+        return out;
+    }
+
+    private static List<String> texts(JsonNode array, String field) {
+        List<String> out = new ArrayList<>();
+        int index = 0;
+        for (JsonNode node : array) {
+            out.add(text(node, field + "[" + index++ + "]"));
+        }
+        return out;
+    }
+
+    private static String text(JsonNode node, String field) {
+        if (node == null || !node.isTextual() || node.asText().isBlank()) {
+            throw new IllegalStateException("limits.json: " + field + " must be a non-empty string");
+        }
+        return node.asText();
     }
 
     public int classSizeMin() {
@@ -99,6 +163,21 @@ public class Limits {
 
     public int maxProducts() {
         return maxProducts;
+    }
+
+    /** D135: the competitive positions, in the order the picker shows them. */
+    public List<String> strategies() {
+        return strategies;
+    }
+
+    /** D135: the competence levels. */
+    public List<String> levels() {
+        return levels;
+    }
+
+    /** D135: the size of the auto-player library, derived so nobody hand-writes it. */
+    public int autoWorkerLibrarySize() {
+        return strategies.size() * levels.size();
     }
 
     /** What {@code GET /api/limits} answers — the file itself, so the console cannot read it differently. */

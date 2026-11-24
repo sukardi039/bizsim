@@ -45,7 +45,7 @@ class StrategyCalibrationTest extends PostgresTestBase {
             Scenario scenario = scenarios.load(economy);
             Measurement m = measure(scenario, "HIGH");
             System.out.printf("%nECONOMY %s (HIGH level, %d rounds)%n", economy, scenario.params().rounds());
-            for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+            for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
                 System.out.printf("  %-16s avg profit/round %14s%n", strategy, m.profit(strategy));
             }
         }
@@ -57,12 +57,12 @@ class StrategyCalibrationTest extends PostgresTestBase {
         for (String level : List.of("HIGH", "MID")) {
             Measurement m = measure(scenario, level);
             System.out.printf("%nSTRATEGY CALIBRATION (%s level, %d rounds)%n", level, scenario.params().rounds());
-            for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+            for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
                 System.out.printf("  %-16s avg profit/round %14s   cash %14s   brand %6s%n",
                         strategy, m.profit(strategy), m.cash(strategy), m.brand(strategy));
             }
             // What each strategy commits in its first month: the numbers behind the ranking.
-            for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+            for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
                 DecisionPayload first = m.firstDecision(strategy);
                 System.out.printf("     %-16s month 1: quality %12s  rnd %12s  marketing %12s  capacity %12s  review %s%n",
                         strategy, sum(first.quality(), DecisionPayload.QualityRow::invest),
@@ -76,13 +76,13 @@ class StrategyCalibrationTest extends PostgresTestBase {
 
     private void assertThatAllSurvive(String level, Measurement m) {
         BigDecimal best = null;
-        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
             BigDecimal profit = m.profit(strategy);
             if (best == null || profit.compareTo(best) > 0) {
                 best = profit;
             }
         }
-        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
             BigDecimal profit = m.profit(strategy);
             org.assertj.core.api.Assertions.assertThat(profit)
                     .as("%s at %s level must not be hopeless (best is %s)", strategy, level, best)
@@ -92,7 +92,7 @@ class StrategyCalibrationTest extends PostgresTestBase {
 
     private Measurement measure(Scenario scenario, String level) {
         List<Player> players = new ArrayList<>();
-        for (String strategy : List.of("COST", "DIFFERENTIATION", "FOCUS")) {
+        for (String strategy : List.of("COST", "DIFFERENTIATION", "COST_FOCUS", "DIFFERENTIATION_FOCUS")) {
             for (int i = 0; i < 2; i++) {
                 players.add(new Player(scenario.params().startingCash(), scenario.params().startingBrand(),
                         AutoWorker.profile(level, strategy)));

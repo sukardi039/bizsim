@@ -114,7 +114,7 @@ class BotLibraryApiTest extends PostgresTestBase {
         mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + facilitatorToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 3", "level", "mid", "strategy", "FOCUS"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 3", "level", "mid", "strategy", "COST_FOCUS"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("auth.builder_only"));
     }
@@ -124,7 +124,7 @@ class BotLibraryApiTest extends PostgresTestBase {
         MvcResult created = mvc.perform(post("/api/bots")
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json.writeValueAsString(Map.of("name", "Market 4", "level", "mid", "strategy", "FOCUS"))))
+                        .content(json.writeValueAsString(Map.of("name", "Market 4", "level", "mid", "strategy", "COST_FOCUS"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.version").value(1))
                 .andReturn();
@@ -134,7 +134,7 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Market 4", "level", "high", "strategy", "FOCUS",
+                                "name", "Market 4", "level", "high", "strategy", "COST_FOCUS",
                                 "params", Map.of("targetShare", 0.31)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(2))
@@ -216,9 +216,9 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Focus player", "level", "MID", "strategy", "FOCUS"))))
+                                "name", "Cost focus player", "level", "MID", "strategy", "COST_FOCUS"))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.strategy").value("FOCUS"))
+                .andExpect(jsonPath("$.strategy").value("COST_FOCUS"))
                 .andReturn();
         long id = json.readTree(created.getResponse().getContentAsString()).get("id").asLong();
 
@@ -227,7 +227,7 @@ class BotLibraryApiTest extends PostgresTestBase {
                         .header("Authorization", "Bearer " + builderToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
-                                "name", "Focus player", "level", "MID", "strategy", "DIFFERENTIATION"))))
+                                "name", "Cost focus player", "level", "MID", "strategy", "DIFFERENTIATION"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.strategy").value("DIFFERENTIATION"));
 

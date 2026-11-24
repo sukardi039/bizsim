@@ -1801,3 +1801,67 @@ quality strategy wins by 2.1bn. The economics, not the bot, decide the winner.
 behaviour. No bot policy changed in this release at all — only a new template and the tests that prove it.
 
 Suite **266 green** (TemplateApiTest now expects five shipped templates).
+
+
+**D135 — Porter's grid is two by two: four positions, twelve profiles (owner's ruling, 24 Nov 2026).** After D130
+retired personality and left three strategies, the owner asked the question that exposes the modelling error:
+*"if Porter said focus has two dimensions, do we need two focus bots?"* Yes — and the single FOCUS position was not
+focus at all.
+
+**Why.** Porter defines the generic strategies on two axes — **scope** (broad/narrow) and **advantage** (cost/
+differentiation) — giving four cells, not three:
+
+| | cost advantage | differentiation advantage |
+|---|---|---|
+| **broad scope** | COST | DIFFERENTIATION |
+| **narrow scope** | COST_FOCUS | DIFFERENTIATION_FOCUS |
+
+The retired FOCUS had the *scope* and no *advantage*: it narrowed its line and then spent nothing, and D134's
+four-cell measurement showed it winning **by restraint** (52m/round against 16m for the differentiator). A focused
+firm in Porter's account earns a **margin in a narrow market by specialising** — it spends *more* per customer on
+what that niche values, not less. Ours was a firm that found a gap in the economics.
+
+**The four positions, and what each buys:**
+
+| Position | Price | Quality/month | Capacity (month 1) | Line |
+|---|---|---|---|---|
+| COST | ×0.94 | 0 | 160m | full |
+| DIFFERENTIATION | ×1.06 | 60m | 40m | full |
+| COST_FOCUS | ×0.96 | 0 | 120m | one product, 1.8× channel bias |
+| DIFFERENTIATION_FOCUS | ×1.08 | 60m | 0 | one product, 1.8× channel bias |
+
+So the narrow positions keep their broad sibling's source of advantage and add the two things that make focus
+work — the narrow line and the channel aimed at the served class.
+
+**Measured, HIGH level, two companies per position, 8 rounds:**
+
+```
+COST +9.2m   DIFFERENTIATION +22.5m   COST_FOCUS +19.7m   DIFFERENTIATION_FOCUS +26.7m
+```
+
+Four profitable positions, each distinguishable, and the ranking is a story a class can read: differentiation
+beats cost, focus beats broad at equal advantage, and the two focus positions sit on opposite sides of price and
+quality. "Spend nothing and win" is no longer reachable — every position has an advantage to spend on.
+
+**Consolidation first, then the positions (D135 part 2).** The strategy list was copied in six places across three
+languages, and adding two positions would have meant six edits. It now lives in **`limits.json`** — the same single
+authority D119 established — as `strategies.positions` (code + shape + advantage) and `levels`. The server
+validates it at startup (refusing a repeated grid cell or an unknown shape/advantage), `Limits` exposes
+`strategies()`, `levels()` and a derived `autoWorkerLibrarySize()`, `LimitsController` projects it, the builder's
+picker renders whatever the list says, and the seeder generates the library from it. Adding a fifth position is now
+one edit there plus the migration that widens the constraint.
+
+**Personality is stated, not defaulted.** D130 stopped writing it, so rows carried whatever the column default
+was — a value that looked meaningful and was not. It is now written as `'BALANCED'` on every insert and backfilled:
+a marker that says exactly what is true, that the profile takes no stance on the retired axis. Nothing reads it —
+`bot_decision` stores a `params` snapshot and no personality — so this is documentation, not behaviour.
+
+**A schema limit the suite caught:** `bot_profile.strategy` was `varchar(20)`, which fits `DIFFERENTIATION` but not
+`DIFFERENTIATION_FOCUS` (22). The insert failed with *"value too long"*, and nineteen tests went red. Widened to
+`varchar(32)` before the constraint is restated.
+
+**Existing data.** The retired `FOCUS` value maps to **COST_FOCUS** — it spent nothing on quality and bought no
+capacity, which is nearer the cost variant. Recorded in the migration rather than left as a value the policy no
+longer understands.
+
+Suite **269 green**.
