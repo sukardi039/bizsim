@@ -2029,3 +2029,13 @@ their own roster would be a way to lose them. Only the machine seats are hidden 
 `not (role = 'AUTO_WORKER' and not active)`, never "hide the inactive".
 
 Suite **285 green**.
+
+
+**D143 — The version is stated as 1.0.1 (owner's ruling, 24 Nov 2026).** The owner asked to promote the release to
+`v1.0.1`. The number reported by `GET /api/version` is `bizsim.version` in `application.yml`; it is bumped on release
+and is deliberately independent of the migration count, which is the real deploy fingerprint. `web/package.json` was
+still `0.1.0` from the first scaffold and is now aligned, so the console and the API state the same number.
+
+Nothing about this release changes behaviour. The cuts since 0.40.1 are the three asked for after D142 — a third
+shade per position, hiding disabled auto workers, and the V57 correction that retires orphaned bot accounts — all of
+which shipped inside 0.40.1 and are recorded in D142. 1.0.1 is the version the owner wants the product to carry.
