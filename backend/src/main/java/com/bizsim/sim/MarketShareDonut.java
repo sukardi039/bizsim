@@ -89,7 +89,7 @@ public final class MarketShareDonut {
             double sweep = share * 3.6;
             if (sweep > 0) {
                 out.append(wedge(start, sweep, OUTER,
-                        slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length],
+                        slice.autoPlayer() ? autoColour(slice.position()) : PALETTE[colour % PALETTE.length],
                         sweep));
                 start += sweep;
             }
@@ -107,7 +107,7 @@ public final class MarketShareDonut {
         colour = 0;
         for (MarketSharePie.Slice slice : pie.slices()) {
             out.append("<tr><td><span class=\"swatch\" style=\"background:")
-                    .append(slice.autoPlayer() ? autoColour(colour) : PALETTE[colour % PALETTE.length])
+                    .append(slice.autoPlayer() ? autoColour(slice.position()) : PALETTE[colour % PALETTE.length])
                     .append("\"></span></td><td>").append(esc(slice.label()));
             // The auto player is shown by **company name only** (owner's ruling, 21 Nov 2026). No
             // "(auto)" tag and no persona: the class reads a company that traded, which is what the
@@ -155,8 +155,24 @@ public final class MarketShareDonut {
     }
 
     /** Auto players get a grey pair so they read as "not a human team" at a glance. */
-    private static String autoColour(int index) {
-        return index % 2 == 0 ? MUTED : "#9ca3af";
+    /**
+     * D139: an auto player is coloured by the Porter position it plays, so a debrief can read which slice is the
+     * cost leader. The four hues stay in a **cool, desaturated family** — visibly different in character from the
+     * warm/strong trainee palette — so a reader can still tell a machine seat from a person at a glance, which was
+     * the earlier ruling this preserves. A bot with no known position (a profile removed after the run) keeps the
+     * neutral grey rather than inventing a colour for it.
+     */
+    private static String autoColour(String position) {
+        if (position == null) {
+            return MUTED;
+        }
+        return switch (position) {
+            case "COST" -> "#3b82a0";
+            case "DIFFERENTIATION" -> "#5b6fa8";
+            case "COST_FOCUS" -> "#4a9d8f";
+            case "DIFFERENTIATION_FOCUS" -> "#7d6aa8";
+            default -> MUTED;
+        };
     }
 
     private static String n(double value) {

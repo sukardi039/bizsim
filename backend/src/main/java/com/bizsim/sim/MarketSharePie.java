@@ -29,7 +29,14 @@ import java.util.Map;
 public final class MarketSharePie {
 
     /** One slice: who, how much they sold, and what fraction of the served market that is. */
-    public record Slice(String label, BigDecimal sold, BigDecimal sharePercent, boolean autoPlayer) {
+    /**
+     * D139: `position` is the Porter cell a bot seat plays (COST / DIFFERENTIATION / COST_FOCUS /
+     * DIFFERENTIATION_FOCUS), or null for a human. The chart colours a bot by its position and a person by
+     * the ordinary palette, so a debrief can read "the cost leader took 30 %" straight off the pie while the
+     * machine seats stay visibly a different family of colour.
+     */
+    public record Slice(String label, BigDecimal sold, BigDecimal sharePercent, boolean autoPlayer,
+                        String position) {
     }
 
     /** One product's pie for one round. `unserved` is demand the class could not supply. */
@@ -38,8 +45,13 @@ public final class MarketSharePie {
     }
 
     /** A company as the pie needs it: its label, its product lines, and whether it is a bot seat. */
-    public record Company(long teamId, String name, boolean autoPlayer,
+    public record Company(long teamId, String name, boolean autoPlayer, String position,
                           List<Map<String, Object>> lines) {
+
+        /** A company with no known position — every human seat, and a bot whose profile has since gone. */
+        public Company(long teamId, String name, boolean autoPlayer, List<Map<String, Object>> lines) {
+            this(teamId, name, autoPlayer, null, lines);
+        }
     }
 
     private MarketSharePie() {
@@ -92,7 +104,8 @@ public final class MarketSharePie {
                         continue;
                     }
                 }
-                slices.add(new Slice(company.name(), sold, percent(sold, served), company.autoPlayer()));
+                slices.add(new Slice(company.name(), sold, percent(sold, served), company.autoPlayer(),
+                        company.position()));
             }
             pies.add(new Pie(product, productNames.getOrDefault(product, product), served, slices,
                     unserved, percent(unserved, served)));

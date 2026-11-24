@@ -216,17 +216,21 @@ public class MapShareService {
         for (Map.Entry<Long, List<Map<String, Object>>> entry : round.linesByTeam().entrySet()) {
             String name = null;
             boolean auto = false;
+            String position = null;
             for (Map<String, Object> row : round.scoreboard()) {
                 if (String.valueOf(entry.getKey()).equals(String.valueOf(row.get("team_id")))) {
                     name = String.valueOf(row.get("company_name"));
                     auto = Boolean.TRUE.equals(row.get("auto_player"));
+                    Object cell = row.get("auto_strategy");
+                    position = cell == null ? null : String.valueOf(cell);
                     break;
                 }
             }
             if (name == null) {
                 name = "Company " + entry.getKey();
             }
-            companies.add(new MarketSharePie.Company(entry.getKey(), name, auto, entry.getValue()));
+            companies.add(new MarketSharePie.Company(entry.getKey(), name, auto, position,
+                    entry.getValue()));
             for (Map<String, Object> line : entry.getValue()) {
                 String product = String.valueOf(line.get("product"));
                 if (!products.contains(product)) {

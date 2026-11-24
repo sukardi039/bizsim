@@ -1943,3 +1943,30 @@ found by watching live after v0.36.2: the library stayed at **6 of 12**.
 
 `BotLibraryFillTest` starts from the state V55 leaves — one retired profile whose account survives, two active
 profiles with no account — and asserts twelve active positions, one row per key, and **twelve** bot accounts.
+
+
+**D139 — An auto player in the pie is coloured by the Porter position it plays.** Until now every bot seat was
+drawn in **one muted grey**, so with several bots on a pie they were indistinguishable from each other and the
+legend showed identical swatches. The ruling: colour by position, but keep the machine seats visibly a different
+*family* of colour so a reader can still tell a bot from a person.
+
+| Position | Hue |
+|---|---|
+| COST | `#3b82a0` |
+| DIFFERENTIATION | `#5b6fa8` |
+| COST_FOCUS | `#4a9d8f` |
+| DIFFERENTIATION_FOCUS | `#7d6aa8` |
+
+All four sit in a cool, desaturated band, deliberately outside the warm/strong trainee palette — so the debrief
+gains a teaching point (**this slice is the cost leader**) without losing the older signal (**this seat was
+machine-played**). A bot whose position is unknown — a profile removed after the run — keeps the neutral grey
+rather than inventing a hue for it.
+
+**How the position reaches the chart.** `scoreboard()` now selects the bot's `strategy` alongside `auto_player`,
+`MarketSharePie.Company` and `Slice` carry a nullable `position`, and both renderers (the browser's
+`MarketSharePies.tsx` and the shared page's `MarketShareDonut`) pick the colour from it. A convenience constructor
+keeps every existing caller that has no position.
+
+**Verified.** `MarketSharePieTest` gains two cases: two bots at different positions must differ, two bots at the
+same position must match (four occurrences — two slices, two swatches), a human seat keeps the ordinary palette,
+and a bot with no position falls back to grey. Suite **276 green**.

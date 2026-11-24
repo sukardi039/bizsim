@@ -33,7 +33,23 @@ const PALETTE = [
   "#0081a7", "#d62828", "#2a9d8f", "#e9c46a", "#8d99ae",
   "#c77dff", "#00b4d8", "#ff7b00", "#5f0f40", "#84a98c",
 ];
+/**
+ * D139: an auto player is coloured by **the Porter position it plays**, so a debrief can read which slice is the
+ * cost leader without consulting a table. The four hues sit in a cool, desaturated family — deliberately different
+ * in character from the warm/strong trainee palette — so the mark that a seat was machine-played survives, which
+ * was the earlier ruling this preserves. A bot whose position is unknown keeps the neutral grey.
+ */
+const AUTO_BY_POSITION: Record<string, string> = {
+  COST: "#3b82a0",
+  DIFFERENTIATION: "#5b6fa8",
+  COST_FOCUS: "#4a9d8f",
+  DIFFERENTIATION_FOCUS: "#7d6aa8",
+};
 const AUTO = "#6b7280";
+
+function autoColour(position?: string | null): string {
+  return (position && AUTO_BY_POSITION[position]) || AUTO;
+}
 /**
  * D123: the **base** of the pie — a full disc drawn under the slices. Slices sweep on the served market,
  * so a class that under-serves leaves a wedge nobody drew: without a base that wedge is page background
@@ -76,7 +92,7 @@ function SolidPie({ pie }: { pie: MarketPie }) {
   let cursor = -90;
   let colour = 0;
   const arcs = pie.slices.map((slice) => {
-    const mine = slice.autoPlayer ? AUTO : PALETTE[colour % PALETTE.length];
+    const mine = slice.autoPlayer ? autoColour(slice.position) : PALETTE[colour % PALETTE.length];
     colour += 1;
     const sweep = served > 0 ? (Number(slice.sold) / served) * 360 : 0;
     const path = sweep > 0 ? wedge(cursor, sweep, OUTER) : null;

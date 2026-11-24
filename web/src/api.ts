@@ -424,12 +424,16 @@ export interface TemplateProduct {
   trendAffinity: number;
 }
 
-/** D112: one slice of a product's market. `autoPlayer` only tints the colour — it is never a label. */
+/**
+ * D112: one slice of a product's market. `autoPlayer` only tints the colour — it is never a label.
+ * D139: `position` is the Porter cell a bot seat plays, used to pick its colour; null for a human seat.
+ */
 export interface MarketPieSlice {
   label: string;
   sold: number;
   sharePercent: number;
   autoPlayer: boolean;
+  position?: string | null;
 }
 
 /** D112: one product's pie. `unserved` is demand the class could not supply, shown as its own slice. */

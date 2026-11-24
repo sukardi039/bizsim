@@ -106,9 +106,9 @@ class MarketSharePieTest {
         // Owner's ruling: company name only. The slice must never carry the bot's persona, and the
         // legend must not mark it "(auto)" either — the class reads a company that traded.
         List<MarketSharePie.Company> companies = List.of(
-                new MarketSharePie.Company(1, "Company 1", false,
+                new MarketSharePie.Company(1, "Company 1", false, null,
                         List.of(line("P1", 400, 0, 400))),
-                new MarketSharePie.Company(2, "Company 2", true,
+                new MarketSharePie.Company(2, "Company 2", true, "COST",
                         List.of(line("P1", 600, 0, 600))));
 
         MarketSharePie.Pie pie = MarketSharePie.build(List.of("P1"), Map.of(),
@@ -194,4 +194,61 @@ class MarketSharePieTest {
         assertThat(html.indexOf("<circle cx=\"110\"")).as("base is drawn before the first wedge")
                 .isLessThan(html.indexOf("d=\"M110 110 L"));
     }
+
+    /**
+     * D139: a bot is coloured by the Porter position it plays, so a debrief can read which slice is the cost
+     * leader. The colour must come from the **position**, not from the slice's index — two bots at different
+     * positions must differ even when they sit next to each other, and the same position must look the same in
+     * two different pies. The four hues are deliberately outside the trainee palette, so a machine seat is still
+     * visibly a machine seat.
+     */
+    @Test
+    void an_auto_player_is_coloured_by_its_position() {
+        List<MarketSharePie.Company> companies = List.of(
+                //                          team  name          auto  position
+                new MarketSharePie.Company(1, "Alpha Ltd", true, "COST", List.of(line("P1", 250, 0, 250))),
+                new MarketSharePie.Company(2, "Bravo Ltd", true, "DIFFERENTIATION_FOCUS",
+                        List.of(line("P1", 250, 0, 250))),
+                new MarketSharePie.Company(3, "Charlie Ltd", false, null, List.of(line("P1", 250, 0, 250))),
+                new MarketSharePie.Company(4, "Delta Ltd", true, "COST", List.of(line("P1", 250, 0, 250))));
+
+        MarketSharePie.Pie pie = MarketSharePie.build(List.of("P1"), Map.of(),
+                Map.of("P1", BigDecimal.valueOf(1000)), companies).get(0);
+
+        assertThat(pie.slices()).extracting(MarketSharePie.Slice::position)
+                .containsExactly("COST", "DIFFERENTIATION_FOCUS", null, "COST");
+
+        String html = MarketShareDonut.render("en", pie, "Basic", "Demand the class could not serve", "—",
+                "share of market");
+        // The two COST bots share a hue; the differentiation-focus bot has another.
+        assertThat(html).as("cost leadership has its own hue").contains("#3b82a0");
+        assertThat(html).as("differentiation focus has its own hue").contains("#7d6aa8");
+        // Both COST bots share the hue: two slice fills plus two legend swatches, so four occurrences — the
+        // point is that the differentiation-focus bot did **not** get it, and that no per-index colour crept in.
+        int costOccurrences = html.split(java.util.regex.Pattern.quote("#3b82a0"), -1).length - 1;
+        assertThat(costOccurrences).as("cost leadership: two slices and two swatches").isEqualTo(4);
+        assertThat(html).as("the differentiation focus bot is a different colour")
+                .contains("#7d6aa8");
+        assertThat(html).as("no bot took a trainee palette hue")
+                .doesNotContain("#f2994a", "#27ae60", "#eb5757");
+        // A human seat keeps the ordinary palette (its own index within the slice order), and no position
+        // colour leaks onto it — the drawn hue must be one the bot family does not use.
+        assertThat(html).as("the trainee slice uses the ordinary palette, not a bot hue")
+                .contains("#f59e0b");
+    }
+
+    /** A bot whose position is unknown (profile removed since the run) keeps the neutral grey, not a made-up hue. */
+    @Test
+    void an_auto_player_with_no_known_position_stays_neutral() {
+        List<MarketSharePie.Company> companies = List.of(
+                new MarketSharePie.Company(1, "Ghost Ltd", true, null, List.of(line("P1", 500, 0, 500))));
+        MarketSharePie.Pie pie = MarketSharePie.build(List.of("P1"), Map.of(),
+                Map.of("P1", BigDecimal.valueOf(1000)), companies).get(0);
+        String html = MarketShareDonut.render("en", pie, "Basic", "Demand the class could not serve", "—",
+                "share of market");
+        assertThat(html).as("falls back to the muted grey").contains("#6b7280");
+    }
 }
+
+
+

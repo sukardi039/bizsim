@@ -634,6 +634,13 @@ public class RoundRepository {
                        exists (select 1 from player p
                                where p.run_id = r.run_id and p.team_id = rr.team_id
                                  and p.bot_profile_id is not null) as auto_player,
+                       -- D139: the position a bot seat plays, so the pie can colour it. Null for a human seat:
+                       -- the chart marks machine seats by colour, and a person has no position to name.
+                       (select bp.strategy from player p
+                          join bot_profile bp on bp.id = p.bot_profile_id
+                         where p.run_id = r.run_id and p.team_id = rr.team_id
+                           and p.bot_profile_id is not null
+                         limit 1) as auto_strategy,
                        (rr.score->>'profit')::numeric            as profit,
                        (rr.score->>'cumulativeProfit')::numeric  as cumulative_profit,
                        (rr.score->>'revenue')::numeric           as revenue,
