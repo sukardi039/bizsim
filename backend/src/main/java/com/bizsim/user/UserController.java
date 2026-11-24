@@ -222,7 +222,8 @@ public class UserController {
     private void setActive(long id, boolean active) {
         TenantContext.Principal me = requireStaff();
         if (!users.setActive(me.tenantId(), id, active)) {
-            throw ProblemException.notFound("user.not_found", "no such trainee in this tenant");
+            throw ProblemException.notFound("user.not_found",
+                    "no such trainee or auto worker in this tenant");
         }
     }
 

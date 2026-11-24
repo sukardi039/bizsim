@@ -452,4 +452,35 @@ class UserRoleApiTest extends PostgresTestBase {
                 // ...but the disabled person is still there, so an admin can re-enable them
                 .andExpect(jsonPath("$[?(@.email=='gone@acme.test')]").isNotEmpty());
     }
+
+    /**
+     * D142: an administrator can disable an auto worker. The old rule only touched {@code role = 'PLAYER'}, so a
+     * retired opponent could not be switched off through the console at all and stayed in every picker forever.
+     */
+    @Test
+    void an_admin_can_disable_an_auto_worker_and_it_leaves_the_roster() throws Exception {
+        long profile = jdbc.queryForObject("""
+                insert into bot_profile (tenant_id, key, name, strategy, level, personality, params, active)
+                values (?, 'cost-mid', 'Cost leader (mid)', 'COST', 'MID', 'BALANCED', '{}'::jsonb, true)
+                returning id
+                """, Long.class, acme);
+        long botId = jdbc.queryForObject("""
+                insert into app_user (tenant_id, email, display_name, role, password_hash, active,
+                                      bot_profile_id)
+                values (?, 'retired@bots.invalid', 'Retired', 'AUTO_WORKER', 'x', true, ?) returning id
+                """, Long.class, acme, profile);
+
+        mvc.perform(post("/api/users/" + botId + "/deactivate")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isNoContent());
+
+        org.assertj.core.api.Assertions
+                .assertThat(jdbc.queryForObject("select active from app_user where id = ?", Boolean.class, botId))
+                .as("the account is disabled").isFalse();
+
+        mvc.perform(get("/api/users").param("includeAssigned", "true")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.email=='retired@bots.invalid')]").isEmpty());
+    }
 }

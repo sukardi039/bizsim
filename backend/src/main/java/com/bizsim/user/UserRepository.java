@@ -101,9 +101,16 @@ public class UserRepository {
         return count == null ? 0 : count;
     }
 
+    /**
+     * Enable or disable an account. D142: an AUTO_WORKER is included — the old rule was {@code role = 'PLAYER'},
+     * so a retired opponent could not be switched off through the console at all, and the account stayed in every
+     * picker forever. Staff roles are still excluded: a facilitator or admin is disabled by an administrator
+     * changing their access deliberately, not by this trainee-shaped action.
+     */
     public boolean setActive(long tenantId, long id, boolean active) {
         int changed = jdbc.update(
-                "update app_user set active = ? where id = ? and tenant_id = ? and role = 'PLAYER'",
+                "update app_user set active = ? where id = ? and tenant_id = ? "
+                        + "and role in ('PLAYER', 'AUTO_WORKER')",
                 active, id, tenantId);
         return changed > 0;
     }
