@@ -1865,3 +1865,53 @@ capacity, which is nearer the cost variant. Recorded in the migration rather tha
 longer understands.
 
 Suite **269 green**.
+
+
+**D136 — A migration that moves rows must be proved against rows that need moving (incident, 24 Nov 2026).**
+V55 took the production site down for fifty minutes. The cause was an ordering mistake, and the reason it reached
+production was a verification habit that could never have caught it.
+
+**What happened.** V55 shipped Porter's four positions. It added the new four-value check constraint *before* the
+`update` that retires the three-value `FOCUS`, and it never dropped the old constraint at all, so even the correct
+order would have been rejected. On the live database:
+
+```
+ERROR: check constraint "bot_profile_strategy_check" of relation "bot_profile" is violated by some row
+```
+
+Flyway recorded `success = false` for version 55 and the application refused to boot. The api container
+restart-looped for fifty minutes; nginx answered 502 while the console stayed up on the new bundle.
+
+**Why no test caught it.** Every test database is created by running the migrations from empty. An empty
+`bot_profile` has no row on the retired value, so a constraint added too early passes. The migration could only
+fail on a database whose *data* looked like production — which is the one database no test used. "273 tests green"
+was true and irrelevant: none of them exercised the condition the migration existed to handle.
+
+**The correction.** V55 now orders its work so the data is legal before any rule judges it:
+
+1. widen `strategy` to `varchar(32)` (20 could not hold `DIFFERENTIATION_FOCUS`);
+2. **drop** the old three-value constraint — while it stands it rejects the update that retires `FOCUS`;
+3. map `FOCUS` → `COST_FOCUS`, state `personality = 'BALANCED'`, retire the old nine;
+4. **only then** add the four-value constraint.
+
+**The recovery, which no migration can perform.** Flyway runs `validate` *before* any migration, so a migration
+file cannot repair a failed predecessor — the app never gets far enough to run it. The repair is one statement,
+performed once against the live database:
+
+```sql
+delete from flyway_schema_history where version = '55' and success = false;
+```
+
+PostgreSQL rolled the failed V55 back completely (the schema was cleanly at V54), so removing the bookkeeping row
+is the whole repair. A V56 was written to do this automatically and **deleted**: it cannot work, and a migration
+that cannot work is worse than none, because it looks like a safety net.
+
+**What now guards it.** `MigrationDataRulesTest` (4 tests, all **red** when the broken ordering is restored and green
+on the fix) asserts the *data rules* rather than the schema: no profile plays a retired position, every profile
+states the retired-personality marker, the constraint accepts the four positions and refuses a fifth, and the
+column is wide enough for the longest position name. Restoring the old statement order fails all four.
+
+**The lesson, stated as a rule.** A migration is not verified by a passing suite or a clean boot on a fresh
+database. It is verified against a database holding **the rows the migration has to change**. Every earlier
+migration in this project that only added a table passed that test by accident — there were no rows to move. V55
+moved rows, and that is exactly where the habit failed.

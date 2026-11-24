@@ -181,7 +181,9 @@ class MapShareApiTest extends PostgresTestBase {
                 .as("a template is reachable, or the app must answer 503 rather than draw nothing")
                 .isTrue();
         PositionMapPage page = new PositionMapPage("");
-        assertThat(page.slots()).as("six slots, the largest class").isEqualTo(6);
+        // D119: the template is built from limits.json, so it carries one slot per seat at the ceiling
+        // (classSize.max = 30). It used to read 6 when the ceiling was 6.
+        assertThat(page.slots()).as("one slot per seat at the class-size ceiling").isEqualTo(30);
         assertThat(page.text(page.template(), "zh", "debrief.quadrantStuck")).isEqualTo("卡在中间");
         assertThat(page.text(page.template(), "en", "debrief.positionBrand")).isEqualTo("Brand index");
     }
