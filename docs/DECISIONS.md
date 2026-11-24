@@ -1701,3 +1701,54 @@ schema rather than a remembered one.
 in the row; `standard-v1` and `preset-cost-v1` both refuse with `template.read_only` and stay listed; a template a
 package pins refuses with `template.in_use` and stays live. The builder shows **Remove** only on tenant-owned
 rows, behind a confirmation that says simulations keep their own record. Suite **264 green**.
+
+
+**D132 — Money has one owner, and the differentiator stops bleeding (owner's rulings, 23 Nov 2026).** Two items
+from the open list: *"Cost: how can we improve?"* and *"Money Formatting: we should streamlined it."* Focus was
+left as it is, and so were the persisted personality column and the thirty-company page.
+
+**1. One money formatter.** There were three:
+
+| Where | Was | Defect |
+|---|---|---|
+| `App.tsx` | `new Intl.NumberFormat("en-US", …)` | **hard-coded English** — a Chinese class saw English separators on the leaderboard while every other screen was localised |
+| `SessionTools.tsx` | `value.toLocaleString(undefined, …)` | followed the **browser**, not the class, and showed **two decimals** where every other screen showed whole units |
+| `i18n.tsx` | `money()` | correct — the class locale, whole units |
+
+Both strays are gone; every amount now goes through `useI18n().money`, which is documented as *the* way to render
+money. `grep` for `Intl.NumberFormat` or `toLocaleString` outside `i18n.tsx` now returns nothing.
+
+**2. The cost strategy — the measurement inverted the question.** The owner asked how to improve COST. A new
+calibration (`StrategyCalibrationTest`) plays two companies per strategy at the same level against each other for
+a full run and prints what each commits in month one. The first measurement:
+
+```
+HIGH  COST    +7.3m/round   DIFFERENTIATION  -42.1m/round   FOCUS  +48.2m/round
+MID   COST   +24.7m/round   DIFFERENTIATION  -23.9m/round   FOCUS  +69.0m/round
+```
+
+**COST was not the weak strategy — differentiation was, at every level**, spending **120m a month on quality**
+(two points) against **2.5m of marketing** and a **6% premium**. That is 48× its marketing budget on a mechanic
+whose payback is a price premium it never earns back. Two defects, both fixed:
+
+- **The premium was bought on the wrong product.** The policy always upgraded `carries.get(0)` — usually P1, the
+  cheap mass product — while the differentiator's price rise sat on the whole line. It now upgrades the product
+  carrying the premium (highest base price).
+- **The spend was never rationed against revenue.** Two points a month at 60m each is unaffordable at any level.
+  A differentiator now buys **one** point a month: quality still compounds, but inside the margin the strategy can
+  defend.
+
+Result: **HIGH +16.5m/round, MID +35.3m/round** — profitable instead of loss-making, with quality still rising
+every month.
+
+**What this leaves, stated plainly.** FOCUS (≈+51m and +69m per round) still out-earns both, because it is the only
+strategy that spends nothing on quality or capacity and simply sells to the class it targets. That is a real
+finding, not a measurement error: **doing less is currently the most profitable play in this template.** The dial
+is the quality cost per point (60m) or the price elasticity of quality in the scoring engine — both are economic
+questions for the owner, not preferences for me to set. The owner asked about COST; the honest answer is that the
+weakest strategy was a different one, and that the strongest is now "spend nothing", which is worth a decision.
+
+**Verified.** Suite **265 green**. `StrategyCalibrationTest` asserts only that no strategy is hopeless (within a
+factor of three of the best) at HIGH and MID — the ranking is reported, not gated, because it is information
+rather than a contract. The money change is covered by `tsc` and the build; no test can assert a locale bug that
+was only visible by rendering both.

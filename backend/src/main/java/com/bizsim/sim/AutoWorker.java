@@ -362,13 +362,21 @@ public final class AutoWorker {
         BigDecimal qualitySpend = BigDecimal.ZERO;
         if (profile.buysQuality() && scenario.params().qualityUpgrade()
                 && comfortable(context, scenario, profile) && !carries.isEmpty()) {
-            Scenario.ProductSpec first = carries.get(0);
-            // D128: a differentiator buys more than one point where it can afford to; a cost leader buys the
-            // cheapest defensible amount (it is the level's call how much of the line it protects).
-            int points = profile.qualityAppetite().compareTo(new BigDecimal("1.30")) >= 0 ? 2 : 1;
-            qualitySpend = scenario.params().qualityCostPerPoint()
-                    .multiply(BigDecimal.valueOf(points));
-            quality.add(new DecisionPayload.QualityRow(first.code(), qualitySpend));
+            // D132: quality is bought for the product the strategy actually sells, not always the first one in
+            // the catalogue. A differentiator whose premium sits on P2 was upgrading P1, so the money bought a
+            // better product than the one carrying the price rise — and the calibration showed it losing money
+            // at every level while the cheaper strategies prospered.
+            // D132: the spend must be rationed by what the company actually earns. Two quality points on one
+            // product cost 120m a month against ~2.5m of marketing and a 6% premium — 48x the marketing budget,
+            // which no premium can recover. A differentiator buys **one** point a month on the product carrying
+            // its price, which builds quality steadily and stays inside the margin the strategy can defend.
+            int points = 1;
+            for (String code : qualityTargets(scenario, carries, profile)) {
+                BigDecimal spend = scenario.params().qualityCostPerPoint()
+                        .multiply(BigDecimal.valueOf(points));
+                qualitySpend = qualitySpend.add(spend);
+                quality.add(new DecisionPayload.QualityRow(code, spend));
+            }
         }
 
         boolean review = profile.buysMarketReview() && comfortable(context, scenario, profile);
@@ -522,6 +530,41 @@ public final class AutoWorker {
             }
         }
         return classes;
+    }
+
+    /**
+     * D132: which products the quality money goes to.
+     *
+     * <p>A focused company upgrades the product aimed at its class. A differentiator upgrades the products it
+     * charges a premium on — the whole line is not affordable, so it buys depth where the price is defensible
+     * rather than always upgrading the first product in the catalogue. A cost leader, if it buys at all, upgrades
+     * the cheapest product, because its strategy is winning on price rather than on product.
+     */
+    private static List<String> qualityTargets(Scenario scenario, List<Scenario.ProductSpec> carries,
+                                               Profile profile) {
+        if (carries.isEmpty()) {
+            return List.of();
+        }
+        if (profile.focused()) {
+            List<String> own = ownClasses(scenario, carries);
+            for (Scenario.ProductSpec spec : carries) {
+                if (spec.targetSegment() != null && own.contains(spec.targetSegment())) {
+                    return List.of(spec.code());
+                }
+            }
+        }
+        if ("DIFFERENTIATION".equals(profile.strategy())) {
+            // The product with the highest base price: that is where a premium is defensible.
+            Scenario.ProductSpec premium = carries.get(0);
+            for (Scenario.ProductSpec spec : carries) {
+                if (spec.basePrice() != null && premium.basePrice() != null
+                        && spec.basePrice().compareTo(premium.basePrice()) > 0) {
+                    premium = spec;
+                }
+            }
+            return List.of(premium.code());
+        }
+        return List.of(carries.get(0).code());
     }
 
     /**

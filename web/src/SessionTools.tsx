@@ -19,7 +19,7 @@ export default function SessionTools({
   onChanged: () => void;
   refreshKey: number;
 }) {
-  const { t } = useI18n();
+  const { t, money } = useI18n();
   const [left, setLeft] = useState(run.clockRemainingSeconds ?? -1);
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
   const [audit, setAudit] = useState<AuditRow[]>([]);
@@ -328,7 +328,7 @@ export default function SessionTools({
                   <td className="num">{row.round ?? "—"}</td>
                   <td>{t(`tools.action.${row.action}`)}</td>
                   <td>{row.companyName ?? "—"}</td>
-                  <td className="num">{row.amount == null ? "—" : moneyText(row.amount)}</td>
+                  <td className="num">{row.amount == null ? "—" : money(row.amount)}</td>
                   <td>{row.reason ?? "—"}</td>
                   <td>{row.actor}</td>
                   <td>{new Date(row.at).toLocaleTimeString()}</td>
@@ -349,6 +349,3 @@ function clockText(seconds: number): string {
   return `${minutes}:${String(rest).padStart(2, "0")}`;
 }
 
-function moneyText(value: number): string {
-  return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}

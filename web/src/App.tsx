@@ -25,9 +25,6 @@ import {
 
 /* ------------------------------------------------------------------ helpers */
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
-
 function errorText(error: unknown, t: (key: string, params?: Record<string, string | number>) => string): string {
   return describeError(error, t);
 }
@@ -144,7 +141,7 @@ function Login({ onDone }: { onDone: () => void }) {
 /* ------------------------------------------------------------------ console */
 
 export default function App() {
-  const { t, adopt, locale, setLocale } = useI18n();
+  const { t, adopt, locale, setLocale, money } = useI18n();
   const [signedIn, setSignedIn] = useState(Boolean(getToken()));
   // Who is signed in decides the screen: a trainee gets the decision form, everything else gets the
   // facilitator console. The role comes from the token, never from the client.

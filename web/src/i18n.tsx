@@ -1722,6 +1722,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return {
       locale,
       t,
+      /**
+       * D132: **the** way to render money. Whole units, class locale — not `toLocaleString()` (which follows the
+       * browser, not the class) and not a hard-coded `"en-US"` (which showed English separators in a Chinese
+       * class). Every screen that shows an amount goes through this; `NumberInput` and `number()` are for
+       * quantities and decimals, not money.
+       */
       money: (v: number) => new Intl.NumberFormat(localeTag, { maximumFractionDigits: 0 }).format(v),
       number: (v: number, decimals = 2) =>
         new Intl.NumberFormat(localeTag, { maximumFractionDigits: decimals }).format(v),
