@@ -221,16 +221,16 @@ class MarketSharePieTest {
         String html = MarketShareDonut.render("en", pie, "Basic", "Demand the class could not serve", "—",
                 "share of market");
         // The two COST bots share a hue; the differentiation-focus bot has another.
-        assertThat(html).as("cost leadership has its own hue").contains("#2f7d99");
-        assertThat(html).as("differentiation focus has its own hue").contains("#7b4fa8");
+        assertThat(html).as("cost leadership has its own hue").contains("#1f5f78");
+        assertThat(html).as("differentiation focus has its own hue").contains("#5b367d");
         // D141: two COST bots now take the two shades of the cost hue — so the dark shade appears for one slice
         // and its swatch (2), and the light shade for the other (2).
-        int darkCost = html.split(java.util.regex.Pattern.quote("#2f7d99"), -1).length - 1;
-        int lightCost = html.split(java.util.regex.Pattern.quote("#7fb4c9"), -1).length - 1;
+        int darkCost = html.split(java.util.regex.Pattern.quote("#1f5f78"), -1).length - 1;
+        int lightCost = html.split(java.util.regex.Pattern.quote("#4f9cbb"), -1).length - 1;
         assertThat(darkCost).as("one cost bot in the dark shade").isEqualTo(2);
         assertThat(lightCost).as("the other cost bot in the light shade").isEqualTo(2);
         assertThat(html).as("the differentiation focus bot is a different colour")
-                .contains("#7b4fa8");
+                .contains("#5b367d");
         assertThat(html).as("no bot took a trainee palette hue")
                 .doesNotContain("#f2994a", "#27ae60", "#eb5757");
         // A human seat keeps the ordinary palette (its own index within the slice order), and no position
@@ -277,12 +277,38 @@ class MarketSharePieTest {
                 "share of market");
 
         // The two differentiation-focus bots take the two shades of the violet hue, not the same one.
-        assertThat(html).as("first differentiation-focus bot").contains("#7b4fa8");
-        assertThat(html).as("second differentiation-focus bot takes the lighter shade").contains("#b597d1");
+        assertThat(html).as("first differentiation-focus bot").contains("#5b367d");
+        assertThat(html).as("second differentiation-focus bot takes the lighter shade").contains("#7b4fa8");
         // Cost has its own, clearly different hue.
-        assertThat(html).as("cost leadership is a separate hue").contains("#2f7d99");
+        assertThat(html).as("cost leadership is a separate hue").contains("#1f5f78");
         // No two bots share a colour.
-        assertThat(html.split(java.util.regex.Pattern.quote("#7b4fa8"), -1).length - 1)
+        assertThat(html.split(java.util.regex.Pattern.quote("#5b367d"), -1).length - 1)
                 .as("the dark violet appears for one slice and its swatch only").isEqualTo(2);
+    }
+
+    /**
+     * D142: **three** shades per position. With two, a third company at the same position was drawn exactly like
+     * the first — the same defect the owner reported at two bots, one company further along. A class may seat many
+     * opponents, so the ladder has to be longer than the common case.
+     */
+    @Test
+    void three_bots_at_the_same_position_all_get_different_shades() {
+        java.util.List<MarketSharePie.Company> companies = java.util.List.of(
+                new MarketSharePie.Company(10, "Alpha Ltd", true, "COST_FOCUS",
+                        java.util.List.of(line("P1", 200, 0, 200))),
+                new MarketSharePie.Company(11, "Bravo Ltd", true, "COST_FOCUS",
+                        java.util.List.of(line("P1", 200, 0, 200))),
+                new MarketSharePie.Company(12, "Cedar Ltd", true, "COST_FOCUS",
+                        java.util.List.of(line("P1", 200, 0, 200))));
+
+        MarketSharePie.Pie pie = MarketSharePie.build(java.util.List.of("P1"), java.util.Map.of(),
+                java.util.Map.of("P1", BigDecimal.valueOf(1000)), companies).get(0);
+        String html = MarketShareDonut.render("en", pie, "Basic",
+                "Demand the class could not serve", "\u2014", "share of market");
+
+        // One dark, one mid, one light — three distinct olive shades, and no two companies share one.
+        assertThat(html).as("first cost-focus bot").contains("#4a6b35");
+        assertThat(html).as("second cost-focus bot").contains("#6a994e");
+        assertThat(html).as("third cost-focus bot").contains("#bcd8a4");
     }
 }

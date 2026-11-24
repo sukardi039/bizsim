@@ -145,13 +145,20 @@ public class UserRepository {
      * filtered -- they are not seated anywhere and the list would become useless.
      */
     public List<AppUser> findAllInTenant(long tenantId, boolean includeAssigned) {
+        // D142: a DISABLED auto worker is hidden. When the library was reduced from nine profiles to twelve and
+        // back again, the retired bots' accounts stayed active and cluttered every people picker, even though
+        // none of them can be seated. A disabled *person* is still listed on purpose — an administrator has to be
+        // able to find the account to re-enable it, and hiding people from their own roster would be a way to
+        // lose them. Only the machine seats are hidden.
+        String hideDisabledBots = "and not (role = 'AUTO_WORKER' and not active)";
         if (includeAssigned) {
-            return jdbc.query("select * from app_user where tenant_id = ? order by role, email",
-                    MAPPER, tenantId);
+            return jdbc.query("select * from app_user where tenant_id = ? " + hideDisabledBots
+                    + " order by role, email", MAPPER, tenantId);
         }
         return jdbc.query("""
                 select u.* from app_user u
                 where u.tenant_id = ?
+                  and not (u.role = 'AUTO_WORKER' and not u.active)
                   and (u.role <> 'PLAYER' or not (
                         exists (select 1 from simulation_package_seat s where s.user_id = u.id)
                      or exists (select 1 from player p where p.user_id = u.id)))

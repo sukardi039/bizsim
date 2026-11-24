@@ -425,4 +425,31 @@ class UserRoleApiTest extends PostgresTestBase {
                 .andReturn();
         return json.readTree(result.getResponse().getContentAsString()).get("token").asText();
     }
+
+    /**
+     * D142: a **disabled auto worker** is hidden from the people list.
+     *
+     * <p>The retired personality-era bots left accounts behind that could not be seated but still appeared in every
+     * picker. A disabled *person* stays listed on purpose: an administrator has to be able to find the account to
+     * re-enable it, and hiding people from their own roster would be a way to lose them.
+     */
+    @Test
+    void a_disabled_auto_worker_is_hidden_but_a_disabled_person_is_not() throws Exception {
+        jdbc.update("""
+                insert into app_user (tenant_id, email, display_name, role, password_hash, active)
+                values (?, 'retired-bot@bots.invalid', 'Retired bot', 'AUTO_WORKER', 'x', false)
+                """, acme);
+        jdbc.update("""
+                insert into app_user (tenant_id, email, display_name, role, password_hash, active)
+                values (?, 'gone@acme.test', 'Gone Person', 'PLAYER', 'x', false)
+                """, acme);
+
+        mvc.perform(get("/api/users").param("includeAssigned", "true")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                // the disabled machine seat is gone...
+                .andExpect(jsonPath("$[?(@.email=='retired-bot@bots.invalid')]").isEmpty())
+                // ...but the disabled person is still there, so an admin can re-enable them
+                .andExpect(jsonPath("$[?(@.email=='gone@acme.test')]").isNotEmpty());
+    }
 }

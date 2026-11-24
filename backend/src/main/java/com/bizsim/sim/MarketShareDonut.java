@@ -182,17 +182,22 @@ public final class MarketShareDonut {
      * <p>The four hues are now properly separated (teal / coral / olive / violet), which also reads better on a
      * projector. {@code shade} is the company's index among the bots of that position, assigned from the team id so
      * a company keeps its shade in every product and round rather than changing colour with slice order.
+     *
+     * <p>D142: **three** shades per position, not two. With two, a third company at the same position would have
+     * been drawn exactly like the first — the same defect the owner reported at two bots, one company further
+     * along. A class may seat many opponents, so the ladder has to be longer than the common case. Past the third
+     * the shades cycle, which is a known limit rather than a claim of unlimited colours.
      */
     private static String autoColour(String position, int shade) {
         if (position == null) {
             return MUTED;
         }
         String[] shades = switch (position) {
-            case "COST" -> new String[] {"#2f7d99", "#7fb4c9"};
-            case "DIFFERENTIATION" -> new String[] {"#d4703f", "#efae8a"};
-            case "COST_FOCUS" -> new String[] {"#6a994e", "#a9c98a"};
-            case "DIFFERENTIATION_FOCUS" -> new String[] {"#7b4fa8", "#b597d1"};
-            default -> new String[] {MUTED, MUTED};
+            case "COST" -> new String[] {"#1f5f78", "#4f9cbb", "#a8cfe0"};
+            case "DIFFERENTIATION" -> new String[] {"#a34f24", "#d4703f", "#f3c6ab"};
+            case "COST_FOCUS" -> new String[] {"#4a6b35", "#6a994e", "#bcd8a4"};
+            case "DIFFERENTIATION_FOCUS" -> new String[] {"#5b367d", "#7b4fa8", "#c7b0dd"};
+            default -> new String[] {MUTED, MUTED, MUTED};
         };
         return shades[Math.floorMod(shade, shades.length)];
     }

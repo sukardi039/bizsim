@@ -39,11 +39,17 @@ const PALETTE = [
  * in character from the warm/strong trainee palette — so the mark that a seat was machine-played survives, which
  * was the earlier ruling this preserves. A bot whose position is unknown keeps the neutral grey.
  */
-const AUTO_SHADES: Record<string, [string, string]> = {
-  COST: ["#2f7d99", "#7fb4c9"],
-  DIFFERENTIATION: ["#d4703f", "#efae8a"],
-  COST_FOCUS: ["#6a994e", "#a9c98a"],
-  DIFFERENTIATION_FOCUS: ["#7b4fa8", "#b597d1"],
+/**
+ * D142: three shades per position. Two was not enough — a third company at the same position would have been
+ * drawn exactly like the first, which is the defect the owner reported at two companies, one seat further along.
+ * A class may seat many opponents, so the ladder has to be longer than the common case. Past the third the shades
+ * cycle, which is a known limit rather than a claim of unlimited colours.
+ */
+const AUTO_SHADES: Record<string, string[]> = {
+  COST: ["#1f5f78", "#4f9cbb", "#a8cfe0"],
+  DIFFERENTIATION: ["#a34f24", "#d4703f", "#f3c6ab"],
+  COST_FOCUS: ["#4a6b35", "#6a994e", "#bcd8a4"],
+  DIFFERENTIATION_FOCUS: ["#5b367d", "#7b4fa8", "#c7b0dd"],
 };
 const AUTO = "#6b7280";
 

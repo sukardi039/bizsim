@@ -2010,3 +2010,22 @@ another tenant. Suite **282 green**.
 
 **Also touched.** Nine test cleanup helpers deleted `app_user` without first removing packages; the new foreign key
 correctly refused. They now clear packages (and the frozen template copies pointing at them) first.
+
+
+**D142 — Three shades per position, and a disabled bot is not a person.** Two follow-ups the owner asked for after
+D141 shipped.
+
+**Three shades, not two.** D141 gave each Porter position a dark and a light shade. That fixed two companies at one
+position but left the same defect one seat along: a **third** company at that position would have been drawn
+exactly like the first. A class may seat many opponents, so the ladder is now three — dark, mid, light — per hue:
+COST `#1f5f78 / #4f9cbb / #a8cfe0`; DIFFERENTIATION `#a34f24 / #d4703f / #f3c6ab`; COST_FOCUS `#4a6b35 / #6a994e /
+#bcd8a4`; DIFFERENTIATION_FOCUS `#5b367d / #7b4fa8 / #c7b0dd`. Past the third the shades cycle, which is a stated
+limit rather than a claim of unlimited colours.
+
+**A disabled auto worker is hidden from the people list.** The personality-era bots left twelve accounts behind that
+could not be seated but still appeared in every picker. They are now filtered out. A disabled **person** is still
+listed, deliberately: an administrator has to be able to find an account to re-enable it, and hiding people from
+their own roster would be a way to lose them. Only the machine seats are hidden — the rule is
+`not (role = 'AUTO_WORKER' and not active)`, never "hide the inactive".
+
+Suite **285 green**.
