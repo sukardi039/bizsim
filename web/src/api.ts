@@ -434,6 +434,8 @@ export interface MarketPieSlice {
   sharePercent: number;
   autoPlayer: boolean;
   position?: string | null;
+  /** D141: the company's team id, so two bots at one position can be told apart by shade. */
+  teamId?: number;
 }
 
 /** D112: one product's pie. `unserved` is demand the class could not supply, shown as its own slice. */

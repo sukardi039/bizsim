@@ -77,6 +77,15 @@ public final class MarketShareDonut {
         //    not supply is a real gap in the circle rather than a label contradicting a closed ring.
         //    Drawing it on `totalSold` (as this did) always sums to 100 % and hides the gap the legend
         //    reports — reported 20 Nov 2026: P1 showed a full ring beside "24.9 % unserved".
+        // D141: two bots may play the same position, so the company's rank among its peers decides the shade.
+        // Built from ascending team ids so the assignment is stable across products and rounds.
+        java.util.Map<String, java.util.List<Long>> peersByPosition = new java.util.HashMap<>();
+        pie.slices().stream()
+                .filter(s -> s.autoPlayer() && s.position() != null)
+                .sorted(java.util.Comparator.comparingLong(MarketSharePie.Slice::teamId))
+                .forEach(s -> peersByPosition.computeIfAbsent(s.position(),
+                        k -> new java.util.ArrayList<>()).add(s.teamId()));
+
         double start = -90;
         int colour = 0;
         for (MarketSharePie.Slice slice : pie.slices()) {
@@ -89,7 +98,10 @@ public final class MarketShareDonut {
             double sweep = share * 3.6;
             if (sweep > 0) {
                 out.append(wedge(start, sweep, OUTER,
-                        slice.autoPlayer() ? autoColour(slice.position()) : PALETTE[colour % PALETTE.length],
+                        slice.autoPlayer()
+                                ? autoColour(slice.position(),
+                                        shadeOf(peersByPosition, slice.position(), slice.teamId()))
+                                : PALETTE[colour % PALETTE.length],
                         sweep));
                 start += sweep;
             }
@@ -107,7 +119,10 @@ public final class MarketShareDonut {
         colour = 0;
         for (MarketSharePie.Slice slice : pie.slices()) {
             out.append("<tr><td><span class=\"swatch\" style=\"background:")
-                    .append(slice.autoPlayer() ? autoColour(slice.position()) : PALETTE[colour % PALETTE.length])
+                    .append(slice.autoPlayer()
+                            ? autoColour(slice.position(),
+                                    shadeOf(peersByPosition, slice.position(), slice.teamId()))
+                            : PALETTE[colour % PALETTE.length])
                     .append("\"></span></td><td>").append(esc(slice.label()));
             // The auto player is shown by **company name only** (owner's ruling, 21 Nov 2026). No
             // "(auto)" tag and no persona: the class reads a company that traded, which is what the
@@ -156,23 +171,37 @@ public final class MarketShareDonut {
 
     /** Auto players get a grey pair so they read as "not a human team" at a glance. */
     /**
-     * D139: an auto player is coloured by the Porter position it plays, so a debrief can read which slice is the
-     * cost leader. The four hues stay in a **cool, desaturated family** — visibly different in character from the
-     * warm/strong trainee palette — so a reader can still tell a machine seat from a person at a glance, which was
-     * the earlier ruling this preserves. A bot with no known position (a profile removed after the run) keeps the
-     * neutral grey rather than inventing a colour for it.
+     * D141: an auto player is coloured by the Porter position it plays, and two companies at the **same** position
+     * are told apart by shade.
+     *
+     * <p>D139 put all four positions in one cool, desaturated band to keep machine seats visually distinct from
+     * trainees — and the result was that the four were hard to tell from *each other*, with differentiation and
+     * differentiation-focus nearly identical. Worse, two bots at the same position were drawn identically. The
+     * owner's ruling: position sets the hue, and a second company at that position takes a lighter shade of it.
+     *
+     * <p>The four hues are now properly separated (teal / coral / olive / violet), which also reads better on a
+     * projector. {@code shade} is the company's index among the bots of that position, assigned from the team id so
+     * a company keeps its shade in every product and round rather than changing colour with slice order.
      */
-    private static String autoColour(String position) {
+    private static String autoColour(String position, int shade) {
         if (position == null) {
             return MUTED;
         }
-        return switch (position) {
-            case "COST" -> "#3b82a0";
-            case "DIFFERENTIATION" -> "#5b6fa8";
-            case "COST_FOCUS" -> "#4a9d8f";
-            case "DIFFERENTIATION_FOCUS" -> "#7d6aa8";
-            default -> MUTED;
+        String[] shades = switch (position) {
+            case "COST" -> new String[] {"#2f7d99", "#7fb4c9"};
+            case "DIFFERENTIATION" -> new String[] {"#d4703f", "#efae8a"};
+            case "COST_FOCUS" -> new String[] {"#6a994e", "#a9c98a"};
+            case "DIFFERENTIATION_FOCUS" -> new String[] {"#7b4fa8", "#b597d1"};
+            default -> new String[] {MUTED, MUTED};
         };
+        return shades[Math.floorMod(shade, shades.length)];
+    }
+
+    /** Which shade this company takes: its rank among the bots of the same position, by team id. */
+    private static int shadeOf(java.util.Map<String, java.util.List<Long>> byPosition, String position,
+                               long teamId) {
+        java.util.List<Long> peers = byPosition.getOrDefault(position, java.util.List.of());
+        return Math.max(0, peers.indexOf(teamId));
     }
 
     private static String n(double value) {

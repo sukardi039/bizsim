@@ -11,7 +11,7 @@
  * colour tells the facilitator a seat was machine-played; the label tells the class nothing about it.
  */
 import { useI18n } from "./i18n";
-import type { MarketPie } from "./api";
+import type { MarketPie, MarketPieSlice } from "./api";
 
 const SIZE = 190;
 const OUTER = 88;
@@ -39,16 +39,45 @@ const PALETTE = [
  * in character from the warm/strong trainee palette — so the mark that a seat was machine-played survives, which
  * was the earlier ruling this preserves. A bot whose position is unknown keeps the neutral grey.
  */
-const AUTO_BY_POSITION: Record<string, string> = {
-  COST: "#3b82a0",
-  DIFFERENTIATION: "#5b6fa8",
-  COST_FOCUS: "#4a9d8f",
-  DIFFERENTIATION_FOCUS: "#7d6aa8",
+const AUTO_SHADES: Record<string, [string, string]> = {
+  COST: ["#2f7d99", "#7fb4c9"],
+  DIFFERENTIATION: ["#d4703f", "#efae8a"],
+  COST_FOCUS: ["#6a994e", "#a9c98a"],
+  DIFFERENTIATION_FOCUS: ["#7b4fa8", "#b597d1"],
 };
 const AUTO = "#6b7280";
 
-function autoColour(position?: string | null): string {
-  return (position && AUTO_BY_POSITION[position]) || AUTO;
+/**
+ * D141: position sets the hue; two companies at the same position are told apart by shade.
+ *
+ * <p>D139 gave all four positions one cool band, and they became indistinguishable from each other — with
+ * differentiation and differentiation-focus nearly identical, and two bots at the same position drawn in exactly
+ * the same colour. The four hues are now properly separated, and `shade` is the company's rank among the bots of
+ * that position (by team id), so a company keeps its shade in every product and round.
+ */
+function autoColour(position: string | null | undefined, shade: number): string {
+  const shades = position ? AUTO_SHADES[position] : undefined;
+  if (!shades) return AUTO;
+  return shades[Math.abs(shade) % shades.length];
+}
+
+/**
+ * The shade index for every bot seat in a pie: its rank among the bots of the same position, taken in ascending
+ * team-id order so a company keeps the same shade in every product and round.
+ */
+function shadesByTeam(slices: MarketPieSlice[]): Record<string, number> {
+  const rank: Record<string, number> = {};
+  const seen: Record<string, number> = {};
+  slices
+    .filter((slice) => slice.autoPlayer && slice.position)
+    .slice()
+    .sort((a, b) => (a.teamId ?? 0) - (b.teamId ?? 0))
+    .forEach((slice) => {
+      const position = slice.position as string;
+      rank[String(slice.teamId)] = seen[position] ?? 0;
+      seen[position] = (seen[position] ?? 0) + 1;
+    });
+  return rank;
 }
 /**
  * D123: the **base** of the pie — a full disc drawn under the slices. Slices sweep on the served market,
@@ -91,8 +120,11 @@ function SolidPie({ pie }: { pie: MarketPie }) {
   const served = Number(pie.servedMarket) || 0;
   let cursor = -90;
   let colour = 0;
+  const shadeIndex = shadesByTeam(pie.slices);
   const arcs = pie.slices.map((slice) => {
-    const mine = slice.autoPlayer ? autoColour(slice.position) : PALETTE[colour % PALETTE.length];
+    const mine = slice.autoPlayer
+      ? autoColour(slice.position, shadeIndex[String(slice.teamId)] ?? 0)
+      : PALETTE[colour % PALETTE.length];
     colour += 1;
     const sweep = served > 0 ? (Number(slice.sold) / served) * 360 : 0;
     const path = sweep > 0 ? wedge(cursor, sweep, OUTER) : null;

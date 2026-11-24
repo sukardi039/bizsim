@@ -36,7 +36,13 @@ public final class MarketSharePie {
      * machine seats stay visibly a different family of colour.
      */
     public record Slice(String label, BigDecimal sold, BigDecimal sharePercent, boolean autoPlayer,
-                        String position) {
+                        String position,
+                        /**
+                         * D141: the company's team id. Two bots can play the same position, so the position alone
+                         * cannot colour them apart — the id makes the shade deterministic per company instead of
+                         * per slice order, so a company keeps its shade across products and rounds.
+                         */
+                        long teamId) {
     }
 
     /** One product's pie for one round. `unserved` is demand the class could not supply. */
@@ -105,7 +111,7 @@ public final class MarketSharePie {
                     }
                 }
                 slices.add(new Slice(company.name(), sold, percent(sold, served), company.autoPlayer(),
-                        company.position()));
+                        company.position(), company.teamId()));
             }
             pies.add(new Pie(product, productNames.getOrDefault(product, product), served, slices,
                     unserved, percent(unserved, served)));
